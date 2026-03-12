@@ -1,7 +1,50 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { Platform } from "react-native";
 
 // AsyncStorage is React Native’s simple, promise-based API for persisting small bits of data on a user’s device. Think of it as the mobile-app equivalent of the browser’s localStorage, but asynchronous and cross-platform.
+
+// In-memory fallback for cases where neither localStorage nor AsyncStorage are available
+const memoryStorage: Record<string, string> = {};
+
+// Safe storage helper to handle cases where AsyncStorage native module might be null (e.g., Web, New Architecture issues)
+const safeStorage = {
+  getItem: async (key: string) => {
+    try {
+      if (Platform.OS === "web") {
+        return typeof localStorage !== "undefined" ? localStorage.getItem(key) : memoryStorage[key];
+      }
+      
+      // Check if AsyncStorage is available and not null before calling
+      if (AsyncStorage && typeof AsyncStorage.getItem === "function") {
+        return await AsyncStorage.getItem(key);
+      }
+      return memoryStorage[key] || null;
+    } catch (error) {
+      // Use console.warn instead of error to avoid alarming logs for expected environment limitations
+      console.warn("AsyncStorage getItem failed, falling back to memory:", error);
+      return memoryStorage[key] || null;
+    }
+  },
+  setItem: async (key: string, value: string) => {
+    try {
+      memoryStorage[key] = value; // Always update memory as a mirror
+
+      if (Platform.OS === "web") {
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem(key, value);
+        }
+        return;
+      }
+      
+      if (AsyncStorage && typeof AsyncStorage.setItem === "function") {
+        await AsyncStorage.setItem(key, value);
+      }
+    } catch (error) {
+      console.warn("AsyncStorage setItem failed, using memory instead:", error);
+    }
+  },
+};
 
 export interface ColorScheme {
   bg: string;
@@ -100,7 +143,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }): React.JSX.
 
   useEffect(() => {
     // get the user's choice
-    AsyncStorage.getItem("darkMode").then((value) => {
+    safeStorage.getItem("darkMode").then((value) => {
       if (value) setIsDarkMode(JSON.parse(value));
     });
   }, []);
@@ -108,7 +151,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }): React.JSX.
   const toggleDarkMode = async () => {
     const newMode = !isDarkMode;
     setIsDarkMode(newMode);
-    await AsyncStorage.setItem("darkMode", JSON.stringify(newMode));
+    await safeStorage.setItem("darkMode", JSON.stringify(newMode));
   };
 
   const colors = isDarkMode ? darkColors : lightColors;
