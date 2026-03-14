@@ -9,24 +9,85 @@ export const get = query({
 });
 
 export const addTodo = mutation({
-  args: { text: v.string() },
+  args: { 
+    text: v.string(),
+    timerDuration: v.optional(v.number()),
+    status: v.optional(v.string()),
+    timerStartTime: v.optional(v.number()),
+    dueDate: v.optional(v.number()),
+    projectId: v.optional(v.string()),
+  },
   handler: async (ctx, args) => {
     const todoId = await ctx.db.insert("todos", {
       text: args.text,
-      isCompleted: false
+      status: args.status || "not_started",
+      ...(args.timerDuration && { timerDuration: args.timerDuration }),
+      ...(args.timerStartTime && { timerStartTime: args.timerStartTime }),
+      ...(args.dueDate && { dueDate: args.dueDate }),
+      ...(args.projectId && { projectId: args.projectId }),
     });
     return todoId;
   },
 });
 
-export const toggleTodo = mutation({
-  args: { id: v.id("todos") },
+export const updateStatus = mutation({
+  args: { id: v.id("todos"), status: v.string() },
   handler: async (ctx, args) => {
     const todo = await ctx.db.get(args.id);
     if (todo) {
-      await ctx.db.patch(args.id, { isCompleted: !todo.isCompleted });
+      await ctx.db.patch(args.id, { status: args.status });
     }
   },
+});
+
+export const setTimer = mutation({
+  args: { 
+    id: v.id("todos"), 
+    duration: v.optional(v.number()),
+    dueDate: v.optional(v.number()) 
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { 
+      ...(args.duration !== undefined && { timerDuration: args.duration }),
+      ...(args.dueDate !== undefined && { dueDate: args.dueDate })
+    });
+  },
+});
+
+export const startTimer = mutation({
+  args: { id: v.id("todos") },
+  handler: async (ctx, args) => {
+    const todo = await ctx.db.get(args.id);
+    if (!todo) return;
+    
+    // If resuming from pause, calculate equivalent start time
+    let newStartTime = Date.now();
+    if (todo.status === "paused" && todo.timeLeftAtPause !== undefined && todo.timerDuration) {
+        newStartTime = Date.now() - (todo.timerDuration - todo.timeLeftAtPause);
+    }
+
+    await ctx.db.patch(args.id, { 
+      status: "in_progress",
+      timerStartTime: newStartTime,
+      timeLeftAtPause: undefined // clear it out once resumed
+    });
+  },
+});
+
+export const pauseTimer = mutation({
+  args: { id: v.id("todos") },
+  handler: async (ctx, args) => {
+    const todo = await ctx.db.get(args.id);
+    if (!todo || todo.status !== "in_progress" || !todo.timerStartTime || !todo.timerDuration) return;
+
+    const elapsed = Date.now() - todo.timerStartTime;
+    const remaining = Math.max(0, todo.timerDuration - elapsed);
+
+    await ctx.db.patch(args.id, {
+      status: "paused",
+      timeLeftAtPause: remaining
+    });
+  }
 });
 
 export const deleteTodo = mutation({
@@ -48,6 +109,13 @@ export const updateTodo = mutation({
     })
   }
 })
+
+export const linkProject = mutation({
+  args: { id: v.id("todos"), projectId: v.string() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { projectId: args.projectId });
+  },
+});
 
 
 export const clearAllTodos = mutation({

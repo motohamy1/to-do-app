@@ -57,6 +57,11 @@ export interface ColorScheme {
   warning: string;
   danger: string;
   shadow: string;
+  info: string;
+  infoBg: string;
+  successBg: string;
+  warningBg: string;
+  dangerBg: string;
   gradients: {
     background: [string, string];
     surface: [string, string];
@@ -75,57 +80,67 @@ export interface ColorScheme {
 }
 
 const lightColors: ColorScheme = {
-  bg: "#f8fafc",
-  surface: "#ffffff",
-  text: "#1e293b",
-  textMuted: "#64748b",
-  border: "#e2e8f0",
-  primary: "#3b82f6",
-  success: "#10b981",
-  warning: "#f59e0b",
-  danger: "#ef4444",
+  bg: "#F4F6FC",
+  surface: "#FFFFFF",
+  text: "#111827",
+  textMuted: "#6B7280",
+  border: "#E5E7EB",
+  primary: "#7C3AED",
+  success: "#10B981",
+  warning: "#F59E0B",
+  danger: "#EF4444",
+  info: "#3B82F6",
+  infoBg: "#EFF6FF",
+  successBg: "#ECFDF5",
+  warningBg: "#FFFBEB",
+  dangerBg: "#FEF2F2",
   shadow: "#000000",
   gradients: {
-    background: ["#f8fafc", "#e2e8f0"],
-    surface: ["#ffffff", "#f8fafc"],
-    primary: ["#3b82f6", "#1d4ed8"],
-    success: ["#10b981", "#059669"],
-    warning: ["#f59e0b", "#d97706"],
-    danger: ["#ef4444", "#dc2626"],
-    muted: ["#9ca3af", "#6b7280"],
-    empty: ["#f3f4f6", "#e5e7eb"],
+    background: ["#F4F6FC", "#F4F6FC"],
+    surface: ["#FFFFFF", "#FFFFFF"],
+    primary: ["#8B5CF6", "#7C3AED"],
+    success: ["#10B981", "#059669"],
+    warning: ["#F59E0B", "#D97706"],
+    danger: ["#EF4444", "#DC2626"],
+    muted: ["#9CA3AF", "#6B7280"],
+    empty: ["#F3F4F6", "#E5E7EB"],
   },
   backgrounds: {
-    input: "#ffffff",
-    editInput: "#ffffff",
+    input: "#FFFFFF",
+    editInput: "#FFFFFF",
   },
   statusBarStyle: "dark-content" as const,
 };
 
 const darkColors: ColorScheme = {
-  bg: "#0f172a",
-  surface: "#1e293b",
-  text: "#f1f5f9",
-  textMuted: "#94a3b8",
-  border: "#334155",
-  primary: "#60a5fa",
-  success: "#34d399",
-  warning: "#fbbf24",
-  danger: "#f87171",
+  bg: "#0F1115",
+  surface: "#181A20",
+  text: "#F9FAFB",
+  textMuted: "#9CA3AF",
+  border: "#272A30",
+  primary: "#8B5CF6",
+  success: "#10B981",
+  warning: "#F59E0B",
+  danger: "#EF4444",
+  info: "#3B82F6",
+  infoBg: "#1E293B",
+  successBg: "#064E3B",
+  warningBg: "#78350F",
+  dangerBg: "#7F1D1D",
   shadow: "#000000",
   gradients: {
-    background: ["#0f172a", "#1e293b"],
-    surface: ["#1e293b", "#334155"],
-    primary: ["#3b82f6", "#1d4ed8"],
-    success: ["#10b981", "#059669"],
-    warning: ["#f59e0b", "#d97706"],
-    danger: ["#ef4444", "#dc2626"],
-    muted: ["#374151", "#4b5563"],
-    empty: ["#374151", "#4b5563"],
+    background: ["#0F1115", "#0F1115"],
+    surface: ["#181A20", "#181A20"],
+    primary: ["#8B5CF6", "#7C3AED"],
+    success: ["#10B981", "#059669"],
+    warning: ["#F59E0B", "#D97706"],
+    danger: ["#EF4444", "#DC2626"],
+    muted: ["#374151", "#4B5563"],
+    empty: ["#374151", "#4B5563"],
   },
   backgrounds: {
-    input: "#1e293b",
-    editInput: "#0f172a",
+    input: "#181A20",
+    editInput: "#0F1115",
   },
   statusBarStyle: "light-content" as const,
 };
