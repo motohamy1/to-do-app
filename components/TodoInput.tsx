@@ -3,11 +3,16 @@ import { api } from "@/convex/_generated/api";
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "convex/react";
-import { useState } from "react";
-import { Alert, TextInput, TouchableOpacity, View, Text } from "react-native";
+import { useState, useEffect } from "react";
+import { Alert, TextInput, TouchableOpacity, View, Text, Platform } from "react-native";
 import TimerModal from "./TimerModal";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
-const TodoInput = () => {
+interface TodoInputProps {
+  initialDate?: number;
+}
+
+const TodoInput: React.FC<TodoInputProps> = ({ initialDate }) => {
   const { colors } = useTheme();
   const homeStyles = createHomeStyles(colors);
 
@@ -18,6 +23,15 @@ const TodoInput = () => {
   const [isTimerModalVisible, setTimerModalVisible] = useState(false);
   const [timerDuration, setTimerDuration] = useState<number | null>(null);
   const [autoStart, setAutoStart] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<number>(initialDate || Date.now());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [status, setStatus] = useState<string>("not_started");
+
+  useEffect(() => {
+    if (initialDate) {
+      setSelectedDate(initialDate);
+    }
+  }, [initialDate]);
 
   const addTodo = useMutation(api.todos.addTodo);
 
@@ -26,8 +40,10 @@ const TodoInput = () => {
       try {
         await addTodo({ 
           text: newTodo.trim(),
+          date: selectedDate,
+          status: status,
           ...(timerDuration && { timerDuration }),
-          ...(autoStart && timerDuration ? { status: 'in_progress', timerStartTime: Date.now() } : {})
+          ...(autoStart && timerDuration && status !== 'done' ? { status: 'in_progress', timerStartTime: Date.now() } : {})
         });
         
         // Reset state
@@ -35,6 +51,8 @@ const TodoInput = () => {
         setTimerDuration(null);
         setAutoStart(false);
         setIsAdding(false);
+        setSelectedDate(Date.now());
+        setStatus("not_started");
       } catch (error) {
         console.log("Error adding a todo", error);
         Alert.alert("Error", "Failed to add todo");
@@ -43,6 +61,12 @@ const TodoInput = () => {
       setIsAdding(false);
     }
   };
+
+  const statusOptions = [
+    { id: 'not_started', label: 'Todo', icon: 'ellipse-outline', color: colors.textMuted },
+    { id: 'in_progress', label: 'Doing', icon: 'play-circle-outline', color: colors.info },
+    { id: 'done', label: 'Done', icon: 'checkmark-circle-outline', color: colors.success },
+  ];
 
   if (!isAdding) {
     return (
@@ -78,10 +102,34 @@ const TodoInput = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Bottom Actions Row (Always visible while adding to show the options) */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 }}>
+        {/* Status Selection Row */}
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border + '40', flexWrap: 'wrap' }}>
+            {statusOptions.map(opt => (
+                <TouchableOpacity 
+                    key={opt.id}
+                    onPress={() => setStatus(opt.id)}
+                    style={{ 
+                        flexDirection: 'row', 
+                        alignItems: 'center', 
+                        gap: 4, 
+                        paddingHorizontal: 10, 
+                        paddingVertical: 6, 
+                        borderRadius: 12,
+                        backgroundColor: status === opt.id ? opt.color + '15' : 'transparent',
+                        borderWidth: 1,
+                        borderColor: status === opt.id ? opt.color : colors.border
+                    }}
+                >
+                    <Ionicons name={opt.icon as any} size={16} color={status === opt.id ? opt.color : colors.textMuted} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: status === opt.id ? opt.color : colors.textMuted }}>{opt.label}</Text>
+                </TouchableOpacity>
+            ))}
+        </View>
+
+        {/* Bottom Actions Row */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, flexWrap: 'wrap', gap: 8 }}>
           
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <TouchableOpacity 
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: timerDuration ? colors.primary + '20' : 'transparent', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }} 
               onPress={() => setTimerModalVisible(true)}
@@ -92,7 +140,7 @@ const TodoInput = () => {
               </Text>
             </TouchableOpacity>
 
-            {timerDuration && (
+            {timerDuration && status !== 'done' && (
               <TouchableOpacity
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: autoStart ? colors.primary + '20' : 'transparent', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}
                 onPress={() => setAutoStart(!autoStart)}
@@ -103,10 +151,32 @@ const TodoInput = () => {
                 </Text>
               </TouchableOpacity>
             )}
+
+            <TouchableOpacity 
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.primary + '10', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }} 
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+              <Text style={{ fontSize: 13, color: colors.primary, fontWeight: '500' }}>
+                {new Date(selectedDate).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+              </Text>
+            </TouchableOpacity>
           </View>
           
         </View>
       </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={new Date(selectedDate)}
+          mode="date"
+          display="default"
+          onChange={(event, date) => {
+            setShowDatePicker(Platform.OS === 'ios');
+            if (date) setSelectedDate(date.getTime());
+          }}
+        />
+      )}
 
       <TimerModal 
         visible={isTimerModalVisible}

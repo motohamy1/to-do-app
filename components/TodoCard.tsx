@@ -17,6 +17,7 @@ interface TodoCardProps {
     timeLeftAtPause?: number;
     dueDate?: number;
     projectId?: string;
+    date?: number;
   };
   onSetTimer: (id: Id<"todos">) => void;
   onLongPress: (id: Id<"todos">) => void;
@@ -249,6 +250,15 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                <Ionicons name="calendar-outline" size={14} color={isDueSoon ? colors.danger : colors.textMuted} />
                <Text style={{ fontSize: 12, color: isDueSoon ? colors.danger : colors.textMuted, fontWeight: '500' }}>
                  {new Date(todo.dueDate).toLocaleDateString()}
+               </Text>
+             </View>
+          )}
+
+          {todo.date && (
+             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 }}>
+               <Ionicons name="calendar-clear-outline" size={14} color={colors.primary} />
+               <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '500' }}>
+                 {new Date(todo.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                </Text>
              </View>
           )}

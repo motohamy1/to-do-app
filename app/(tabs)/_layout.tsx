@@ -32,6 +32,15 @@ const _layout = () => {
                 )
             }}
         />
+        <Tabs.Screen
+            name='planner'
+            options={{
+                title : 'Planner',
+                tabBarIcon: ({color, size}) => (
+                    <Ionicons name='calendar-outline' color={color} size={size}/>
+                )
+            }}
+        />
          <Tabs.Screen
             name='settings'
             options={{

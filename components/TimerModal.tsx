@@ -7,28 +7,35 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 interface TimerModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: (durationInMs: number, dueDate?: number) => void;
+  onSave: (durationInMs: number, dueDate?: number, date?: number) => void;
+  initialDate?: number;
 }
 
-const TimerModal: React.FC<TimerModalProps> = ({ visible, onClose, onSave }) => {
+const TimerModal: React.FC<TimerModalProps> = ({ visible, onClose, onSave, initialDate }) => {
   const { colors } = useTheme();
   const [hours, setHours] = useState('0');
   const [minutes, setMinutes] = useState('0');
   const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [plannerDate, setPlannerDate] = useState<Date>(initialDate ? new Date(initialDate) : new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [datePickerMode, setDatePickerMode] = useState<'dueDate' | 'plannerDate'>('dueDate');
 
   const handleSave = () => {
     const h = parseInt(hours) || 0;
     const m = parseInt(minutes) || 0;
     const durationInMs = (h * 60 * 60 * 1000) + (m * 60 * 1000);
-    onSave(durationInMs, dueDate?.getTime());
+    onSave(durationInMs, dueDate?.getTime(), plannerDate.getTime());
     onClose();
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
     if (selectedDate) {
-      setDueDate(selectedDate);
+      if (datePickerMode === 'dueDate') {
+        setDueDate(selectedDate);
+      } else {
+        setPlannerDate(selectedDate);
+      }
     }
   };
 
@@ -65,10 +72,10 @@ const TimerModal: React.FC<TimerModalProps> = ({ visible, onClose, onSave }) => 
             </View>
           </View>
 
-          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Due Date</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Due Date (Deadline)</Text>
           <TouchableOpacity 
             style={[styles.dateButton, { borderColor: colors.border }]} 
-            onPress={() => setShowDatePicker(true)}
+            onPress={() => { setDatePickerMode('dueDate'); setShowDatePicker(true); }}
           >
             <Ionicons name="calendar-outline" size={20} color={colors.primary} />
             <Text style={[styles.dateButtonText, { color: colors.text }]}>
@@ -81,13 +88,24 @@ const TimerModal: React.FC<TimerModalProps> = ({ visible, onClose, onSave }) => 
             )}
           </TouchableOpacity>
 
+          <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Planner Date (Schedule)</Text>
+          <TouchableOpacity 
+            style={[styles.dateButton, { borderColor: colors.border }]} 
+            onPress={() => { setDatePickerMode('plannerDate'); setShowDatePicker(true); }}
+          >
+            <Ionicons name="calendar-clear-outline" size={20} color={colors.primary} />
+            <Text style={[styles.dateButtonText, { color: colors.text }]}>
+              {plannerDate.toLocaleDateString()}
+            </Text>
+          </TouchableOpacity>
+
           {showDatePicker && (
             <DateTimePicker
-              value={dueDate || new Date()}
+              value={(datePickerMode === 'dueDate' ? dueDate : plannerDate) || new Date()}
               mode="date"
               display="default"
               onChange={onDateChange}
-              minimumDate={new Date()}
+              minimumDate={datePickerMode === 'dueDate' ? new Date() : undefined}
             />
           )}
 

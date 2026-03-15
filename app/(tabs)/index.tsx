@@ -42,9 +42,9 @@ const index = () => {
       setTimerModalVisible(true);
     };
 
-    const handleSaveTimer = (durationInMs: number, dueDate?: number) => {
+    const handleSaveTimer = (durationInMs: number, dueDate?: number, date?: number) => {
       if (selectedTodoId) {
-        setTimerMutation({ id: selectedTodoId, duration: durationInMs, dueDate });
+        setTimerMutation({ id: selectedTodoId, duration: durationInMs, dueDate, date });
       }
     };
 
@@ -120,6 +120,7 @@ const index = () => {
                 setSelectedTodoId(null);
               }}
               onSave={handleSaveTimer}
+              initialDate={todos?.find(t => t._id === selectedTodoId)?.date}
             />
 
             <ProjectPickerModal

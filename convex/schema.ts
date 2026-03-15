@@ -11,5 +11,6 @@ export default defineSchema({
     timeLeftAtPause: v.optional(v.number()), // Recorded remaining time at the moment of pausing
     dueDate: v.optional(v.number()), // Deadline timestamp
     projectId: v.optional(v.string()), // ID of the linked project
+    date: v.optional(v.number()), // Planner/Scheduled date timestamp
   }),
 });

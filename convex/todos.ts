@@ -16,6 +16,7 @@ export const addTodo = mutation({
     timerStartTime: v.optional(v.number()),
     dueDate: v.optional(v.number()),
     projectId: v.optional(v.string()),
+    date: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const todoId = await ctx.db.insert("todos", {
@@ -25,6 +26,7 @@ export const addTodo = mutation({
       ...(args.timerStartTime && { timerStartTime: args.timerStartTime }),
       ...(args.dueDate && { dueDate: args.dueDate }),
       ...(args.projectId && { projectId: args.projectId }),
+      ...(args.date && { date: args.date }),
     });
     return todoId;
   },
@@ -44,12 +46,14 @@ export const setTimer = mutation({
   args: { 
     id: v.id("todos"), 
     duration: v.optional(v.number()),
-    dueDate: v.optional(v.number()) 
+    dueDate: v.optional(v.number()), 
+    date: v.optional(v.number()) 
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, { 
       ...(args.duration !== undefined && { timerDuration: args.duration }),
-      ...(args.dueDate !== undefined && { dueDate: args.dueDate })
+      ...(args.dueDate !== undefined && { dueDate: args.dueDate }),
+      ...(args.date !== undefined && { date: args.date })
     });
   },
 });
@@ -114,6 +118,13 @@ export const linkProject = mutation({
   args: { id: v.id("todos"), projectId: v.string() },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, { projectId: args.projectId });
+  },
+});
+
+export const updateDate = mutation({
+  args: { id: v.id("todos"), date: v.number() },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { date: args.date });
   },
 });
 
