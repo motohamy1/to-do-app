@@ -8,13 +8,28 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
   unsavedChangesWarning: false,
 });
 
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
+
+function RootLayoutContent() {
+  const { isLoading } = useAuth();
+
+  if (isLoading) return null;
+
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="auth" options={{ presentation: 'modal' }} />
+    </Stack>
+  );
+}
+
 export default function RootLayout() {
   return (
     <ThemeProvider>
       <ConvexProvider client={convex}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-        </Stack>
+        <AuthProvider>
+          <RootLayoutContent />
+        </AuthProvider>
       </ConvexProvider>
     </ThemeProvider>
   );

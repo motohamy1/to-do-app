@@ -2,14 +2,19 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 
 export const get = query({
-  args: {},
-  handler: async (ctx) => {
-    return await ctx.db.query("todos").order('desc').collect();
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("todos")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .order('desc')
+      .collect();
   },
 });
 
 export const addTodo = mutation({
   args: { 
+    userId: v.id("users"),
     text: v.string(),
     timerDuration: v.optional(v.number()),
     status: v.optional(v.string()),
@@ -20,6 +25,7 @@ export const addTodo = mutation({
   },
   handler: async (ctx, args) => {
     const todoId = await ctx.db.insert("todos", {
+      userId: args.userId,
       text: args.text,
       status: args.status || "not_started",
       ...(args.timerDuration && { timerDuration: args.timerDuration }),
@@ -64,7 +70,6 @@ export const startTimer = mutation({
     const todo = await ctx.db.get(args.id);
     if (!todo) return;
     
-    // If resuming from pause, calculate equivalent start time
     let newStartTime = Date.now();
     if (todo.status === "paused" && todo.timeLeftAtPause !== undefined && todo.timerDuration) {
         newStartTime = Date.now() - (todo.timerDuration - todo.timeLeftAtPause);
@@ -73,7 +78,7 @@ export const startTimer = mutation({
     await ctx.db.patch(args.id, { 
       status: "in_progress",
       timerStartTime: newStartTime,
-      timeLeftAtPause: undefined // clear it out once resumed
+      timeLeftAtPause: undefined 
     });
   },
 });
@@ -99,7 +104,6 @@ export const deleteTodo = mutation({
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);
   }
-
 })
 
 export const updateTodo = mutation({
@@ -128,10 +132,13 @@ export const updateDate = mutation({
   },
 });
 
-
 export const clearAllTodos = mutation({
-  handler: async (ctx) => {
-    const todos = await ctx.db.query('todos').collect();
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const todos = await ctx.db
+      .query('todos')
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
 
     for (const todo of todos) {
       await ctx.db.delete(todo._id);

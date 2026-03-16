@@ -13,8 +13,12 @@ import TodoCard from "@/components/TodoCard";
 import TimerModal from "@/components/TimerModal";
 import ProjectPickerModal from "@/components/ProjectPickerModal";
 
+import { useAuth } from "@/hooks/useAuth";
+
 const index = () => {
-    const todos = useQuery(api.todos.get);
+    const { userId, language } = useAuth();
+    const isArabic = language === 'ar';
+    const todos = useQuery(api.todos.get, userId ? { userId } : "skip");
     const deleteTodo = useMutation(api.todos.deleteTodo);
     const setTimerMutation = useMutation(api.todos.setTimer);
     const linkProject = useMutation(api.todos.linkProject);
@@ -61,9 +65,14 @@ const index = () => {
 
     const renderSection = (title: string, data: any[]) => {
       if (data.length === 0) return null;
+      const sectionTitle = isArabic ? 
+        (title === 'IN PROGRESS' ? 'قيد التنفيذ' : 
+         title === 'NOT STARTED' ? 'لم تبدأ بعد' : 
+         title === 'DONE' ? 'مكتمل' : 'غير مكتمل') : title;
+         
       return (
         <View style={homeStyles.section}>
-          <Text style={homeStyles.sectionTitle}>{title}</Text>
+          <Text style={[homeStyles.sectionTitle, isArabic && { textAlign: 'right' }]}>{sectionTitle}</Text>
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}

@@ -7,13 +7,16 @@ import { useState, useEffect } from "react";
 import { Alert, TextInput, TouchableOpacity, View, Text, Platform } from "react-native";
 import TimerModal from "./TimerModal";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useAuth } from "@/hooks/useAuth";
 
 interface TodoInputProps {
   initialDate?: number;
+  projectId?: string;
 }
 
-const TodoInput: React.FC<TodoInputProps> = ({ initialDate }) => {
+const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId }) => {
   const { colors } = useTheme();
+  const { userId } = useAuth();
   const homeStyles = createHomeStyles(colors);
 
   const [newTodo, setNewTodo] = useState("");
@@ -36,14 +39,20 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate }) => {
   const addTodo = useMutation(api.todos.addTodo);
 
   const handleAddTodo = async () => {
+    if (!userId) {
+      Alert.alert("Error", "You must be logged in to add tasks");
+      return;
+    }
     if (newTodo.trim()) {
       try {
         await addTodo({ 
+          userId,
           text: newTodo.trim(),
           date: selectedDate,
           status: status,
           ...(timerDuration && { timerDuration }),
-          ...(autoStart && timerDuration && status !== 'done' ? { status: 'in_progress', timerStartTime: Date.now() } : {})
+          ...(autoStart && timerDuration && status !== 'done' ? { status: 'in_progress', timerStartTime: Date.now() } : {}),
+          ...(projectId ? { projectId } : {}),
         });
         
         // Reset state
@@ -64,7 +73,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate }) => {
 
   const statusOptions = [
     { id: 'not_started', label: 'Todo', icon: 'ellipse-outline', color: colors.textMuted },
-    { id: 'in_progress', label: 'Doing', icon: 'play-circle-outline', color: colors.info },
+    { id: 'in_progress', label: 'In Progress', icon: 'play-circle-outline', color: colors.info },
     { id: 'done', label: 'Done', icon: 'checkmark-circle-outline', color: colors.success },
   ];
 
@@ -72,7 +81,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate }) => {
     return (
       <TouchableOpacity style={homeStyles.addButton} onPress={() => setIsAdding(true)}>
         <Ionicons name="add" size={20} color={colors.primary} />
-        <Text style={homeStyles.addButtonText}>Add a card</Text>
+        <Text style={homeStyles.addButtonText}>Add a task</Text>
       </TouchableOpacity>
     );
   }
@@ -162,7 +171,13 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate }) => {
               </Text>
             </TouchableOpacity>
           </View>
-          
+
+          <TouchableOpacity 
+            style={{ paddingHorizontal: 12, paddingVertical: 6 }} 
+            onPress={() => setIsAdding(false)}
+          >
+            <Text style={{ fontSize: 14, color: colors.danger, fontWeight: '600' }}>Cancel</Text>
+          </TouchableOpacity>
         </View>
       </View>
 

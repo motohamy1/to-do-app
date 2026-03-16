@@ -1,161 +1,172 @@
 import { ColorScheme } from "@/hooks/useTheme";
-import { StyleSheet } from "react-native";
+import { StyleSheet, Dimensions } from "react-native";
+
+const { width } = Dimensions.get('window');
 
 export const createSettingsStyles = (colors: ColorScheme) => {
-  const styles = StyleSheet.create({
+  return StyleSheet.create({
     container: {
       flex: 1,
+      backgroundColor: colors.bg,
     },
     safeArea: {
       flex: 1,
     },
-    header: {
-      paddingHorizontal: 24,
-      paddingVertical: 32,
-      paddingBottom: 24,
-    },
-    titleContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    iconContainer: {
-      width: 56,
-      height: 56,
-      borderRadius: 16,
-      justifyContent: "center",
-      alignItems: "center",
-      marginRight: 16,
-    },
-    title: {
-      fontSize: 32,
-      fontWeight: "700",
-      letterSpacing: -1,
-      color: colors.text,
-    },
-    scrollView: {
-      flex: 1,
-    },
-    content: {
-      paddingHorizontal: 20,
-      gap: 20,
+    scrollContent: {
       paddingBottom: 120,
     },
+    header: {
+      paddingHorizontal: 24,
+      paddingTop: 32,
+      paddingBottom: 24,
+    },
+    headerTitle: {
+      fontSize: 34,
+      fontWeight: '800',
+      color: colors.text,
+      letterSpacing: -1,
+    },
     section: {
-      borderRadius: 20,
-      padding: 24,
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 8, // elevation is used to create a shadow on the section, in android
+      marginTop: 24,
+      paddingHorizontal: 20,
     },
     sectionTitle: {
-      fontSize: 20,
-      fontWeight: "700",
-      marginBottom: 20,
-      letterSpacing: -0.5,
-      color: colors.text,
+      fontSize: 13,
+      fontWeight: '800',
+      color: colors.primary,
+      textTransform: 'uppercase',
+      letterSpacing: 1.5,
+      marginBottom: 16,
+      marginLeft: 4,
     },
-    sectionTitleDanger: {
-      fontSize: 20,
-      fontWeight: "700",
-      marginBottom: 20,
-      letterSpacing: -0.5,
-      color: colors.danger,
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: 4,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 2,
     },
-    statsContainer: {
-      gap: 16,
-    },
-    statCard: {
-      flexDirection: "row",
-      alignItems: "center",
+    profileHero: {
+      flexDirection: 'row',
+      alignItems: 'center',
       padding: 20,
-      borderRadius: 16,
-      borderLeftWidth: 4,
     },
-    statIconContainer: {
-      marginRight: 16,
+    avatarContainer: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.primary + '15',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: colors.primary,
     },
-    statIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      justifyContent: "center",
-      alignItems: "center",
+    profileInfo: {
+      marginLeft: 20,
+      flex: 1,
     },
-    statNumber: {
-      fontSize: 28,
-      fontWeight: "800",
-      letterSpacing: -1,
+    profileName: {
+      fontSize: 22,
+      fontWeight: '800',
       color: colors.text,
+      marginBottom: 4,
     },
-    statLabel: {
+    profileEmail: {
       fontSize: 14,
-      fontWeight: "600",
-      marginTop: 2,
       color: colors.textMuted,
+      fontWeight: '500',
     },
     settingItem: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      paddingVertical: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+      borderRadius: 20,
     },
-    settingLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      flex: 1,
-    },
-    settingIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 8,
-      justifyContent: "center",
-      alignItems: "center",
+    iconWrapper: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
       marginRight: 16,
     },
-    settingText: {
-      fontSize: 17,
-      fontWeight: "600",
-      color: colors.text,
-    },
-    actionButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingVertical: 20,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    actionLeft: {
-      flexDirection: "row",
-      alignItems: "center",
+    settingLabel: {
       flex: 1,
-    },
-    actionIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 8,
-      justifyContent: "center",
-      alignItems: "center",
-      marginRight: 16,
-    },
-    actionText: {
-      fontSize: 17,
-      fontWeight: "600",
+      fontSize: 16,
+      fontWeight: '600',
       color: colors.text,
     },
-    actionTextDanger: {
-      fontSize: 17,
-      fontWeight: "600",
+    settingValue: {
+      fontSize: 14,
+      color: colors.textMuted,
+      marginRight: 8,
+      fontWeight: '500',
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginHorizontal: 16,
+      opacity: 0.5,
+    },
+    dbInfoCard: {
+      padding: 20,
+    },
+    dbRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    dbLabel: {
+      fontSize: 14,
+      color: colors.textMuted,
+      fontWeight: '600',
+    },
+    dbValue: {
+      fontSize: 14,
+      color: colors.text,
+      fontWeight: '700',
+      fontFamily: 'monospace',
+    },
+    statusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+      backgroundColor: colors.success + '15',
+    },
+    statusText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: colors.success,
+      textTransform: 'uppercase',
+    },
+    logoutButton: {
+      marginTop: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+      backgroundColor: colors.danger + '10',
+      borderRadius: 20,
+      gap: 8,
+    },
+    logoutText: {
       color: colors.danger,
+      fontSize: 16,
+      fontWeight: '700',
     },
+    versionText: {
+      textAlign: 'center',
+      marginTop: 32,
+      color: colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+      letterSpacing: 1,
+    }
   });
-
-  return styles;
 };

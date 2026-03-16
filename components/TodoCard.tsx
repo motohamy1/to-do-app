@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import CircularProgress from './CircularProgress';
@@ -26,11 +26,17 @@ interface TodoCardProps {
 }
 
 const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLinkProject, homeStyles }) => {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const updateStatus = useMutation(api.todos.updateStatus);
   const startTimer = useMutation(api.todos.startTimer);
   const pauseTimer = useMutation(api.todos.pauseTimer);
   const deleteTodo = useMutation(api.todos.deleteTodo);
+  const updateTodo = useMutation(api.todos.updateTodo);
+  
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(todo.text);
+  
+  const project = useQuery(api.projects.getProjectMetadata, todo.projectId ? { id: todo.projectId } : "skip");
 
   const [timeLeft, setTimeLeft] = useState(todo.timerDuration || 0);
   const [progress, setProgress] = useState(0);
@@ -48,18 +54,14 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
         const prog = Math.min(100, (elapsed / todo.timerDuration!) * 100);
         setProgress(prog);
 
-        // Auto transition to Done if timer expires, checking the original status directly
         if (remaining === 0 && todo.status === 'in_progress') {
           updateStatus({ id: todo._id, status: 'done' });
         }
       };
 
-      // Initial calc
       calculateTimeInfo();
-      
       interval = setInterval(calculateTimeInfo, 1000);
     } else if (todo.status === 'paused') {
-      // Show paused state from timeLeftAtPause
       const remaining = todo.timeLeftAtPause || 0;
       setTimeLeft(remaining);
       const prog = todo.timerDuration ? Math.min(100, ((todo.timerDuration - remaining) / todo.timerDuration) * 100) : 0;
@@ -68,7 +70,6 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
       setProgress(todo.status === 'done' ? 100 : 0);
       setTimeLeft(0);
     } else {
-      // not_started
       setProgress(0);
       setTimeLeft(todo.timerDuration || 0);
     }
@@ -114,6 +115,13 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     updateStatus({ id: todo._id, status });
   };
 
+  const handleSaveEdit = () => {
+    if (editText.trim() && editText !== todo.text) {
+      updateTodo({ id: todo._id, text: editText.trim() });
+    }
+    setIsEditing(false);
+  };
+
   let badgeText = "Not Started";
   let badgeBg = colors.border;
   let badgeColor = colors.text;
@@ -121,48 +129,72 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   let timerText = formatTime(timeLeft);
   let arrowColor = colors.danger;
   let arrowName = "arrow-up" as any;
+  let cardBg = colors.surface;
   
   if (todo.status === "in_progress") {
     badgeText = "In Progress";
-    badgeBg = colors.infoBg;
-    badgeColor = colors.info;
+    badgeBg = colors.warning + '20';
+    badgeColor = colors.warning;
+    cardBg = colors.taskInProgressBg;
   } else if (todo.status === "paused") {
     badgeText = "Paused";
     badgeBg = colors.border;
     badgeColor = colors.text;
     timerIconColor = colors.textMuted;
+    cardBg = colors.taskPausedBg;
   } else if (todo.status === "done") {
     badgeText = "Done";
-    badgeBg = colors.successBg;
+    badgeBg = colors.success + '20';
     badgeColor = colors.success;
     timerText = "00:00:00";
     arrowColor = colors.success;
     timerIconColor = colors.textMuted;
+    cardBg = colors.taskDoneBg;
   } else if (todo.status === "not_done") {
     badgeText = "Not Done";
-    badgeBg = colors.danger + '20'; // transparent red
+    badgeBg = colors.danger + '20'; 
     badgeColor = colors.danger;
     timerText = "00:00:00";
     timerIconColor = colors.danger;
+    cardBg = colors.taskNotDoneBg;
+  } else if (todo.status === "not_started") {
+    cardBg = colors.taskNotStartedBg;
+    badgeBg = colors.textMuted + '20';
+    badgeColor = colors.textMuted;
   }
 
   const isTimerSet = !!todo.timerDuration;
-  const isDueSoon = todo.dueDate && todo.dueDate < Date.now() + 86400000; // 24 hours
+  const isDueSoon = todo.dueDate && todo.dueDate < Date.now() + 86400000;
 
   return (
     <TouchableOpacity 
-      style={[homeStyles.card, { overflow: 'hidden', position: 'relative' }]}
+      style={[homeStyles.card, { overflow: 'hidden', position: 'relative', backgroundColor: cardBg }]}
       onLongPress={() => onLongPress(todo._id)}
       activeOpacity={0.8}
     >
       <View style={{ zIndex: 1 }}>
-        
-        {/* Top Row: Title & Badge on Left, Timer on Right */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-           
            <View style={{ flex: 1, paddingRight: 12 }}>
-             <Text style={[homeStyles.cardTitle, { marginBottom: 8 }]} numberOfLines={2}>{todo.text}</Text>
-             <View style={[homeStyles.badge, { backgroundColor: badgeBg, alignSelf: 'flex-start' }]}>
+             {isEditing ? (
+               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                 <TextInput
+                   style={[homeStyles.cardTitle, { flex: 1, backgroundColor: colors.bg, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary }]}
+                   value={editText}
+                   onChangeText={setEditText}
+                   autoFocus
+                   onBlur={handleSaveEdit}
+                   onSubmitEditing={handleSaveEdit}
+                 />
+                 <TouchableOpacity onPress={handleSaveEdit}>
+                    <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                 </TouchableOpacity>
+               </View>
+             ) : (
+               <TouchableOpacity onPress={() => setIsEditing(true)}>
+                 <Text style={[homeStyles.cardTitle, { marginBottom: 8 }]} numberOfLines={2}>{todo.text}</Text>
+               </TouchableOpacity>
+             )}
+             <View style={[homeStyles.badge, { backgroundColor: badgeBg === colors.border ? colors.surface + '80' : badgeBg, alignSelf: 'flex-start' }]}>
                <Text style={[homeStyles.badgeText, { color: badgeColor }]}>{badgeText}</Text>
              </View>
            </View>
@@ -173,17 +205,15 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                strokeWidth={5} 
                progress={progress} 
                color={todo.status === 'paused' ? colors.textMuted : timerIconColor} 
-               unfilledColor={colors.border}
+               unfilledColor={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
              >
                <Text style={{ fontSize: 11, fontWeight: "700", color: todo.status === 'paused' ? colors.textMuted : timerIconColor, textAlign: 'center' }}>
                  {timerText}
                </Text>
              </CircularProgress>
            </View>
-           
         </View>
 
-        {/* Actions Row */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
           {todo.status === 'not_started' && (
             <View style={homeStyles.actionButtons}>
@@ -232,7 +262,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
           )}
         </View>
 
-        <View style={homeStyles.dividerDashed} />
+        <View style={[homeStyles.dividerDashed, { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]} />
 
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <TouchableOpacity 
@@ -241,7 +271,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
           >
             <Ionicons name="link-outline" size={16} color={todo.projectId ? colors.primary : colors.textMuted} />
             <Text style={[homeStyles.projectText, todo.projectId && { color: colors.primary, fontStyle: 'normal', fontWeight: '600' }]}>
-              {todo.projectId || 'No project linked'}
+              {project?.name || todo.projectId || 'No project linked'}
             </Text>
           </TouchableOpacity>
 
@@ -267,22 +297,15 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
         <View style={homeStyles.footerRow}>
            <View style={homeStyles.footerStats}>
               <View style={homeStyles.statItem}>
-                 <Ionicons name="attach-outline" size={16} color={colors.textMuted} />
-                 <Text style={homeStyles.statText}>{stats.clip}</Text>
-              </View>
-              {stats.chat > 0 && (
-                 <View style={homeStyles.statItem}>
-                   <Ionicons name="chatbubble-outline" size={14} color={colors.textMuted} />
-                   <Text style={homeStyles.statText}>{stats.chat}</Text>
-                 </View>
-              )}
-              <View style={homeStyles.statItem}>
                  <Ionicons name="checkbox-outline" size={15} color={colors.textMuted} />
                  <Text style={homeStyles.statText}>{stats.checkDone}/{stats.checkTotal}</Text>
               </View>
            </View>
            
            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+             <TouchableOpacity onPress={() => setIsEditing(true)}>
+               <Ionicons name="create-outline" size={18} color={colors.textMuted} />
+             </TouchableOpacity>
              <TouchableOpacity onPress={() => deleteTodo({ id: todo._id })}>
                <Ionicons name="trash-outline" size={18} color={colors.danger} />
              </TouchableOpacity>

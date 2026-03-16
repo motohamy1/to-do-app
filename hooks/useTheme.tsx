@@ -2,41 +2,33 @@ import * as SecureStore from 'expo-secure-store';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 
-// AsyncStorage is React Native’s simple, promise-based API for persisting small bits of data on a user’s device. Think of it as the mobile-app equivalent of the browser’s localStorage, but asynchronous and cross-platform.
-
-// In-memory fallback for cases where neither localStorage nor AsyncStorage are available
+// In-memory fallback
 const memoryStorage: Record<string, string> = {};
 
-// Safe storage helper to handle cases where AsyncStorage native module might be null (e.g., Web, New Architecture issues)
 const safeStorage = {
   getItem: async (key: string) => {
     try {
       if (Platform.OS === "web") {
         return typeof localStorage !== "undefined" ? localStorage.getItem(key) : memoryStorage[key];
       }
-      
-      // Check if AsyncStorage is available and not null before calling
       if (SecureStore && typeof SecureStore.getItemAsync === "function") {
         return await SecureStore.getItemAsync(key);
       }
       return memoryStorage[key] || null;
     } catch (error) {
-      // Use console.warn instead of error to avoid alarming logs for expected environment limitations
       console.warn("AsyncStorage getItem failed, falling back to memory:", error);
       return memoryStorage[key] || null;
     }
   },
   setItem: async (key: string, value: string) => {
     try {
-      memoryStorage[key] = value; // Always update memory as a mirror
-
+      memoryStorage[key] = value;
       if (Platform.OS === "web") {
         if (typeof localStorage !== "undefined") {
           localStorage.setItem(key, value);
         }
         return;
       }
-      
       if (SecureStore && typeof SecureStore.setItemAsync === "function") {
         await SecureStore.setItemAsync(key, value);
       }
@@ -62,6 +54,11 @@ export interface ColorScheme {
   successBg: string;
   warningBg: string;
   dangerBg: string;
+  taskInProgressBg: string;
+  taskNotStartedBg: string;
+  taskDoneBg: string;
+  taskPausedBg: string;
+  taskNotDoneBg: string;
   gradients: {
     background: [string, string];
     surface: [string, string];
@@ -80,67 +77,77 @@ export interface ColorScheme {
 }
 
 const lightColors: ColorScheme = {
-  bg: "#F4F6FC",
+  bg: "#F0F2FA",
   surface: "#FFFFFF",
-  text: "#111827",
-  textMuted: "#6B7280",
-  border: "#E5E7EB",
-  primary: "#7C3AED",
-  success: "#10B981",
-  warning: "#F59E0B",
-  danger: "#EF4444",
-  info: "#3B82F6",
-  infoBg: "#EFF6FF",
-  successBg: "#ECFDF5",
-  warningBg: "#FFFBEB",
-  dangerBg: "#FEF2F2",
-  shadow: "#000000",
+  text: "#0D0F1A",
+  textMuted: "#64748B",
+  border: "#E2E8F0",
+  primary: "#6C47FF",
+  success: "#00C58E",
+  warning: "#FFAB00",
+  danger: "#FF4D6A",
+  info: "#2196F3",
+  infoBg: "#EBF5FF",
+  successBg: "#E0FBF2",
+  warningBg: "#FFF8E1",
+  dangerBg: "#FFEBEE",
+  taskInProgressBg: "#f6bf0aff", // Orange 100 - clearly orange tinted
+  taskNotStartedBg: "#F1F5F9", // Slightly gray
+  taskDoneBg: "#E0FBF2",
+  taskPausedBg: "#FFF7ED", // Orange 50 - subtler orange
+  taskNotDoneBg: "#FFEBEE",
+  shadow: "#1A0050",
   gradients: {
-    background: ["#F4F6FC", "#F4F6FC"],
-    surface: ["#FFFFFF", "#FFFFFF"],
-    primary: ["#8B5CF6", "#7C3AED"],
-    success: ["#10B981", "#059669"],
-    warning: ["#F59E0B", "#D97706"],
-    danger: ["#EF4444", "#DC2626"],
-    muted: ["#9CA3AF", "#6B7280"],
-    empty: ["#F3F4F6", "#E5E7EB"],
+    background: ["#F0F2FA", "#E8ECF8"],
+    surface: ["#FFFFFF", "#F8F9FF"],
+    primary: ["#7C5CFF", "#6C47FF"],
+    success: ["#00C58E", "#00A87A"],
+    warning: ["#FFAB00", "#E09600"],
+    danger: ["#FF4D6A", "#E0394F"],
+    muted: ["#94A3B8", "#64748B"],
+    empty: ["#EEF0F8", "#E2E8F0"],
   },
   backgrounds: {
     input: "#FFFFFF",
-    editInput: "#FFFFFF",
+    editInput: "#F8F9FF",
   },
   statusBarStyle: "dark-content" as const,
 };
 
 const darkColors: ColorScheme = {
-  bg: "#0F1115",
-  surface: "#181A20",
-  text: "#F9FAFB",
-  textMuted: "#9CA3AF",
-  border: "#272A30",
-  primary: "#8B5CF6",
-  success: "#10B981",
-  warning: "#F59E0B",
-  danger: "#EF4444",
-  info: "#3B82F6",
-  infoBg: "#1E293B",
-  successBg: "#064E3B",
-  warningBg: "#78350F",
-  dangerBg: "#7F1D1D",
+  bg: "#0A0B10",
+  surface: "#12141C",
+  text: "#EDF0FF",
+  textMuted: "#7A8099",
+  border: "#1E2130",
+  primary: "#7C5CFF",
+  success: "#00C58E",
+  warning: "#FFAB00",
+  danger: "#FF4D6A",
+  info: "#47A3FF",
+  infoBg: "#0D1A2E",
+  successBg: "#0A2E24",
+  warningBg: "#2A1E00",
+  dangerBg: "#2A0A10",
+  taskInProgressBg: "#4C2B0A", // More saturated dark orange
+  taskNotStartedBg: "#1E2130", // Slightly gray-dark
+  taskDoneBg: "#0A2E24",
+  taskPausedBg: "#2A1E0D", // Muted dark orange
+  taskNotDoneBg: "#2A0A10",
   shadow: "#000000",
   gradients: {
-    background: ["#0F1115", "#0F1115"],
-    surface: ["#181A20", "#181A20"],
-    primary: ["#8B5CF6", "#7C3AED"],
-    success: ["#10B981", "#059669"],
-    warning: ["#F59E0B", "#D97706"],
-    danger: ["#EF4444", "#DC2626"],
-    muted: ["#374151", "#4B5563"],
-    empty: ["#374151", "#4B5563"],
+    background: ["#0A0B10", "#0D0F18"],
+    surface: ["#12141C", "#161824"],
+    primary: ["#7C5CFF", "#6C47FF"],
+    success: ["#00C58E", "#00A87A"],
+    warning: ["#FFAB00", "#E09600"],
+    danger: ["#FF4D6A", "#E0394F"],
+    muted: ["#2A2D3E", "#3A3D52"],
+    empty: ["#1A1C28", "#1E2030"],
   },
   backgrounds: {
-    input: "#181A20",
-    editInput: "#0F1115",
+    input: "#12141C",
+    editInput: "#0A0B10",
   },
   statusBarStyle: "light-content" as const,
 };
@@ -154,10 +161,9 @@ interface ThemeContextType {
 const ThemeContext = createContext<undefined | ThemeContextType>(undefined);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }): React.JSX.Element => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
   useEffect(() => {
-    // get the user's choice
     safeStorage.getItem("darkMode").then((value) => {
       if (value) setIsDarkMode(JSON.parse(value));
     });
@@ -183,7 +189,6 @@ const useTheme = () => {
   if (context === undefined) {
     throw new Error("useTheme must be used within a ThemeProvider");
   }
-
   return context;
 };
 
