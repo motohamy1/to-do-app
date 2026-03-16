@@ -1,4 +1,4 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from 'expo-secure-store';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { Platform } from "react-native";
 
@@ -16,8 +16,8 @@ const safeStorage = {
       }
       
       // Check if AsyncStorage is available and not null before calling
-      if (AsyncStorage && typeof AsyncStorage.getItem === "function") {
-        return await AsyncStorage.getItem(key);
+      if (SecureStore && typeof SecureStore.getItemAsync === "function") {
+        return await SecureStore.getItemAsync(key);
       }
       return memoryStorage[key] || null;
     } catch (error) {
@@ -37,8 +37,8 @@ const safeStorage = {
         return;
       }
       
-      if (AsyncStorage && typeof AsyncStorage.setItem === "function") {
-        await AsyncStorage.setItem(key, value);
+      if (SecureStore && typeof SecureStore.setItemAsync === "function") {
+        await SecureStore.setItemAsync(key, value);
       }
     } catch (error) {
       console.warn("AsyncStorage setItem failed, using memory instead:", error);
