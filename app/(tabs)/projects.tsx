@@ -11,6 +11,8 @@ import {
   Alert,
   Linking,
   BackHandler,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -98,7 +100,7 @@ const AddSubCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
   const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
@@ -109,7 +111,7 @@ const AddSubCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -124,7 +126,7 @@ const AddCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
   const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
@@ -149,7 +151,7 @@ const AddCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -165,7 +167,7 @@ const AddProjectModal = ({ visible, onClose, colors, styles, onAdd }: {
   const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), desc.trim(), icon, color); setName(''); setDesc(''); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
@@ -178,7 +180,7 @@ const AddProjectModal = ({ visible, onClose, colors, styles, onAdd }: {
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -194,7 +196,7 @@ const AddResourceModal = ({ visible, onClose, colors, styles, onAdd }: {
   const handleAdd = () => { if (!title.trim()) return; onAdd(resType, title.trim(), url.trim() || undefined, note.trim() || undefined); setTitle(''); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
@@ -214,7 +216,7 @@ const AddResourceModal = ({ visible, onClose, colors, styles, onAdd }: {
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

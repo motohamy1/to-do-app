@@ -9,9 +9,26 @@ const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
 });
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
+import { LayoutAnimation, Platform, UIManager } from "react-native";
+import { requestPermissionsAsync, scheduleDailyReminders } from "@/utils/notifications";
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 function RootLayoutContent() {
   const { isLoading } = useAuth();
+
+  useEffect(() => {
+    async function setupApp() {
+      const granted = await requestPermissionsAsync();
+      if (granted) {
+        await scheduleDailyReminders();
+      }
+    }
+    setupApp();
+  }, []);
 
   if (isLoading) return null;
 

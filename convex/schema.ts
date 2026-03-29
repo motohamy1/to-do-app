@@ -22,7 +22,9 @@ export default defineSchema({
     dueDate: v.optional(v.number()), 
     projectId: v.optional(v.string()), 
     date: v.optional(v.number()), 
-  }).index("by_user", ["userId"]),
+    parentId: v.optional(v.id("todos")),
+  }).index("by_user", ["userId"])
+    .index("by_parent", ["parentId"]),
 
   projectCategories: defineTable({
     userId: v.optional(v.id("users")),

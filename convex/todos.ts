@@ -4,9 +4,21 @@ import { mutation, query } from "./_generated/server";
 export const get = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const todos = await ctx.db
       .query("todos")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .order('desc')
+      .collect();
+    return todos.filter((t) => !t.parentId);
+  },
+});
+
+export const getSubtasks = query({
+  args: { parentId: v.id("todos") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("todos")
+      .withIndex("by_parent", (q) => q.eq("parentId", args.parentId))
       .order('desc')
       .collect();
   },
@@ -22,6 +34,7 @@ export const addTodo = mutation({
     dueDate: v.optional(v.number()),
     projectId: v.optional(v.string()),
     date: v.optional(v.number()),
+    parentId: v.optional(v.id("todos")),
   },
   handler: async (ctx, args) => {
     const todoId = await ctx.db.insert("todos", {
@@ -33,6 +46,7 @@ export const addTodo = mutation({
       ...(args.dueDate && { dueDate: args.dueDate }),
       ...(args.projectId && { projectId: args.projectId }),
       ...(args.date && { date: args.date }),
+      ...(args.parentId && { parentId: args.parentId }),
     });
     return todoId;
   },
@@ -102,6 +116,14 @@ export const pauseTimer = mutation({
 export const deleteTodo = mutation({
   args: { id: v.id('todos') },
   handler: async (ctx, args) => {
+    const subtasks = await ctx.db
+      .query("todos")
+      .withIndex("by_parent", (q) => q.eq("parentId", args.id))
+      .collect();
+      
+    for (const sub of subtasks) {
+      await ctx.db.delete(sub._id);
+    }
     await ctx.db.delete(args.id);
   }
 })
