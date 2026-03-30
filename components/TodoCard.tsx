@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, LayoutAnimation, Modal, Alert } from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, TextInput, LayoutAnimation, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
 import { useMutation, useQuery } from 'convex/react';
@@ -52,8 +52,14 @@ const InlineTimerPicker = ({
     const h = parseInt(hours) || 0;
     const m = parseInt(minutes) || 0;
     const ms = (h * 3600 + m * 60) * 1000;
-    if (maxMs && ms > maxMs) {
-      Alert.alert('Timer Too Long', `Timer cannot exceed ${Math.floor(maxMs / 60000)} minutes (parent task limit).`);
+    if (ms <= 0) {
+      Alert.alert('Invalid Timer', 'Please set a timer greater than 0.');
+      return;
+    }
+    if (maxMs !== undefined && maxMs > 0 && ms > maxMs) {
+      const availH = Math.floor(maxMs / 3600000);
+      const availM = Math.floor((maxMs % 3600000) / 60000);
+      Alert.alert('Timer Too Long', `Timer cannot exceed ${availH > 0 ? availH + 'h ' : ''}${availM}m (available budget).`);
       return;
     }
     onSave(ms);
@@ -61,6 +67,14 @@ const InlineTimerPicker = ({
 
   return (
     <View style={{ marginTop: 4, padding: 12, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + '30', gap: 12 }}>
+      {maxMs !== undefined && maxMs > 0 && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 }}>
+          <Ionicons name="information-circle-outline" size={14} color={colors.warning} />
+          <Text style={{ color: colors.warning, fontSize: 11, fontWeight: '600' }}>
+            Budget: {Math.floor(maxMs / 3600000) > 0 ? Math.floor(maxMs / 3600000) + 'h ' : ''}{Math.floor((maxMs % 3600000) / 60000)}m available
+          </Text>
+        </View>
+      )}
       {/* Duration row */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
         {/* Hours */}
@@ -121,6 +135,265 @@ const InlineTimerPicker = ({
   );
 };
 
+// ─── Helper: format ms to HH:MM:SS or MM:SS ────────────────────────────────
+const formatTime = (ms: number) => {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+};
+
+// ─── Helper: format ms to compact "1h 30m" ──────────────────────────────────
+const formatDuration = (ms: number) => {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+};
+
+// ─── Subtask Row Component ───────────────────────────────────────────────────
+const SubtaskRow = ({
+  sub,
+  parentTimerDuration,
+  colors,
+  isDarkMode,
+  homeStyles,
+  onStartSubtask,
+  onPauseSubtask,
+  onToggleComplete,
+  onDelete,
+  onSetTimer,
+  onUpdateText,
+}: {
+  sub: any;
+  parentTimerDuration?: number;
+  colors: any;
+  isDarkMode: boolean;
+  homeStyles: any;
+  onStartSubtask: (id: Id<"todos">) => void;
+  onPauseSubtask: (id: Id<"todos">) => void;
+  onToggleComplete: (id: Id<"todos">, currentStatus: string) => void;
+  onDelete: (id: Id<"todos">) => void;
+  onSetTimer: (id: Id<"todos">, ms: number) => void;
+  onUpdateText: (id: Id<"todos">, text: string) => void;
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(sub.text);
+  const [showTimerPicker, setShowTimerPicker] = useState(false);
+  const [subTimeLeft, setSubTimeLeft] = useState(sub.timerDuration || 0);
+
+  // Compute remaining budget for this subtask's timer picker
+  const subtasks = useQuery(api.todos.getSubtasks, sub.parentId ? { parentId: sub.parentId } : "skip");
+  const remainingBudget = useMemo(() => {
+    if (!parentTimerDuration || !subtasks) return undefined;
+    const otherSubsDuration = subtasks
+      .filter((s: any) => s._id !== sub._id)
+      .reduce((sum: number, s: any) => sum + (s.timerDuration || 0), 0);
+    return Math.max(0, parentTimerDuration - otherSubsDuration);
+  }, [parentTimerDuration, subtasks, sub._id]);
+
+  // Live countdown for running subtasks
+  useEffect(() => {
+    if (sub.status === 'in_progress' && sub.timerStartTime && sub.timerDuration) {
+      const calc = () => {
+        const elapsed = Date.now() - sub.timerStartTime!;
+        const remaining = Math.max(0, sub.timerDuration! - elapsed);
+        setSubTimeLeft(remaining);
+      };
+      calc();
+      const interval = setInterval(calc, 1000);
+      return () => clearInterval(interval);
+    } else if (sub.status === 'paused' && sub.timeLeftAtPause !== undefined) {
+      setSubTimeLeft(sub.timeLeftAtPause);
+    } else if (sub.status === 'done') {
+      setSubTimeLeft(0);
+    } else {
+      setSubTimeLeft(sub.timerDuration || 0);
+    }
+  }, [sub.status, sub.timerStartTime, sub.timerDuration, sub.timeLeftAtPause]);
+
+  const handleSaveEdit = () => {
+    if (editText.trim() && editText !== sub.text) onUpdateText(sub._id, editText.trim());
+    setIsEditing(false);
+    setShowTimerPicker(false);
+  };
+
+  const isDone = sub.status === 'done';
+  const isRunning = sub.status === 'in_progress';
+  const isPaused = sub.status === 'paused';
+  const hasTimer = !!sub.timerDuration;
+
+  if (isEditing) {
+    return (
+      <View style={{ backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden', padding: 10, gap: 8 }}>
+        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, letterSpacing: 0.5 }}>EDITING SUBTASK</Text>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity onPress={() => onToggleComplete(sub._id, sub.status)}>
+            <Ionicons
+              name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
+              size={22}
+              color={isDone ? colors.success : colors.textMuted}
+            />
+          </TouchableOpacity>
+          <TextInput
+            style={{ flex: 1, color: colors.text, fontSize: 14, backgroundColor: colors.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.primary, fontWeight: '500' }}
+            value={editText}
+            onChangeText={setEditText}
+            autoFocus
+            onSubmitEditing={handleSaveEdit}
+          />
+        </View>
+
+        {/* Timer toggle */}
+        <TouchableOpacity
+          style={[homeStyles.actionBtn, {
+            backgroundColor: hasTimer ? colors.primary + '15' : colors.surface,
+            borderColor: colors.primary,
+            borderWidth: 1,
+            alignSelf: 'flex-start',
+          }]}
+          onPress={() => setShowTimerPicker(!showTimerPicker)}
+        >
+          <Ionicons name="timer-outline" size={16} color={colors.primary} />
+          <Text style={[homeStyles.actionBtnText, { color: colors.primary }]}>
+            {hasTimer ? formatDuration(sub.timerDuration!) : 'Set Timer'}
+          </Text>
+          <Ionicons name={showTimerPicker ? 'chevron-up' : 'chevron-down'} size={13} color={colors.primary} />
+        </TouchableOpacity>
+
+        {showTimerPicker && (
+          <InlineTimerPicker
+            initialMs={sub.timerDuration}
+            maxMs={remainingBudget}
+            colors={colors}
+            onSave={(ms) => {
+              onSetTimer(sub._id, ms);
+              setShowTimerPicker(false);
+            }}
+            onCancel={() => setShowTimerPicker(false)}
+          />
+        )}
+
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+            onPress={handleSaveEdit}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Save</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: colors.border, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+            onPress={() => { setIsEditing(false); setShowTimerPicker(false); }}
+          >
+            <Text style={{ color: colors.text, fontWeight: '600', fontSize: 13 }}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ── COLLAPSED ROW ──
+  return (
+    <View style={{ backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10 }}>
+        {/* Checkbox */}
+        <TouchableOpacity onPress={() => onToggleComplete(sub._id, sub.status)}>
+          <Ionicons
+            name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
+            size={22}
+            color={isDone ? colors.success : colors.textMuted}
+            style={{ marginRight: 10 }}
+          />
+        </TouchableOpacity>
+
+        {/* Task text - tap to edit */}
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          onPress={() => { setIsEditing(true); setEditText(sub.text); }}
+        >
+          <Text
+            style={{
+              color: isDone ? colors.textMuted : colors.text,
+              textDecorationLine: isDone ? 'line-through' : 'none',
+              fontSize: 14,
+              fontWeight: '500',
+            }}
+            numberOfLines={2}
+          >
+            {sub.text}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Timer controls */}
+        {hasTimer && !isDone && (
+          <TouchableOpacity
+            onPress={() => isRunning ? onPauseSubtask(sub._id) : onStartSubtask(sub._id)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 5,
+              backgroundColor: isRunning ? colors.warning + '20' : isPaused ? colors.primary + '15' : colors.primary + '12',
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 10,
+              marginLeft: 8,
+              borderWidth: 1,
+              borderColor: isRunning ? colors.warning + '50' : colors.primary + '30',
+            }}
+          >
+            <Ionicons
+              name={isRunning ? 'pause' : 'play'}
+              size={12}
+              color={isRunning ? colors.warning : colors.primary}
+            />
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '800',
+                fontVariant: ['tabular-nums'],
+                color: isRunning ? colors.warning : colors.primary,
+              }}
+            >
+              {isRunning || isPaused ? formatTime(subTimeLeft) : formatDuration(sub.timerDuration!)}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Done badge for timed subtasks */}
+        {hasTimer && isDone && (
+          <View style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            backgroundColor: colors.success + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginLeft: 8
+          }}>
+            <Ionicons name="checkmark" size={12} color={colors.success} />
+            <Text style={{ fontSize: 11, color: colors.success, fontWeight: '700' }}>Done</Text>
+          </View>
+        )}
+
+        {/* Delete */}
+        <TouchableOpacity style={{ paddingLeft: 12 }} onPress={() => onDelete(sub._id)}>
+          <Ionicons name="trash-outline" size={18} color={colors.danger} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Running indicator bar */}
+      {isRunning && (
+        <View style={{ height: 2, backgroundColor: colors.warning + '30' }}>
+          <View style={{
+            height: 2,
+            backgroundColor: colors.warning,
+            width: sub.timerDuration ? `${Math.min(100, ((sub.timerDuration - subTimeLeft) / sub.timerDuration) * 100)}%` : '0%',
+          }} />
+        </View>
+      )}
+    </View>
+  );
+};
+
 // ─── Main Card ────────────────────────────────────────────────────────────────
 const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLinkProject, homeStyles, depth = 0 }) => {
   const { colors, isDarkMode } = useTheme();
@@ -128,6 +401,8 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const updateStatus = useMutation(api.todos.updateStatus);
   const startTimer = useMutation(api.todos.startTimer);
   const pauseTimer = useMutation(api.todos.pauseTimer);
+  const startSubtaskTimer = useMutation(api.todos.startSubtaskTimer);
+  const pauseSubtaskTimer = useMutation(api.todos.pauseSubtaskTimer);
   const deleteTodo = useMutation(api.todos.deleteTodo);
   const updateTodo = useMutation(api.todos.updateTodo);
   const setTimer = useMutation(api.todos.setTimer);
@@ -143,29 +418,51 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const subtasks = useQuery(api.todos.getSubtasks, { parentId: todo._id });
 
   const [timeLeft, setTimeLeft] = useState(todo.timerDuration || 0);
-  const [progress, setProgress] = useState(0);
 
   const [showSubtasks, setShowSubtasks] = useState(false);
   const [isAddingSub, setIsAddingSub] = useState(false);
   const [newSubText, setNewSubText] = useState("");
 
-  // Subtask editing state
-  const [editingSubId, setEditingSubId] = useState<Id<"todos"> | null>(null);
-  const [editingSubText, setEditingSubText] = useState("");
-  const [editingSubTimerOpen, setEditingSubTimerOpen] = useState<Id<"todos"> | null>(null);
-
   const [lastNotifId, setLastNotifId] = useState<string | null>(null);
 
   const hasSubtasks = subtasks && subtasks.length > 0;
 
+  // Determine if subtasks have timers (controls whether main timer buttons show)
+  const subtasksWithTimers = useMemo(() => {
+    if (!hasSubtasks) return [];
+    return subtasks.filter((s: any) => !!s.timerDuration);
+  }, [subtasks]);
+  const hasSubtaskTimers = subtasksWithTimers.length > 0;
+
+  // Calculate timer-weighted progress
+  const timerProgress = useMemo(() => {
+    if (!hasSubtasks || !todo.timerDuration) return null;
+    
+    const completedTimerSum = subtasks
+      .filter((s: any) => s.status === 'done' && s.timerDuration)
+      .reduce((sum: number, s: any) => sum + (s.timerDuration || 0), 0);
+    
+    return Math.min(100, (completedTimerSum / todo.timerDuration) * 100);
+  }, [subtasks, todo.timerDuration]);
+
+  // Calculate simple count-based progress for tasks without timers
+  const countProgress = useMemo(() => {
+    if (!hasSubtasks) return 0;
+    const done = subtasks.filter((s: any) => s.status === 'done').length;
+    return (done / subtasks.length) * 100;
+  }, [subtasks]);
+
+  // The actual progress to display
+  const progress = timerProgress !== null ? timerProgress : (hasSubtasks ? countProgress : 0);
+
+  // Main timer countdown
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
-    const completedSubtasks = hasSubtasks ? subtasks.filter((s: any) => s.status === 'done').length : 0;
-    const totalSubtasks = hasSubtasks ? subtasks.length : 0;
-
+    // Auto-complete parent if all subtasks done
     if (hasSubtasks) {
-      setProgress((completedSubtasks / totalSubtasks) * 100);
+      const completedSubtasks = subtasks.filter((s: any) => s.status === 'done').length;
+      const totalSubtasks = subtasks.length;
       if (totalSubtasks > 0 && completedSubtasks === totalSubtasks && todo.status !== 'done') {
         updateStatus({ id: todo._id, status: 'done' });
       } else if (completedSubtasks < totalSubtasks && todo.status === 'done') {
@@ -178,10 +475,6 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
         const elapsed = Date.now() - todo.timerStartTime!;
         const remaining = Math.max(0, todo.timerDuration! - elapsed);
         setTimeLeft(remaining);
-        if (!hasSubtasks) {
-          const prog = Math.min(100, (elapsed / todo.timerDuration!) * 100);
-          setProgress(prog);
-        }
         if (remaining === 0 && todo.status === 'in_progress') {
           updateStatus({ id: todo._id, status: 'done' });
         }
@@ -189,31 +482,15 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
       calculateTimeInfo();
       interval = setInterval(calculateTimeInfo, 1000);
     } else if (todo.status === 'paused') {
-      const remaining = todo.timeLeftAtPause || 0;
-      setTimeLeft(remaining);
-      if (!hasSubtasks) {
-        const prog = todo.timerDuration ? Math.min(100, ((todo.timerDuration - remaining) / todo.timerDuration) * 100) : 0;
-        setProgress(prog);
-      }
+      setTimeLeft(todo.timeLeftAtPause || 0);
     } else if (todo.status === 'done' || todo.status === 'not_done') {
-      if (!hasSubtasks) setProgress(todo.status === 'done' ? 100 : 0);
       setTimeLeft(0);
     } else {
-      if (!hasSubtasks) setProgress(0);
       setTimeLeft(todo.timerDuration || 0);
     }
 
     return () => { if (interval) clearInterval(interval); };
   }, [todo.status, todo.timerDuration, todo.timerStartTime, todo.timeLeftAtPause, subtasks]);
-
-  const formatTime = (ms: number) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    if (hours > 0) return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  };
 
   const stats = {
     done: subtasks?.filter((s: any) => s.status === 'done').length || 0,
@@ -230,6 +507,30 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     pauseTimer({ id: todo._id });
     if (lastNotifId) { await cancelNotification(lastNotifId); setLastNotifId(null); }
   };
+
+  const handleStartSubtask = useCallback((subId: Id<"todos">) => {
+    startSubtaskTimer({ id: subId });
+  }, [startSubtaskTimer]);
+
+  const handlePauseSubtask = useCallback((subId: Id<"todos">) => {
+    pauseSubtaskTimer({ id: subId });
+  }, [pauseSubtaskTimer]);
+
+  const handleToggleSubComplete = useCallback((subId: Id<"todos">, currentStatus: string) => {
+    updateStatus({ id: subId, status: currentStatus === 'done' ? 'not_started' : 'done' });
+  }, [updateStatus]);
+
+  const handleDeleteSub = useCallback((subId: Id<"todos">) => {
+    deleteTodo({ id: subId });
+  }, [deleteTodo]);
+
+  const handleSetSubTimer = useCallback((subId: Id<"todos">, ms: number) => {
+    setTimer({ id: subId, duration: ms });
+  }, [setTimer]);
+
+  const handleUpdateSubText = useCallback((subId: Id<"todos">, text: string) => {
+    updateTodo({ id: subId, text });
+  }, [updateTodo]);
 
   const moveToStatus = (status: string) => updateStatus({ id: todo._id, status });
 
@@ -254,12 +555,6 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     setShowSubtasks(!showSubtasks);
   };
 
-  const handleSaveSubEdit = (sub: any) => {
-    if (editingSubText.trim() && editingSubText !== sub.text) updateTodo({ id: sub._id, text: editingSubText.trim() });
-    setEditingSubId(null);
-    setEditingSubTimerOpen(null);
-  };
-
   // ─── Status colors ──────────────────────────────────────────────────────────
   let badgeText = "Not Started";
   let badgeBg = colors.border;
@@ -268,7 +563,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   let timerText = formatTime(timeLeft);
   let cardBg = colors.surface;
 
-  if (todo.status === "in_progress") { badgeText = "In Progress"; badgeBg = colors.warning + '20'; badgeColor = colors.warning; cardBg = colors.taskInProgressBg; }
+  if (todo.status === "in_progress") { badgeText = "In Progress"; badgeBg = colors.primary + '20'; badgeColor = colors.primary; cardBg = colors.taskInProgressBg; }
   else if (todo.status === "paused") { badgeText = "Paused"; badgeBg = colors.border; badgeColor = colors.text; timerIconColor = colors.textMuted; cardBg = colors.taskPausedBg; }
   else if (todo.status === "done") { badgeText = "Done"; badgeBg = colors.success + '20'; badgeColor = colors.success; timerText = "Done"; timerIconColor = colors.textMuted; cardBg = colors.taskDoneBg; }
   else if (todo.status === "not_done") { badgeText = "Not Done"; badgeBg = colors.danger + '20'; badgeColor = colors.danger; timerText = "—"; timerIconColor = colors.danger; cardBg = colors.taskNotDoneBg; }
@@ -277,6 +572,9 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const isTimerSet = !!todo.timerDuration;
   const isDueSoon = todo.dueDate && todo.dueDate < Date.now() + 86400000;
   if (!isTimerSet && hasSubtasks) timerText = `${stats.done}/${stats.total}`;
+
+  // Are any subtasks currently running?
+  const anySubtaskRunning = hasSubtasks && subtasks.some((s: any) => s.status === 'in_progress');
 
   return (
     <View style={{ marginLeft: depth * 16 }}>
@@ -312,7 +610,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                   >
                     <Ionicons name="timer-outline" size={16} color={isTimerSet ? colors.primary : colors.textMuted} />
                     <Text style={{ color: isTimerSet ? colors.primary : colors.textMuted, fontWeight: '600', fontSize: 13 }}>
-                      {isTimerSet ? `Timer: ${Math.floor(todo.timerDuration! / 3600000)}h ${Math.floor((todo.timerDuration! % 3600000) / 60000)}m` : 'Set Timer'}
+                      {isTimerSet ? `Timer: ${formatDuration(todo.timerDuration!)}` : 'Set Timer'}
                     </Text>
                     <Ionicons name={showTimerPicker ? "chevron-up" : "chevron-down"} size={14} color={colors.textMuted} />
                   </TouchableOpacity>
@@ -362,43 +660,87 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
             </View>
           </View>
 
+          {/* ─── Progress Bar (timer-weighted) ─── */}
+          {hasSubtasks && isTimerSet && (
+            <View style={{ marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textMuted, letterSpacing: 0.3 }}>
+                  Progress
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: progress >= 100 ? colors.success : colors.primary }}>
+                  {Math.round(progress)}%
+                </Text>
+              </View>
+              <View style={{
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                overflow: 'hidden',
+              }}>
+                <View style={{
+                  height: 6,
+                  borderRadius: 3,
+                  width: `${Math.min(100, progress)}%`,
+                  backgroundColor: progress >= 100 ? colors.success : progress >= 50 ? colors.primary : colors.warning,
+                }} />
+              </View>
+            </View>
+          )}
+
           {/* ─── Action Row ─── */}
           <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
-            {todo.status === 'not_started' && (
-              <View style={homeStyles.actionButtons}>
-                {!isTimerSet ? (
-                  <TouchableOpacity style={[homeStyles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 1 }]} onPress={() => onSetTimer(todo._id)}>
-                    <Ionicons name="timer-outline" size={16} color={colors.primary} />
-                    <Text style={[homeStyles.actionBtnText, { color: colors.primary }]}>Set Timer</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity style={[homeStyles.actionBtn, { backgroundColor: colors.primary }]} onPress={handleStartTimer}>
-                    <Ionicons name="play" size={16} color="#fff" />
-                    <Text style={[homeStyles.actionBtnText, { color: '#fff' }]}>Start Task</Text>
-                  </TouchableOpacity>
+            {/* Show main task timer controls ONLY when there are NO subtasks with timers */}
+            {!hasSubtaskTimers && (
+              <>
+                {todo.status === 'not_started' && (
+                  <View style={homeStyles.actionButtons}>
+                    {!isTimerSet ? (
+                      <TouchableOpacity style={[homeStyles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 1 }]} onPress={() => onSetTimer(todo._id)}>
+                        <Ionicons name="timer-outline" size={16} color={colors.primary} />
+                        <Text style={[homeStyles.actionBtnText, { color: colors.primary }]}>Set Timer</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity style={[homeStyles.actionBtn, { backgroundColor: colors.primary }]} onPress={handleStartTimer}>
+                        <Ionicons name="play" size={16} color="#fff" />
+                        <Text style={[homeStyles.actionBtnText, { color: '#fff' }]}>Start Task</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 )}
-              </View>
+
+                {todo.status === 'in_progress' && (
+                  <View style={homeStyles.actionButtons}>
+                    <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={handlePauseTimer}>
+                      <Ionicons name="pause" size={16} color={colors.text} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.successBg }]} onPress={() => moveToStatus('done')}>
+                      <Ionicons name="checkmark" size={18} color={colors.success} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.danger + '20' }]} onPress={() => moveToStatus('not_done')}>
+                      <Ionicons name="close" size={18} color={colors.danger} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {todo.status === 'paused' && (
+                  <View style={homeStyles.actionButtons}>
+                    <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.primary }]} onPress={handleStartTimer}>
+                      <Ionicons name="play" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </>
             )}
 
-            {todo.status === 'in_progress' && (
-              <View style={homeStyles.actionButtons}>
-                <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={handlePauseTimer}>
-                  <Ionicons name="pause" size={16} color={colors.text} />
-                </TouchableOpacity>
-                <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.successBg }]} onPress={() => moveToStatus('done')}>
-                  <Ionicons name="checkmark" size={18} color={colors.success} />
-                </TouchableOpacity>
-                <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.danger + '20' }]} onPress={() => moveToStatus('not_done')}>
-                  <Ionicons name="close" size={18} color={colors.danger} />
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {todo.status === 'paused' && (
-              <View style={homeStyles.actionButtons}>
-                <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.primary }]} onPress={handleStartTimer}>
-                  <Ionicons name="play" size={16} color="#fff" />
-                </TouchableOpacity>
+            {/* When subtasks have timers, show a status indicator instead */}
+            {hasSubtaskTimers && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {anySubtaskRunning && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.warning + '15', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.warning + '30' }}>
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.warning }} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.warning }}>Timer Running</Text>
+                  </View>
+                )}
               </View>
             )}
 
@@ -515,125 +857,22 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
       {/* ─── Subtask List ─── */}
       {showSubtasks && hasSubtasks && (
         <View style={{ marginTop: 8, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: colors.primary + '40', gap: 8 }}>
-          {subtasks.map((sub: any) => {
-            const isEditingThis = editingSubId === sub._id;
-            const isTimerOpenForThis = editingSubTimerOpen === sub._id;
-            return (
-              <View key={sub._id} style={{ backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden' }}>
-                {isEditingThis ? (
-                  /* ── FULL EDIT PANEL (expanded) ── */
-                  <View style={{ padding: 10, gap: 8 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, letterSpacing: 0.5 }}>EDITING SUBTASK</Text>
-
-                    {/* Top row: check + text input */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <TouchableOpacity onPress={() => updateStatus({ id: sub._id, status: sub.status === 'done' ? 'not_started' : 'done' })}>
-                        <Ionicons
-                          name={sub.status === 'done' ? 'checkmark-circle' : 'ellipse-outline'}
-                          size={22}
-                          color={sub.status === 'done' ? colors.success : colors.textMuted}
-                        />
-                      </TouchableOpacity>
-                      <TextInput
-                        style={{ flex: 1, color: colors.text, fontSize: 14, backgroundColor: colors.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.primary, fontWeight: '500' }}
-                        value={editingSubText}
-                        onChangeText={setEditingSubText}
-                        autoFocus
-                        onSubmitEditing={() => handleSaveSubEdit(sub)}
-                      />
-                    </View>
-
-                    {/* Timer toggle — styled like main task Set Timer button */}
-                    <TouchableOpacity
-                      style={[homeStyles.actionBtn, {
-                        backgroundColor: sub.timerDuration ? colors.primary + '15' : colors.surface,
-                        borderColor: colors.primary,
-                        borderWidth: 1,
-                        alignSelf: 'flex-start',
-                      }]}
-                      onPress={() => setEditingSubTimerOpen(isTimerOpenForThis ? null : sub._id)}
-                    >
-                      <Ionicons name="timer-outline" size={16} color={colors.primary} />
-                      <Text style={[homeStyles.actionBtnText, { color: colors.primary }]}>
-                        {sub.timerDuration
-                          ? `${Math.floor(sub.timerDuration / 3600000) > 0 ? Math.floor(sub.timerDuration / 3600000) + 'h ' : ''}${Math.floor((sub.timerDuration % 3600000) / 60000)}m`
-                          : 'Set Timer'}
-                      </Text>
-                      <Ionicons name={isTimerOpenForThis ? 'chevron-up' : 'chevron-down'} size={13} color={colors.primary} />
-                    </TouchableOpacity>
-
-                    {isTimerOpenForThis && (
-                      <InlineTimerPicker
-                        initialMs={sub.timerDuration}
-                        maxMs={todo.timerDuration}
-                        colors={colors}
-                        onSave={(ms) => {
-                          setTimer({ id: sub._id, duration: ms });
-                          setEditingSubTimerOpen(null);
-                        }}
-                        onCancel={() => setEditingSubTimerOpen(null)}
-                      />
-                    )}
-
-                    {/* Save / Cancel buttons */}
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <TouchableOpacity
-                        style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
-                        onPress={() => handleSaveSubEdit(sub)}
-                      >
-                        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Save</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={{ flex: 1, backgroundColor: colors.border, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
-                        onPress={() => { setEditingSubId(null); setEditingSubTimerOpen(null); }}
-                      >
-                        <Text style={{ color: colors.text, fontWeight: '600', fontSize: 13 }}>Cancel</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ) : (
-                  /* ── NORMAL ROW (collapsed) ── */
-                  <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10 }}>
-                    <TouchableOpacity onPress={() => updateStatus({ id: sub._id, status: sub.status === 'done' ? 'not_started' : 'done' })}>
-                      <Ionicons
-                        name={sub.status === 'done' ? 'checkmark-circle' : 'ellipse-outline'}
-                        size={22}
-                        color={sub.status === 'done' ? colors.success : colors.textMuted}
-                        style={{ marginRight: 10 }}
-                      />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
-                      onPress={() => { setEditingSubId(sub._id); setEditingSubText(sub.text); }}
-                    >
-                      <Text style={{ flex: 1, color: sub.status === 'done' ? colors.textMuted : colors.text, textDecorationLine: sub.status === 'done' ? 'line-through' : 'none', fontSize: 14, fontWeight: '500' }}>
-                        {sub.text}
-                      </Text>
-                      <Ionicons name="pencil" size={12} color={colors.textMuted} style={{ marginLeft: 4, opacity: 0.5 }} />
-                    </TouchableOpacity>
-
-                    {/* Timer badge */}
-                    {!!sub.timerDuration && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginLeft: 8 }}>
-                        <Ionicons name="timer-outline" size={14} color={colors.primary} />
-                        <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '700' }}>
-                          {sub.timerDuration >= 3600000
-                            ? `${Math.floor(sub.timerDuration / 3600000)}h ${Math.floor((sub.timerDuration % 3600000) / 60000)}m`
-                            : `${Math.floor(sub.timerDuration / 60000)}m`}
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Delete */}
-                    <TouchableOpacity style={{ paddingLeft: 12 }} onPress={() => deleteTodo({ id: sub._id })}>
-                      <Ionicons name="trash-outline" size={18} color={colors.danger} />
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
-            );
-          })}
+          {subtasks.map((sub: any) => (
+            <SubtaskRow
+              key={sub._id}
+              sub={sub}
+              parentTimerDuration={todo.timerDuration}
+              colors={colors}
+              isDarkMode={isDarkMode}
+              homeStyles={homeStyles}
+              onStartSubtask={handleStartSubtask}
+              onPauseSubtask={handlePauseSubtask}
+              onToggleComplete={handleToggleSubComplete}
+              onDelete={handleDeleteSub}
+              onSetTimer={handleSetSubTimer}
+              onUpdateText={handleUpdateSubText}
+            />
+          ))}
         </View>
       )}
     </View>

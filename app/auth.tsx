@@ -23,29 +23,39 @@ const AuthScreen = () => {
   const [loading, setLoading] = useState(false);
 
   const handleAuth = async () => {
-    if (!email || !password || (!isLogin && !name)) {
-      Alert.alert("Error", "Please fill in all fields");
+    if (!email.trim() || !password || (!isLogin && !name.trim())) {
+      Alert.alert("Missing Fields", "Please fill in all required fields.");
+      return;
+    }
+    if (password.length < 6) {
+      Alert.alert("Weak Password", "Password must be at least 6 characters.");
       return;
     }
 
     setLoading(true);
     try {
+      let userId: any;
       if (isLogin) {
-        const userId = await signInMutation({ email, password });
-        await linkAccount(userId);
-        router.back();
+        userId = await signInMutation({ email: email.trim(), password });
       } else {
-        const userId = await signUpMutation({ 
-          email, 
-          password, 
-          name, 
-          anonymousId: (isAnonymous && currentUserId) ? currentUserId : undefined 
+        userId = await signUpMutation({
+          email: email.trim(),
+          password,
+          name: name.trim(),
+          anonymousId: (isAnonymous && currentUserId) ? currentUserId : undefined,
         });
-        await linkAccount(userId);
-        router.back();
       }
+
+      if (!userId) {
+        throw new Error("Authentication failed — no user ID returned.");
+      }
+
+      await linkAccount(userId);
+      router.back();
     } catch (error: any) {
-      Alert.alert("Auth Error", error.message);
+      // Make Convex error messages more readable (they often include stack traces)
+      const msg = error?.message?.split('\n')[0] || "Authentication failed. Please try again.";
+      Alert.alert("Auth Error", msg);
     } finally {
       setLoading(false);
     }

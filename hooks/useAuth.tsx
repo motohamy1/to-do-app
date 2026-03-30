@@ -106,11 +106,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
-    // When signing out, we might want to create a NEW guest account immediately 
-    // to keep the app functional without a restart.
-    const newAnonId = await createAnonMutation();
-    setUserId(newAnonId);
-    await safeStorage.setItem("userId", newAnonId);
+    try {
+      // Create a fresh anonymous account so app stays functional without restart
+      const newAnonId = await createAnonMutation();
+      setUserId(newAnonId);
+      await safeStorage.setItem("userId", newAnonId);
+    } catch (error) {
+      console.warn("Sign out failed to create new anonymous session:", error);
+      // Clear storage so next app launch creates a fresh anon session
+      setUserId(null);
+      await safeStorage.removeItem("userId");
+    }
   };
 
   const linkAccount = async (id: Id<"users">) => {
@@ -122,7 +128,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     <AuthContext.Provider value={{ 
       userId, 
       isLoading, 
-      isAnonymous: user?.isAnonymous ?? false,
+      isAnonymous: user ? (user.isAnonymous ?? false) : true,
       language: user?.language ?? "en",
       notificationsEnabled: user?.notificationsEnabled ?? true,
       userName: user?.name ?? null,

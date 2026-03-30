@@ -70,6 +70,28 @@ export const setTimer = mutation({
     date: v.optional(v.number()) 
   },
   handler: async (ctx, args) => {
+    // If this is a subtask, validate against parent budget
+    if (args.duration !== undefined) {
+      const todo = await ctx.db.get(args.id);
+      if (todo?.parentId) {
+        const parent = await ctx.db.get(todo.parentId);
+        if (parent?.timerDuration) {
+          const siblings = await ctx.db
+            .query("todos")
+            .withIndex("by_parent", (q) => q.eq("parentId", todo.parentId!))
+            .collect();
+          const otherSubtasksDuration = siblings
+            .filter((s) => s._id !== args.id)
+            .reduce((sum, s) => sum + (s.timerDuration || 0), 0);
+          if (otherSubtasksDuration + args.duration > parent.timerDuration) {
+            throw new Error(
+              `Subtask timer exceeds budget. Available: ${Math.floor((parent.timerDuration - otherSubtasksDuration) / 60000)} minutes.`
+            );
+          }
+        }
+      }
+    }
+
     await ctx.db.patch(args.id, { 
       ...(args.duration !== undefined && { timerDuration: args.duration }),
       ...(args.dueDate !== undefined && { dueDate: args.dueDate }),
@@ -111,6 +133,79 @@ export const pauseTimer = mutation({
       timeLeftAtPause: remaining
     });
   }
+});
+
+// Start a subtask timer and sync the parent timer
+export const startSubtaskTimer = mutation({
+  args: { id: v.id("todos") },
+  handler: async (ctx, args) => {
+    const sub = await ctx.db.get(args.id);
+    if (!sub || !sub.parentId || !sub.timerDuration) return;
+
+    // Start subtask timer
+    let subStartTime = Date.now();
+    if (sub.status === "paused" && sub.timeLeftAtPause !== undefined) {
+      subStartTime = Date.now() - (sub.timerDuration - sub.timeLeftAtPause);
+    }
+    await ctx.db.patch(args.id, {
+      status: "in_progress",
+      timerStartTime: subStartTime,
+      timeLeftAtPause: undefined,
+    });
+
+    // Auto-start parent if not already running
+    const parent = await ctx.db.get(sub.parentId);
+    if (parent && parent.status !== "in_progress" && parent.timerDuration) {
+      let parentStartTime = Date.now();
+      if (parent.status === "paused" && parent.timeLeftAtPause !== undefined) {
+        parentStartTime = Date.now() - (parent.timerDuration - parent.timeLeftAtPause);
+      }
+      await ctx.db.patch(sub.parentId, {
+        status: "in_progress",
+        timerStartTime: parentStartTime,
+        timeLeftAtPause: undefined,
+      });
+    }
+  },
+});
+
+// Pause a subtask timer and conditionally pause parent
+export const pauseSubtaskTimer = mutation({
+  args: { id: v.id("todos") },
+  handler: async (ctx, args) => {
+    const sub = await ctx.db.get(args.id);
+    if (!sub || !sub.parentId || sub.status !== "in_progress" || !sub.timerStartTime || !sub.timerDuration) return;
+
+    // Pause subtask
+    const elapsed = Date.now() - sub.timerStartTime;
+    const remaining = Math.max(0, sub.timerDuration - elapsed);
+    await ctx.db.patch(args.id, {
+      status: "paused",
+      timeLeftAtPause: remaining,
+    });
+
+    // Check if any sibling subtasks are still running
+    const siblings = await ctx.db
+      .query("todos")
+      .withIndex("by_parent", (q) => q.eq("parentId", sub.parentId!))
+      .collect();
+    const anyStillRunning = siblings.some(
+      (s) => s._id !== args.id && s.status === "in_progress"
+    );
+
+    // If no siblings running, pause parent too
+    if (!anyStillRunning) {
+      const parent = await ctx.db.get(sub.parentId);
+      if (parent && parent.status === "in_progress" && parent.timerStartTime && parent.timerDuration) {
+        const parentElapsed = Date.now() - parent.timerStartTime;
+        const parentRemaining = Math.max(0, parent.timerDuration - parentElapsed);
+        await ctx.db.patch(sub.parentId, {
+          status: "paused",
+          timeLeftAtPause: parentRemaining,
+        });
+      }
+    }
+  },
 });
 
 export const deleteTodo = mutation({

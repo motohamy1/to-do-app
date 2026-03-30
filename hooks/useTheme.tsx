@@ -91,7 +91,7 @@ const lightColors: ColorScheme = {
   successBg: "#E0FBF2",
   warningBg: "#FFF8E1",
   dangerBg: "#FFEBEE",
-  taskInProgressBg: "#f6bf0aff", // Orange 100 - clearly orange tinted
+  taskInProgressBg: "#fdc448ff", // Custom orange for in-progress
   taskNotStartedBg: "#F1F5F9", // Slightly gray
   taskDoneBg: "#E0FBF2",
   taskPausedBg: "#FFF7ED", // Orange 50 - subtler orange
@@ -118,9 +118,9 @@ const darkColors: ColorScheme = {
   bg: "#0A0B10",
   surface: "#12141C",
   text: "#EDF0FF",
-  textMuted: "#7A8099",
+  textMuted: "#a4b1e6ff",
   border: "#1E2130",
-  primary: "#7C5CFF",
+  primary: "#917de4ff",
   success: "#00C58E",
   warning: "#FFAB00",
   danger: "#FF4D6A",
@@ -129,7 +129,7 @@ const darkColors: ColorScheme = {
   successBg: "#0A2E24",
   warningBg: "#2A1E00",
   dangerBg: "#2A0A10",
-  taskInProgressBg: "#4C2B0A", // More saturated dark orange
+  taskInProgressBg: "#023e66ff", // Custom orange for in-progress
   taskNotStartedBg: "#1E2130", // Slightly gray-dark
   taskDoneBg: "#0A2E24",
   taskPausedBg: "#2A1E0D", // Muted dark orange

@@ -25,8 +25,6 @@ if (Notifications) {
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
       }),
     });
   } catch (error) {
@@ -102,7 +100,17 @@ export async function scheduleDailyReminders() {
   if (!Notifications) return;
 
   try {
-    await Notifications.cancelAllScheduledNotificationsAsync();
+    // Only cancel previously scheduled daily reminders (by identifier prefix),
+    // NOT timer notifications — cancelAllScheduled was wiping those too.
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const n of scheduled) {
+      if (
+        n.content.title === "Good Morning! 🌅" ||
+        n.content.title === "Evening Summary 🌙"
+      ) {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+      }
+    }
 
     await Notifications.scheduleNotificationAsync({
       content: {
