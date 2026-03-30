@@ -15,8 +15,8 @@ export const createHomeStyles = (colors: ColorScheme) => {
       alignItems: "center",
       justifyContent: "space-between",
       paddingHorizontal: 24,
-      paddingTop: 32,
-      paddingBottom: 24,
+      paddingTop: 16,
+      paddingBottom: 12,
     },
     headerLeft: {
       flexDirection: "row",
@@ -39,17 +39,17 @@ export const createHomeStyles = (colors: ColorScheme) => {
       padding: 4,
     },
     scrollContent: {
-      paddingVertical: 24,
+      paddingVertical: 12,
       paddingBottom: 100,
     },
     section: {
-      marginBottom: 32,
+      marginBottom: 16,
     },
     sectionTitle: {
       fontSize: 12,
       fontWeight: "700",
       color: colors.textMuted,
-      marginBottom: 16,
+      marginBottom: 8,
       letterSpacing: 1,
       textTransform: "uppercase",
       paddingHorizontal: 24, // As ScrollView content no longer has padding
@@ -60,8 +60,8 @@ export const createHomeStyles = (colors: ColorScheme) => {
     },
     card: {
       backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 20,
+      borderRadius: 12,
+      padding: 12,
       width: 280, // Fixed width for horizontal scrolling
       shadowColor: colors.primary,
       shadowOffset: {
@@ -155,12 +155,12 @@ export const createHomeStyles = (colors: ColorScheme) => {
       borderStyle: "dashed",
       borderWidth: 1,
       borderColor: colors.border,
-      marginVertical: 16,
+      marginVertical: 8,
     },
     projectRow: {
       flexDirection: "row",
       alignItems: "center",
-      marginBottom: 16,
+      marginBottom: 8,
       gap: 8,
     },
     projectText: {

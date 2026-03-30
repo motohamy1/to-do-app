@@ -30,6 +30,11 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [status, setStatus] = useState<string>("not_started");
 
+  // Subtasks State
+  const [pendingSubtasks, setPendingSubtasks] = useState<{text: string, timerDuration?: number}[]>([]);
+  const [newSubtaskText, setNewSubtaskText] = useState("");
+  const [activeTimerIndex, setActiveTimerIndex] = useState<number | null>(null);
+
   useEffect(() => {
     if (initialDate) {
       setSelectedDate(initialDate);
@@ -45,7 +50,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId }) => {
     }
     if (newTodo.trim()) {
       try {
-        await addTodo({ 
+        const todoId = await addTodo({ 
           userId,
           text: newTodo.trim(),
           date: selectedDate,
@@ -54,6 +59,18 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId }) => {
           ...(autoStart && timerDuration && status !== 'done' ? { status: 'in_progress', timerStartTime: Date.now() } : {}),
           ...(projectId ? { projectId } : {}),
         });
+
+        // Add pending subtasks
+        for (const sub of pendingSubtasks) {
+          await addTodo({
+            userId,
+            text: sub.text,
+            status: "not_started",
+            parentId: todoId,
+            ...(sub.timerDuration && { timerDuration: sub.timerDuration }),
+            ...(projectId ? { projectId } : {}),
+          });
+        }
         
         // Reset state
         setNewTodo("");
@@ -62,6 +79,9 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId }) => {
         setIsAdding(false);
         setSelectedDate(Date.now());
         setStatus("not_started");
+        setPendingSubtasks([]);
+        setNewSubtaskText("");
+        setActiveTimerIndex(null);
       } catch (error) {
         console.log("Error adding a todo", error);
         Alert.alert("Error", "Failed to add todo");
@@ -111,6 +131,56 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId }) => {
           </TouchableOpacity>
         </View>
 
+        {/* Pending Subtasks List */}
+        {pendingSubtasks.length > 0 && (
+          <View style={{ gap: 8, marginTop: 8, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: colors.primary + '40' }}>
+            {pendingSubtasks.map((sub, idx) => (
+              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, padding: 8, borderRadius: 8 }}>
+                <Ionicons name="ellipse-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
+                <Text style={{ flex: 1, color: colors.text, fontSize: 13 }}>{sub.text}</Text>
+                
+                <TouchableOpacity 
+                   style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: sub.timerDuration ? colors.primary + '20' : 'transparent', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6, marginRight: 8 }}
+                   onPress={() => { setActiveTimerIndex(idx); setTimerModalVisible(true); }}
+                >
+                  <Ionicons name="timer-outline" size={14} color={sub.timerDuration ? colors.primary : colors.textMuted} />
+                  {!!sub.timerDuration && <Text style={{ fontSize: 11, color: colors.primary }}>{Math.floor(sub.timerDuration / 60000)}m</Text>}
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => setPendingSubtasks(prev => prev.filter((_, i) => i !== idx))}>
+                  <Ionicons name="close-circle" size={18} color={colors.danger} />
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Add Subtask Input */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: colors.border }}>
+           <Ionicons name="return-down-forward" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
+           <TextInput
+             style={[homeStyles.addInput, { flex: 1, paddingVertical: 4, fontSize: 13 }]}
+             placeholder="Add a sub-task..."
+             placeholderTextColor={colors.textMuted}
+             value={newSubtaskText}
+             onChangeText={setNewSubtaskText}
+             onSubmitEditing={() => {
+               if (newSubtaskText.trim()) {
+                 setPendingSubtasks(prev => [...prev, { text: newSubtaskText.trim() }]);
+                 setNewSubtaskText("");
+               }
+             }}
+           />
+           <TouchableOpacity onPress={() => {
+             if (newSubtaskText.trim()) {
+                 setPendingSubtasks(prev => [...prev, { text: newSubtaskText.trim() }]);
+                 setNewSubtaskText("");
+             }
+           }}>
+             <Ionicons name="add-circle" size={24} color={newSubtaskText.trim() ? colors.primary : colors.textMuted} />
+           </TouchableOpacity>
+        </View>
+
         {/* Status Selection Row */}
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border + '40', flexWrap: 'wrap' }}>
             {statusOptions.map(opt => (
@@ -141,7 +211,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId }) => {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <TouchableOpacity 
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: timerDuration ? colors.primary + '20' : 'transparent', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }} 
-              onPress={() => setTimerModalVisible(true)}
+              onPress={() => { setActiveTimerIndex(null); setTimerModalVisible(true); }}
             >
               <Ionicons name="timer-outline" size={18} color={timerDuration ? colors.primary : colors.textMuted} />
               <Text style={{ fontSize: 13, color: timerDuration ? colors.primary : colors.textMuted, fontWeight: '500' }}>
@@ -197,8 +267,26 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId }) => {
         visible={isTimerModalVisible}
         onClose={() => setTimerModalVisible(false)}
         onSave={(ms: number) => {
-          setTimerDuration(ms);
-          if (ms === 0) setAutoStart(false); 
+          if (activeTimerIndex === null) {
+            // Main task timer validation
+            const totalSubTime = pendingSubtasks.reduce((acc, sub) => acc + (sub.timerDuration || 0), 0);
+            if (ms > 0 && totalSubTime > ms) {
+              Alert.alert("Invalid Timer", "The main task timer cannot be less than the sum of its subtask timers.");
+              return;
+            }
+            setTimerDuration(ms);
+            if (ms === 0) setAutoStart(false); 
+          } else {
+            // Subtask timer validation
+            const currentSubTime = pendingSubtasks[activeTimerIndex].timerDuration || 0;
+            const otherSubTime = pendingSubtasks.reduce((acc, sub) => acc + (sub.timerDuration || 0), 0) - currentSubTime;
+            if (timerDuration && (otherSubTime + ms) > timerDuration) {
+               Alert.alert("Invalid Timer", "The sum of all subtask timers cannot exceed the main task timer.");
+               return;
+            }
+            setPendingSubtasks(prev => prev.map((sub, i) => i === activeTimerIndex ? { ...sub, timerDuration: ms > 0 ? ms : undefined } : sub));
+          }
+          setTimerModalVisible(false);
         }}
       />
     </>

@@ -1,7 +1,8 @@
 import { Platform } from 'react-native';
-import Constants, { ExecutionEnvironment } from 'expo-constants';
+import Constants from 'expo-constants';
 
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+// In SDK 55, executionEnvironment is a string: 'storeClient' | 'standalone' | 'bare'
+const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
 function getNotificationsAPI() {
   if (isExpoGo && Platform.OS === 'android') {
@@ -77,7 +78,6 @@ export async function scheduleTimerNotification(title: string, durationMs: numbe
         priority: 'high', // AndroidNotificationPriority.HIGH corresponds to 'high' or 'max'
       },
       trigger: {
-        type: 'timeInterval', // SchedulableTriggerInputTypes.TIME_INTERVAL
         seconds: seconds > 0 ? seconds : 1,
       },
     });
@@ -110,9 +110,9 @@ export async function scheduleDailyReminders() {
         body: "Check your tasks and plan your day.",
       },
       trigger: {
-        type: 'daily', // SchedulableTriggerInputTypes.DAILY
         hour: 9,
         minute: 0,
+        repeats: true,
       },
     });
 
@@ -122,9 +122,9 @@ export async function scheduleDailyReminders() {
         body: "How did you do today? Check off your completed tasks!",
       },
       trigger: {
-        type: 'daily',
         hour: 20,
         minute: 0,
+        repeats: true,
       },
     });
   } catch (error) {
