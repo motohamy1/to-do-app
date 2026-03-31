@@ -35,6 +35,11 @@ export const addTodo = mutation({
     projectId: v.optional(v.string()),
     date: v.optional(v.number()),
     parentId: v.optional(v.id("todos")),
+    description: v.optional(v.string()),
+    location: v.optional(v.string()),
+    meetingLink: v.optional(v.string()),
+    priority: v.optional(v.string()),
+    categoryId: v.optional(v.id("projectCategories")),
   },
   handler: async (ctx, args) => {
     const todoId = await ctx.db.insert("todos", {
@@ -47,6 +52,11 @@ export const addTodo = mutation({
       ...(args.projectId && { projectId: args.projectId }),
       ...(args.date && { date: args.date }),
       ...(args.parentId && { parentId: args.parentId }),
+      ...(args.description !== undefined && { description: args.description }),
+      ...(args.location !== undefined && { location: args.location }),
+      ...(args.meetingLink !== undefined && { meetingLink: args.meetingLink }),
+      ...(args.priority !== undefined && { priority: args.priority }),
+      ...(args.categoryId !== undefined && { categoryId: args.categoryId }),
     });
     return todoId;
   },
@@ -226,12 +236,16 @@ export const deleteTodo = mutation({
 export const updateTodo = mutation({
   args: {
     id: v.id('todos'),
-    text: v.string(),
+    text: v.optional(v.string()),
+    description: v.optional(v.string()),
+    location: v.optional(v.string()),
+    meetingLink: v.optional(v.string()),
+    priority: v.optional(v.string()),
+    categoryId: v.optional(v.id("projectCategories")),
   },
   handler: async (ctx, args) => {
-    await ctx.db.patch(args.id, {
-      text: args.text,
-    })
+    const { id, ...updates } = args;
+    await ctx.db.patch(id, updates);
   }
 })
 

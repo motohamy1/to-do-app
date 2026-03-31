@@ -14,16 +14,28 @@ import ProjectPickerModal from '@/components/ProjectPickerModal';
 import { createHomeStyles } from '@/assets/styles/home.styles';
 import { Id } from '@/convex/_generated/dataModel';
 
-const months = [
+import { useTranslation } from '@/utils/i18n';
+
+const months_en = [
   'January', 'February', 'March', 'April',
   'May', 'June', 'July', 'August',
   'September', 'October', 'November', 'December'
 ];
 
+const months_ar = [
+  'يناير', 'فبراير', 'مارس', 'أبريل',
+  'مايو', 'يونيو', 'يوليو', 'أغسطس',
+  'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+];
+
 const Planner = () => {
   const { colors, isDarkMode, toggleDarkMode } = useTheme();
-  const styles = createPlannerStyles(colors);
-  const homeStyles = createHomeStyles(colors);
+  const { userId, language } = useAuth();
+  const { t, isArabic } = useTranslation(language);
+  const styles = createPlannerStyles(colors, isArabic);
+  const homeStyles = createHomeStyles(colors, isArabic);
+  const months = isArabic ? months_ar : months_en;
+  
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   
@@ -71,7 +83,6 @@ const Planner = () => {
   const pillTranslate = toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] });
   const trackBg = toggleAnim.interpolate({ inputRange: [0, 1], outputRange: ['#E2E8F0', '#1E2130'] });
   
-  const { userId } = useAuth();
   const todos = useQuery(api.todos.get, userId ? { userId } : "skip") || [];
 
   const currentYear = new Date().getFullYear();
@@ -84,7 +95,6 @@ const Planner = () => {
     return todos.filter(todo => {
       if (!todo.date) return false;
       const todoDate = new Date(todo.date);
-      // Ensure we compare day, month, and year correctly
       return todoDate.getDate() === day && 
              todoDate.getMonth() === month && 
              todoDate.getFullYear() === year;
@@ -109,7 +119,7 @@ const Planner = () => {
       showsVerticalScrollIndicator={false} 
       contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingBottom: 80 }}
     >
-      <View style={styles.monthGrid}>
+      <View style={[styles.monthGrid, isArabic && { flexDirection: 'row-reverse' }]}>
         {months.map((month, index) => {
           const tasks = getTasksForMonth(index);
           const isSelected = selectedMonth === index;
@@ -122,10 +132,10 @@ const Planner = () => {
             >
               {tasks.length > 0 && !isSelected && <View style={styles.monthIndicator} />}
               <Text style={[styles.monthName, isSelected && styles.selectedMonthName]}>
-                {month.substring(0, 3)}
+                {isArabic ? month : month.substring(0, 3)}
               </Text>
               <Text style={[styles.monthStats, isSelected && styles.selectedMonthStats]}>
-                {tasks.length > 0 ? `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}` : 'Empty'}
+                {tasks.length > 0 ? `${tasks.length} ${tasks.length === 1 ? t.task : t.tasks}` : t.empty}
               </Text>
             </TouchableOpacity>
           );
@@ -164,7 +174,7 @@ const Planner = () => {
                     styles.dayStats, 
                     isToday && styles.todayStats
                 ]}>
-                    {tasks.length > 0 ? `${tasks.length} ${tasks.length === 1 ? 'task' : 'tasks'}` : 'Empty'}
+                    {tasks.length > 0 ? `${tasks.length} ${tasks.length === 1 ? t.task : t.tasks}` : t.empty}
                 </Text>
             </TouchableOpacity>
         );
@@ -177,15 +187,15 @@ const Planner = () => {
         >
 
             <View style={{ paddingHorizontal: 24, marginBottom: 32, alignItems: 'center' }}>
-                <Text style={[styles.headerTitle, { fontSize: 38, letterSpacing: -1 }]}>{months[monthIndex]}</Text>
+                <Text style={[styles.headerTitle, { fontSize: isArabic ? 34 : 38, letterSpacing: -1 }]}>{months[monthIndex]}</Text>
                 <View style={{ height: 4, width: 40, backgroundColor: colors.primary, borderRadius: 2, marginTop: 8 }} />
                 <Text style={{ color: colors.textMuted, fontSize: 14, marginTop: 12, fontWeight: '700' }}>
-                    {getTasksForMonth(monthIndex).length} tasks this month
+                    {getTasksForMonth(monthIndex).length} {t.tasksThisMonth}
                 </Text>
             </View>
 
-            <View style={styles.dayGrid}>
-                {dayElements}
+            <View style={[styles.dayGrid, isArabic && { flexDirection: 'row-reverse' }]}>
+                {isArabic ? [...dayElements].reverse() : dayElements}
             </View>
         </ScrollView>
     );
@@ -198,10 +208,10 @@ const Planner = () => {
     return (
         <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
 
-            <View style={styles.specificDayHeader}>
-                <Text style={styles.specificDayTitle}>{day} {months[month]}</Text>
-                <Text style={styles.specificDaySubtitle}>
-                    {tasks.length === 0 ? 'No tasks for today. Start planning!' : `${tasks.length} tasks scheduled`}
+            <View style={[styles.specificDayHeader, isArabic && { alignItems: 'flex-end' }]}>
+                <Text style={styles.specificDayTitle}>{isArabic ? `${day} ${months[month]}` : `${day} ${months[month]}`}</Text>
+                <Text style={[styles.specificDaySubtitle, isArabic && { textAlign: 'right' }]}>
+                    {tasks.length === 0 ? t.startPlanning : `${tasks.length} ${t.tasksScheduled}`}
                 </Text>
             </View>
 
@@ -248,7 +258,7 @@ const Planner = () => {
                     return (
                         <TouchableOpacity 
                             key={task._id} 
-                            style={styles.taskItem}
+                            style={[styles.taskItem, isArabic && { flexDirection: 'row-reverse' }]}
                             onPress={() => setExpandedTodoId(task._id)}
                             activeOpacity={0.7}
                         >
@@ -265,16 +275,17 @@ const Planner = () => {
                                     color={task.status === 'done' ? colors.success : colors.border} 
                                 />
                             </TouchableOpacity>
-                            <View style={{ flex: 1 }}>
+                            <View style={{ flex: 1, marginHorizontal: 12 }}>
                                 <Text style={[
                                     styles.taskItemText, 
-                                    task.status === 'done' && { textDecorationLine: 'line-through', color: colors.textMuted, opacity: 0.6 }
+                                    task.status === 'done' && { textDecorationLine: 'line-through', color: colors.textMuted, opacity: 0.6 },
+                                    isArabic && { textAlign: 'right' }
                                 ]}>
                                     {task.text}
                                 </Text>
                                 {task.status !== 'done' && task.status && (
-                                    <Text style={{ fontSize: 11, color: colors.textMuted, textTransform: 'capitalize', marginTop: 2 }}>
-                                        {task.status.replace('_', ' ')}
+                                    <Text style={[{ fontSize: 11, color: colors.textMuted, textTransform: 'capitalize', marginTop: 2 }, isArabic && { textAlign: 'right' }]}>
+                                        {isArabic ? (t as any)[task.status] || task.status : task.status.replace('_', ' ')}
                                     </Text>
                                 )}
                             </View>
@@ -306,13 +317,12 @@ const Planner = () => {
 
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, isArabic && { direction: 'rtl' }]}>
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.bg} />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-            <Text style={styles.headerTitle}>Planner</Text>
+        <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
+            <Text style={styles.headerTitle}>{t.planner}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              {/* Dark/Light Mode Toggle */}
               <TouchableOpacity
                 onPress={toggleDarkMode}
                 activeOpacity={0.85}
@@ -329,7 +339,6 @@ const Planner = () => {
                   />
                 </Animated.View>
               </TouchableOpacity>
-              {/* Close / Reset */}
               {(selectedMonth !== null || selectedDay !== null) && (
                 <TouchableOpacity onPress={resetAll}>
                   <Ionicons name="close" size={28} color={colors.text} />

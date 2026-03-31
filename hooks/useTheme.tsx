@@ -73,6 +73,7 @@ export interface ColorScheme {
     input: string;
     editInput: string;
   };
+  surfaceText: string;
   statusBarStyle: "light-content" | "dark-content";
 }
 
@@ -111,16 +112,18 @@ const lightColors: ColorScheme = {
     input: "#FFFFFF",
     editInput: "#F8F9FF",
   },
+  surfaceText: "#0D0F1A",
   statusBarStyle: "dark-content" as const,
 };
 
 const darkColors: ColorScheme = {
-  bg: "#0A0B10",
-  surface: "#12141C",
-  text: "#EDF0FF",
-  textMuted: "#a4b1e6ff",
-  border: "#1E2130",
-  primary: "#917de4ff",
+  bg: "#1A1A1A",
+  surface: "#cbc9fe",
+  surfaceText: "#0D0F1A",
+  text: "#FFFFFF",
+  textMuted: "#888888",
+  border: "#333333",
+  primary: "#D4F82D",
   success: "#00C58E",
   warning: "#FFAB00",
   danger: "#FF4D6A",
@@ -129,16 +132,16 @@ const darkColors: ColorScheme = {
   successBg: "#0A2E24",
   warningBg: "#2A1E00",
   dangerBg: "#2A0A10",
-  taskInProgressBg: "#023e66ff", // Custom orange for in-progress
-  taskNotStartedBg: "#1E2130", // Slightly gray-dark
-  taskDoneBg: "#0A2E24",
-  taskPausedBg: "#2A1E0D", // Muted dark orange
-  taskNotDoneBg: "#2A0A10",
+  taskInProgressBg: "#cbc9fe",
+  taskNotStartedBg: "#cbc9fe",
+  taskDoneBg: "#cbc9fe",
+  taskPausedBg: "#cbc9fe",
+  taskNotDoneBg: "#cbc9fe",
   shadow: "#000000",
   gradients: {
-    background: ["#0A0B10", "#0D0F18"],
-    surface: ["#12141C", "#161824"],
-    primary: ["#7C5CFF", "#6C47FF"],
+    background: ["#1A1A1A", "#1A1A1A"],
+    surface: ["#FFFFFF", "#FFFFFF"],
+    primary: ["#D4F82D", "#C4E81D"],
     success: ["#00C58E", "#00A87A"],
     warning: ["#FFAB00", "#E09600"],
     danger: ["#FF4D6A", "#E0394F"],
@@ -146,8 +149,8 @@ const darkColors: ColorScheme = {
     empty: ["#1A1C28", "#1E2030"],
   },
   backgrounds: {
-    input: "#12141C",
-    editInput: "#0A0B10",
+    input: "#FFFFFF",
+    editInput: "#FFFFFF",
   },
   statusBarStyle: "light-content" as const,
 };

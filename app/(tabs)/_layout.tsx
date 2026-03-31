@@ -2,9 +2,14 @@ import { Tabs } from 'expo-router';
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Platform } from 'react-native';
 
 const _layout = () => {
   const { colors, isDarkMode } = useTheme();
+  const insets = useSafeAreaInsets();
+  const paddingBottom = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : Math.max(insets.bottom, 30);
+  const tabHeight = 60 + paddingBottom;
 
   return (
     <Tabs
@@ -13,7 +18,7 @@ const _layout = () => {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarStyle: {
-          backgroundColor: isDarkMode ? 'rgba(10, 11, 16, 0.85)' : 'rgba(240, 242, 250, 0.85)',
+          backgroundColor: isDarkMode ? 'rgba(10, 11, 16, 1)' : 'rgba(240, 242, 250, 1)',
           position: 'absolute',
           borderTopLeftRadius: 32,
           borderTopRightRadius: 32,
@@ -22,8 +27,8 @@ const _layout = () => {
           borderRightWidth: 1,
           borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
           elevation: 0,
-          height: 90,
-          paddingBottom: 30,
+          height: tabHeight,
+          paddingBottom: paddingBottom,
           paddingTop: 12,
           left: 0,
           right: 0,

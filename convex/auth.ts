@@ -30,7 +30,7 @@ export const signUp = mutation({
       throw new Error("User with this email already exists");
     }
 
-    const hashedPassword = await bcrypt.hash(args.password, 10);
+    const hashedPassword = bcrypt.hashSync(args.password, 10);
 
     if (args.anonymousId) {
       // Upgrade existing anonymous user
@@ -75,7 +75,7 @@ export const signIn = mutation({
       throw new Error("Invalid email or password");
     }
 
-    const isValid = await bcrypt.compare(args.password, user.password);
+    const isValid = bcrypt.compareSync(args.password, user.password);
 
     if (!isValid) {
       throw new Error("Invalid email or password");

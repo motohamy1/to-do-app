@@ -21,6 +21,11 @@ export default defineSchema({
     timeLeftAtPause: v.optional(v.number()), 
     dueDate: v.optional(v.number()), 
     projectId: v.optional(v.string()), 
+    categoryId: v.optional(v.id("projectCategories")),
+    description: v.optional(v.string()),
+    location: v.optional(v.string()),
+    meetingLink: v.optional(v.string()),
+    priority: v.optional(v.string()), 
     date: v.optional(v.number()), 
     parentId: v.optional(v.id("todos")),
   }).index("by_user", ["userId"])

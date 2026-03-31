@@ -1,9 +1,9 @@
 import { ColorScheme } from "@/hooks/useTheme";
-import { StyleSheet, Dimensions } from "react-native";
+import { StyleSheet, Dimensions, Platform } from "react-native";
 
 const { width } = Dimensions.get('window');
 
-export const createSettingsStyles = (colors: ColorScheme) => {
+export const createSettingsStyles = (colors: ColorScheme, isArabic: boolean = false) => {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -21,7 +21,7 @@ export const createSettingsStyles = (colors: ColorScheme) => {
       paddingBottom: 24,
     },
     headerTitle: {
-      fontSize: 34,
+      fontSize: isArabic ? 38 : 34,
       fontWeight: '800',
       color: colors.text,
       letterSpacing: -1,
@@ -31,13 +31,14 @@ export const createSettingsStyles = (colors: ColorScheme) => {
       paddingHorizontal: 20,
     },
     sectionTitle: {
-      fontSize: 13,
+      fontSize: isArabic ? 15 : 13,
       fontWeight: '800',
       color: colors.primary,
       textTransform: 'uppercase',
       letterSpacing: 1.5,
       marginBottom: 16,
-      marginLeft: 4,
+      marginLeft: isArabic ? 0 : 4,
+      marginRight: isArabic ? 4 : 0,
     },
     card: {
       backgroundColor: colors.surface,
@@ -71,9 +72,9 @@ export const createSettingsStyles = (colors: ColorScheme) => {
       flex: 1,
     },
     profileName: {
-      fontSize: 22,
+      fontSize: isArabic ? 24 : 22,
       fontWeight: '800',
-      color: colors.text,
+      color: colors.surfaceText,
       marginBottom: 4,
     },
     profileEmail: {
@@ -97,9 +98,9 @@ export const createSettingsStyles = (colors: ColorScheme) => {
     },
     settingLabel: {
       flex: 1,
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
+      fontSize: isArabic ? 18 : 16,
+      fontWeight: '700',
+      color: colors.surfaceText,
     },
     settingValue: {
       fontSize: 14,
@@ -129,9 +130,9 @@ export const createSettingsStyles = (colors: ColorScheme) => {
     },
     dbValue: {
       fontSize: 14,
-      color: colors.text,
+      color: colors.surfaceText,
       fontWeight: '700',
-      fontFamily: 'monospace',
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     },
     statusBadge: {
       paddingHorizontal: 8,

@@ -8,7 +8,7 @@ const totalPadding = paddingHorizontal * 2;
 // Subtracting border width (approx 3-4px total) and a small buffer to ensure 3 columns
 const cardWidth = (width - totalPadding - (gapSize * 2) - 6) / 3;
 
-export const createPlannerStyles = (colors: ColorScheme) => {
+export const createPlannerStyles = (colors: ColorScheme, isArabic: boolean = false) => {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -26,7 +26,7 @@ export const createPlannerStyles = (colors: ColorScheme) => {
       justifyContent: 'space-between',
     },
     headerTitle: {
-      fontSize: 24,
+      fontSize: isArabic ? 28 : 24,
       fontWeight: '800',
       color: colors.text,
     },
@@ -57,9 +57,9 @@ export const createPlannerStyles = (colors: ColorScheme) => {
       borderColor: colors.primary,
     },
     monthName: {
-      fontSize: 18,
+      fontSize: isArabic ? 20 : 18,
       fontWeight: '800',
-      color: colors.text,
+      color: '#000000',
       marginBottom: 2,
     },
     selectedMonthName: {
@@ -120,9 +120,9 @@ export const createPlannerStyles = (colors: ColorScheme) => {
       shadowRadius: 8,
     },
     dayText: {
-      fontSize: 20,
+      fontSize: isArabic ? 22 : 20,
       fontWeight: '800',
-      color: colors.text,
+      color: colors.surfaceText,
       marginBottom: 2,
     },
     todayText: {
@@ -154,7 +154,7 @@ export const createPlannerStyles = (colors: ColorScheme) => {
       marginBottom: 20,
     },
     specificDayTitle: {
-      fontSize: 28,
+      fontSize: isArabic ? 32 : 28,
       fontWeight: '800',
       color: colors.text,
     },

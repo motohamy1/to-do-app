@@ -40,12 +40,17 @@ export async function requestPermissionsAsync() {
 
   try {
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        // Note: these might not be strongly typed if using require(), but they map to 5 and max
-        importance: 5, // AndroidImportance.MAX is 5
-        vibrationPattern: [0, 250, 250, 250],
+      await Notifications.setNotificationChannelAsync('tasks', {
+        name: 'Task Timers',
+        importance: 5, // AndroidImportance.MAX
+        vibrationPattern: [0, 500, 200, 500],
         lightColor: '#FF231F7C',
+      });
+      await Notifications.setNotificationChannelAsync('subtasks', {
+        name: 'Subtask Timers',
+        importance: 4, // AndroidImportance.HIGH
+        vibrationPattern: [0, 250, 150, 250],
+        lightColor: '#D4F82D',
       });
     }
 
@@ -63,17 +68,24 @@ export async function requestPermissionsAsync() {
   }
 }
 
-export async function scheduleTimerNotification(title: string, durationMs: number): Promise<string> {
+import { translations } from './i18n';
+
+export async function scheduleTimerNotification(title: string, durationMs: number, isSubtask = false, language: string = 'en'): Promise<string> {
   if (!Notifications) return "";
 
+  const t: any = translations[language as keyof typeof translations] || translations.en;
+  
   try {
     const seconds = Math.floor(durationMs / 1000);
     const id = await Notifications.scheduleNotificationAsync({
       content: {
-        title: "Task Timer Complete! ⏱️",
-        body: `Your timer for "${title}" has ended.`,
+        title: isSubtask ? t.notifSubtaskTitle : t.notifTaskTitle,
+        body: (isSubtask ? t.notifSubtaskBody : t.notifTaskBody) + `"${title}"`,
         sound: true,
-        priority: 'high', // AndroidNotificationPriority.HIGH corresponds to 'high' or 'max'
+        priority: 'max',
+        android: {
+          channelId: isSubtask ? 'subtasks' : 'tasks',
+        }
       },
       trigger: {
         seconds: seconds > 0 ? seconds : 1,

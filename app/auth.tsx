@@ -4,6 +4,7 @@ import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import useTheme from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/utils/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,7 +12,8 @@ import { useRouter } from 'expo-router';
 
 const AuthScreen = () => {
   const { colors, isDarkMode } = useTheme();
-  const { userId: currentUserId, isAnonymous, linkAccount } = useAuth();
+  const { userId: currentUserId, isAnonymous, linkAccount, language } = useAuth();
+  const { isArabic } = useTranslation(language);
   const signUpMutation = useMutation(api.auth.signUp);
   const signInMutation = useMutation(api.auth.signIn);
   const router = useRouter();
@@ -73,45 +75,50 @@ const AuthScreen = () => {
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
         >
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          <ScrollView 
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 }]} 
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.header}>
               <View style={[styles.logoContainer, { backgroundColor: colors.primary }]}>
                 <Ionicons name="checkbox" size={40} color="#FFF" />
               </View>
               <Text style={[styles.title, { color: colors.text }]}>
-                {isLogin ? 'Welcome Back' : 'Create Account'}
+                {isLogin ? (isArabic ? 'مرحباً بعودتك' : 'Welcome Back') : (isArabic ? 'إنشاء حساب' : 'Create Account')}
               </Text>
               <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-                {isLogin ? 'Sign in to sync your tasks' : 'Start organizing your life today'}
+                {isLogin ? (isArabic ? 'سجل الدخول لمزامنة مهامك' : 'Sign in to sync your tasks') : (isArabic ? 'ابدأ في تنظيم حياتك اليوم' : 'Start organizing your life today')}
               </Text>
             </View>
-
+ 
             <View style={styles.form}>
               {!isLogin && (
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.label, { color: colors.text }]}>Full Name</Text>
-                  <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <Ionicons name="person-outline" size={20} color={colors.textMuted} />
+                <View style={[styles.inputGroup, isArabic && { alignItems: 'flex-end' }]}>
+                  <Text style={[styles.label, { color: isDarkMode ? colors.text : colors.surfaceText }]}>{isArabic ? 'الاسم الكامل' : 'Full Name'}</Text>
+                  <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                    <Ionicons name="person-outline" size={20} color={colors.surfaceText + '60'} />
                     <TextInput
-                      style={[styles.input, { color: colors.text }]}
-                      placeholder="John Doe"
-                      placeholderTextColor={colors.textMuted}
+                      style={[styles.input, { color: colors.surfaceText }, isArabic && { textAlign: 'right' }]}
+                      placeholder={isArabic ? "جون دو" : "John Doe"}
+                      placeholderTextColor={colors.surfaceText + '40'}
                       value={name}
                       onChangeText={setName}
                     />
                   </View>
                 </View>
               )}
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Email Address</Text>
-                <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Ionicons name="mail-outline" size={20} color={colors.textMuted} />
+ 
+              <View style={[styles.inputGroup, isArabic && { alignItems: 'flex-end' }]}>
+                <Text style={[styles.label, { color: isDarkMode ? colors.text : colors.surfaceText }]}>{isArabic ? 'عنوان البريد الإلكتروني' : 'Email Address'}</Text>
+                <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                  <Ionicons name="mail-outline" size={20} color={colors.surfaceText + '60'} />
                   <TextInput
-                    style={[styles.input, { color: colors.text }]}
+                    style={[styles.input, { color: colors.surfaceText }, isArabic && { textAlign: 'right' }]}
                     placeholder="example@gmail.com"
-                    placeholderTextColor={colors.textMuted}
+                    placeholderTextColor={colors.surfaceText + '40'}
                     value={email}
                     onChangeText={setEmail}
                     keyboardType="email-address"
@@ -119,22 +126,22 @@ const AuthScreen = () => {
                   />
                 </View>
               </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: colors.text }]}>Password</Text>
-                <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} />
+ 
+              <View style={[styles.inputGroup, isArabic && { alignItems: 'flex-end' }]}>
+                <Text style={[styles.label, { color: isDarkMode ? colors.text : colors.surfaceText }]}>{isArabic ? 'كلمة المرور' : 'Password'}</Text>
+                <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
+                  <Ionicons name="lock-closed-outline" size={20} color={colors.surfaceText + '60'} />
                   <TextInput
-                    style={[styles.input, { color: colors.text }]}
+                    style={[styles.input, { color: colors.surfaceText }, isArabic && { textAlign: 'right' }]}
                     placeholder="••••••••"
-                    placeholderTextColor={colors.textMuted}
+                    placeholderTextColor={colors.surfaceText + '40'}
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry
                   />
                 </View>
               </View>
-
+ 
               <TouchableOpacity 
                 style={[styles.button, { backgroundColor: colors.primary }]}
                 onPress={handleAuth}
@@ -143,17 +150,17 @@ const AuthScreen = () => {
                 {loading ? (
                   <ActivityIndicator color="#FFF" />
                 ) : (
-                  <Text style={styles.buttonText}>{isLogin ? 'Sign In' : 'Sign Up'}</Text>
+                  <Text style={styles.buttonText}>{isLogin ? (isArabic ? 'تسجيل الدخول' : 'Sign In') : (isArabic ? 'إنشاء حساب' : 'Sign Up')}</Text>
                 )}
               </TouchableOpacity>
-
-              <View style={styles.switchContainer}>
+ 
+              <View style={[styles.switchContainer, isArabic && { flexDirection: 'row-reverse' }]}>
                 <Text style={[styles.switchText, { color: colors.textMuted }]}>
-                  {isLogin ? "Don't have an account?" : "Already have an account?"}
+                  {isLogin ? (isArabic ? "ليس لديك حساب؟" : "Don't have an account?") : (isArabic ? "لديك حساب بالفعل؟" : "Already have an account?")}
                 </Text>
                 <TouchableOpacity onPress={() => setIsLogin(!isLogin)}>
                   <Text style={[styles.switchAction, { color: colors.primary }]}>
-                    {isLogin ? ' Sign Up' : ' Sign In'}
+                    {isLogin ? (isArabic ? ' إنشاء حساب' : ' Sign Up') : (isArabic ? ' تسجيل دخول' : ' Sign In')}
                   </Text>
                 </TouchableOpacity>
               </View>

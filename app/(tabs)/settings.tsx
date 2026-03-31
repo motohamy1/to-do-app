@@ -9,19 +9,19 @@ import { api } from '@/convex/_generated/api';
 
 import { useAuth } from '@/hooks/useAuth';
 import { useMutation } from 'convex/react';
-
 import { useRouter } from 'expo-router';
+import { useTranslation } from '@/utils/i18n';
 
 const Settings = () => {
   const { colors, isDarkMode, toggleDarkMode } = useTheme();
-  const { userId, signOut, isAnonymous } = useAuth();
-  const styles = createSettingsStyles(colors);
+  const { userId, signOut, isAnonymous, language } = useAuth();
+  const { t, isArabic } = useTranslation(language);
+  const styles = createSettingsStyles(colors, isArabic);
   const router = useRouter();
   
   const userSettings = useQuery(api.auth.getUserSettings, userId ? { userId } : "skip");
   const updateSettings = useMutation(api.auth.updateSettings);
 
-  // Data for "Database Information"
   const todos = useQuery(api.todos.get, userId ? { userId } : "skip") || [];
   const projects = useQuery(api.projects.getCategories, userId ? { userId } : "skip") || [];
 
@@ -52,9 +52,9 @@ const Settings = () => {
       <View style={[styles.iconWrapper, { backgroundColor: color + '15' }]}>
         <Ionicons name={icon} size={20} color={color} />
       </View>
-      <Text style={[styles.settingLabel, userSettings?.language === 'ar' && { textAlign: 'right' }]}>{label}</Text>
+      <Text style={[styles.settingLabel, isArabic && { textAlign: 'right' }]}>{label}</Text>
       {value && <Text style={styles.settingValue}>{value}</Text>}
-      {type === 'chevron' && <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />}
+      {type === 'chevron' && <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={18} color={colors.textMuted} />}
       {type === 'switch' && (
         <Switch 
           value={status ?? isDarkMode} 
@@ -66,8 +66,6 @@ const Settings = () => {
     </TouchableOpacity>
   );
 
-  const isArabic = userSettings?.language === 'ar';
-
   return (
     <View style={[styles.container, isArabic && { direction: 'rtl' }]}>
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.bg} />
@@ -76,31 +74,31 @@ const Settings = () => {
           
           <View style={styles.header}>
             <Text style={[styles.headerTitle, isArabic && { textAlign: 'right' }]}>
-              {isArabic ? 'الإعدادات' : 'Settings'}
+              {t.settings}
             </Text>
           </View>
 
           {/* Profile Section */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
-              {isArabic ? 'الملف الشخصي' : 'Profile'}
+              {t.profile}
             </Text>
             <View style={styles.card}>
               <View style={[styles.profileHero, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={styles.avatarContainer}>
+                <View style={[styles.avatarContainer, isArabic && { marginLeft: 0, marginRight: 0 }]}>
                   <Ionicons name="person" size={40} color={colors.primary} />
                 </View>
-                <View style={[styles.profileInfo, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 15 }]}>
+                <View style={[styles.profileInfo, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 20 }]}>
                   <Text style={styles.profileName}>
-                    {isAnonymous ? (isArabic ? 'زائر' : 'Guest') : (userSettings?.name || 'Loading...')}
+                    {isAnonymous ? t.guest : (userSettings?.name || '...')}
                   </Text>
                   <Text style={styles.profileEmail}>
-                    {isAnonymous ? (isArabic ? 'سجل للمزامنة' : 'Sign in to sync progress') : (userSettings?.email || '...')}
+                    {isAnonymous ? t.signInToSync : (userSettings?.email || '...')}
                   </Text>
                 </View>
                 {isAnonymous ? (
                   <TouchableOpacity onPress={() => router.push('/auth')}>
-                    <Ionicons name="log-in-outline" size={24} color={colors.primary} />
+                    <Ionicons name={isArabic ? "log-in" : "log-in-outline"} size={24} color={colors.primary} />
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity>
@@ -114,12 +112,12 @@ const Settings = () => {
           {/* Preferences */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
-              {isArabic ? 'التفضيلات' : 'Preferences'}
+              {t.preferences}
             </Text>
             <View style={styles.card}>
               <SettingItem 
                 icon="moon-outline" 
-                label={isArabic ? 'الوضع الداكن' : 'Dark Mode'} 
+                label={t.darkMode} 
                 type="switch" 
                 color="#7C5CFF" 
                 onPress={toggleDarkMode}
@@ -128,7 +126,7 @@ const Settings = () => {
               <View style={styles.divider} />
               <SettingItem 
                 icon="notifications-outline" 
-                label={isArabic ? 'الإشعارات' : 'Notifications'} 
+                label={t.notifications} 
                 type="switch"
                 status={userSettings?.notificationsEnabled}
                 onPress={handleToggleNotifications}
@@ -137,7 +135,7 @@ const Settings = () => {
               <View style={styles.divider} />
               <SettingItem 
                 icon="language-outline" 
-                label={isArabic ? 'اللغة' : 'Language'} 
+                label={t.language} 
                 value={isArabic ? 'العربية' : 'English'}
                 onPress={handleToggleLanguage}
                 color="#4ECDC4" 
@@ -148,27 +146,27 @@ const Settings = () => {
           {/* Statistics Section */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
-              {isArabic ? 'الإحصائيات' : 'Your Statistics'}
+              {t.statistics}
             </Text>
             <View style={[styles.card, styles.dbInfoCard]}>
               <View style={[styles.dbRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                <Text style={styles.dbLabel}>{isArabic ? 'إجمالي المهام' : 'Total Tasks'}</Text>
+                <Text style={styles.dbLabel}>{t.totalTasks}</Text>
                 <Text style={styles.dbValue}>{todos.length}</Text>
               </View>
               <View style={[styles.dbRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                <Text style={styles.dbLabel}>{isArabic ? 'المكتملة' : 'Completed'}</Text>
+                <Text style={styles.dbLabel}>{t.completed}</Text>
                 <View style={[styles.statusBadge, { backgroundColor: colors.success + '15' }]}>
                   <Text style={[styles.statusText, { color: colors.success }]}>
-                    {todos.filter(t => t.status === 'done').length} {isArabic ? 'تم' : 'Done'}
+                    {todos.filter(t => t.status === 'done').length} {t.done}
                   </Text>
                 </View>
               </View>
               <View style={[styles.dbRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                <Text style={styles.dbLabel}>{isArabic ? 'مساحات العمل النشطة' : 'Active Workspaces'}</Text>
+                <Text style={styles.dbLabel}>{t.activeWorkspaces}</Text>
                 <Text style={styles.dbValue}>{projects.length}</Text>
               </View>
               <View style={[styles.dbRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                <Text style={styles.dbLabel}>{isArabic ? 'معدل الإنجاز' : 'Completion Rate'}</Text>
+                <Text style={styles.dbLabel}>{t.completionRate}</Text>
                 <Text style={[styles.dbValue, { color: colors.primary }]}>
                   {todos.length > 0 
                     ? Math.round((todos.filter(t => t.status === 'done').length / todos.length) * 100) 
@@ -181,31 +179,31 @@ const Settings = () => {
           {/* Utility / Other */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
-              {isArabic ? 'المشروع' : 'Project'}
+              {t.project}
             </Text>
             <View style={styles.card}>
               <SettingItem 
                 icon="shield-checkmark-outline" 
-                label={isArabic ? 'الخصوصية والأمان' : 'Privacy & Security'} 
+                label={t.privacy} 
                 color="#00C58E" 
               />
               <View style={styles.divider} />
               <SettingItem 
                 icon="help-circle-outline" 
-                label={isArabic ? 'مركز المساعدة' : 'Help Center'} 
+                label={t.help} 
                 color="#FFAB00" 
               />
               <View style={styles.divider} />
               <SettingItem 
                 icon="information-circle-outline" 
-                label={isArabic ? 'حول التطبيق' : 'About DeepMind Todo'} 
+                label={t.about} 
                 color={colors.primary} 
               />
             </View>
             
             <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
               <Ionicons name="log-out-outline" size={20} color={colors.danger} />
-              <Text style={styles.logoutText}>{isArabic ? 'تسجيل الخروج' : 'Log Out'}</Text>
+              <Text style={styles.logoutText}>{t.logout}</Text>
             </TouchableOpacity>
           </View>
 

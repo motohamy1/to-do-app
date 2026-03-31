@@ -8,6 +8,7 @@ import { Id } from '@/convex/_generated/dataModel';
 import CircularProgress from './CircularProgress';
 import { scheduleTimerNotification, cancelNotification } from '@/utils/notifications';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/utils/i18n';
 
 interface TodoCardProps {
   todo: {
@@ -22,12 +23,18 @@ interface TodoCardProps {
     date?: number;
     parentId?: Id<"todos">;
     userId?: Id<"users">;
+    description?: string;
+    location?: string;
+    meetingLink?: string;
+    priority?: string;
+    categoryId?: Id<"projectCategories">;
   };
   onSetTimer: (id: Id<"todos">) => void;
   onLongPress: (id: Id<"todos">) => void;
   onLinkProject: (id: Id<"todos">) => void;
   homeStyles: any;
   depth?: number;
+  isTimelineMode?: boolean;
 }
 
 // ─── Inline Timer Picker ─────────────────────────────────────────────────────
@@ -37,12 +44,16 @@ const InlineTimerPicker = ({
   onCancel,
   maxMs,
   colors,
+  t,
+  isArabic
 }: {
   initialMs?: number;
   onSave: (ms: number) => void;
   onCancel: () => void;
   maxMs?: number;
   colors: any;
+  t: any;
+  isArabic: boolean;
 }) => {
   const init = initialMs || 0;
   const [hours, setHours] = useState(String(Math.floor(init / 3600000)));
@@ -53,82 +64,82 @@ const InlineTimerPicker = ({
     const m = parseInt(minutes) || 0;
     const ms = (h * 3600 + m * 60) * 1000;
     if (ms <= 0) {
-      Alert.alert('Invalid Timer', 'Please set a timer greater than 0.');
+      Alert.alert(t.invalidTimer, t.setTimerGreater);
       return;
     }
     if (maxMs !== undefined && maxMs > 0 && ms > maxMs) {
       const availH = Math.floor(maxMs / 3600000);
       const availM = Math.floor((maxMs % 3600000) / 60000);
-      Alert.alert('Timer Too Long', `Timer cannot exceed ${availH > 0 ? availH + 'h ' : ''}${availM}m (available budget).`);
+      Alert.alert(t.timerTooLong, `${t.timerExceed} ${availH > 0 ? availH + (isArabic ? 'س ' : 'h ') : ''}${availM}${isArabic ? 'د' : 'm'} (${t.budgetAvailable}).`);
       return;
     }
     onSave(ms);
   };
 
   return (
-    <View style={{ marginTop: 4, padding: 12, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + '30', gap: 12 }}>
+    <View style={[{ marginTop: 4, padding: 12, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + '30', gap: 12 }, isArabic && { direction: 'rtl' }]}>
       {maxMs !== undefined && maxMs > 0 && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 }}>
+        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 }, isArabic && { flexDirection: 'row-reverse' }]}>
           <Ionicons name="information-circle-outline" size={14} color={colors.warning} />
-          <Text style={{ color: colors.warning, fontSize: 11, fontWeight: '600' }}>
-            Budget: {Math.floor(maxMs / 3600000) > 0 ? Math.floor(maxMs / 3600000) + 'h ' : ''}{Math.floor((maxMs % 3600000) / 60000)}m available
+          <Text style={[{ color: colors.warning, fontSize: 11, fontWeight: '700' }, isArabic && { textAlign: 'right' }]}>
+            {t.budget}: {Math.floor(maxMs / 3600000) > 0 ? Math.floor(maxMs / 3600000) + (isArabic ? 'س ' : 'h ') : ''}{Math.floor((maxMs % 3600000) / 60000)}{isArabic ? 'د' : 'm'} {t.available}
           </Text>
         </View>
       )}
       {/* Duration row */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      <View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
         {/* Hours */}
         <View style={{ alignItems: 'center', gap: 4 }}>
-          <View style={{ backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.primary + '60', borderRadius: 10, width: 64, height: 52, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: colors.surfaceText + '08', borderWidth: 1.5, borderColor: colors.surfaceText + '20', borderRadius: 10, width: 64, height: 52, justifyContent: 'center', alignItems: 'center' }}>
             <TextInput
-              style={{ color: colors.text, fontSize: 22, fontWeight: '800', textAlign: 'center', width: '100%', padding: 0 }}
+              style={{ color: colors.surfaceText, fontSize: 22, fontWeight: '800', textAlign: 'center', width: '100%', padding: 0 }}
               keyboardType="numeric"
               value={hours}
               onChangeText={setHours}
               maxLength={2}
               selectTextOnFocus
               placeholder="0"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.surfaceText + '40'}
               underlineColorAndroid="transparent"
             />
           </View>
-          <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '600', letterSpacing: 0.5 }}>HOURS</Text>
+          <Text style={{ color: colors.surfaceText + '60', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>{t.hours}</Text>
         </View>
 
-        <Text style={{ color: colors.primary, fontWeight: '800', fontSize: 24, marginBottom: 18 }}>:</Text>
+        <Text style={{ color: colors.surfaceText, fontWeight: '800', fontSize: 24, marginBottom: 18 }}>:</Text>
 
         {/* Minutes */}
         <View style={{ alignItems: 'center', gap: 4 }}>
-          <View style={{ backgroundColor: colors.bg, borderWidth: 1.5, borderColor: colors.primary + '60', borderRadius: 10, width: 64, height: 52, justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: colors.surfaceText + '08', borderWidth: 1.5, borderColor: colors.surfaceText + '20', borderRadius: 10, width: 64, height: 52, justifyContent: 'center', alignItems: 'center' }}>
             <TextInput
-              style={{ color: colors.text, fontSize: 22, fontWeight: '800', textAlign: 'center', width: '100%', padding: 0 }}
+              style={{ color: colors.surfaceText, fontSize: 22, fontWeight: '800', textAlign: 'center', width: '100%', padding: 0 }}
               keyboardType="numeric"
               value={minutes}
               onChangeText={setMinutes}
               maxLength={2}
               selectTextOnFocus
               placeholder="0"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.surfaceText + '40'}
               underlineColorAndroid="transparent"
             />
           </View>
-          <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: '600', letterSpacing: 0.5 }}>MINUTES</Text>
+          <Text style={{ color: colors.surfaceText + '60', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>{t.minutes}</Text>
         </View>
       </View>
 
       {/* Action buttons */}
-      <View style={{ flexDirection: 'row', gap: 8 }}>
+      <View style={[{ flexDirection: 'row', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
         <TouchableOpacity
           onPress={handleSave}
-          style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+          style={[{ flex: 1, backgroundColor: colors.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }, isArabic && { flexDirection: 'row-reverse' }]}
         >
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>✓ Set Timer</Text>
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>✓ {t.setTimer}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={onCancel}
           style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}
         >
-          <Text style={{ color: colors.textMuted, fontWeight: '600', fontSize: 14 }}>Cancel</Text>
+          <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 14 }}>{t.cancel}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -167,6 +178,7 @@ const SubtaskRow = ({
   onDelete,
   onSetTimer,
   onUpdateText,
+  onUpdateStatus,
 }: {
   sub: any;
   parentTimerDuration?: number;
@@ -179,7 +191,10 @@ const SubtaskRow = ({
   onDelete: (id: Id<"todos">) => void;
   onSetTimer: (id: Id<"todos">, ms: number) => void;
   onUpdateText: (id: Id<"todos">, text: string) => void;
+  onUpdateStatus: (id: Id<"todos">, status: string) => void;
 }) => {
+  const { language } = useAuth();
+  const { t, isArabic } = useTranslation(language);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(sub.text);
   const [showTimerPicker, setShowTimerPicker] = useState(false);
@@ -202,6 +217,9 @@ const SubtaskRow = ({
         const elapsed = Date.now() - sub.timerStartTime!;
         const remaining = Math.max(0, sub.timerDuration! - elapsed);
         setSubTimeLeft(remaining);
+        if (remaining === 0 && sub.status === 'in_progress') {
+          onUpdateStatus(sub._id, 'not_done');
+        }
       };
       calc();
       const interval = setInterval(calc, 1000);
@@ -228,10 +246,10 @@ const SubtaskRow = ({
 
   if (isEditing) {
     return (
-      <View style={{ backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden', padding: 10, gap: 8 }}>
-        <Text style={{ fontSize: 10, fontWeight: '700', color: colors.primary, letterSpacing: 0.5 }}>EDITING SUBTASK</Text>
+      <View style={[{ backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden', padding: 10, gap: 8 }, isArabic && { direction: 'rtl' }]}>
+        <Text style={[{ fontSize: 10, fontWeight: '800', color: colors.surfaceText, letterSpacing: 0.5 }, isArabic && { textAlign: 'right' }]}>{t.editingSubtask}</Text>
 
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
           <TouchableOpacity onPress={() => onToggleComplete(sub._id, sub.status)}>
             <Ionicons
               name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
@@ -240,7 +258,7 @@ const SubtaskRow = ({
             />
           </TouchableOpacity>
           <TextInput
-            style={{ flex: 1, color: colors.text, fontSize: 14, backgroundColor: colors.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.primary, fontWeight: '500' }}
+            style={[{ flex: 1, color: colors.surfaceText, fontSize: 14, backgroundColor: colors.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.primary, fontWeight: '600' }, isArabic && { textAlign: 'right' }]}
             value={editText}
             onChangeText={setEditText}
             autoFocus
@@ -251,18 +269,19 @@ const SubtaskRow = ({
         {/* Timer toggle */}
         <TouchableOpacity
           style={[homeStyles.actionBtn, {
-            backgroundColor: hasTimer ? colors.primary + '15' : colors.surface,
-            borderColor: colors.primary,
+            backgroundColor: hasTimer ? colors.surfaceText + '10' : 'transparent',
+            borderColor: colors.surfaceText + '30',
             borderWidth: 1,
-            alignSelf: 'flex-start',
+            alignSelf: isArabic ? 'flex-end' : 'flex-start',
+            flexDirection: isArabic ? 'row-reverse' : 'row'
           }]}
           onPress={() => setShowTimerPicker(!showTimerPicker)}
         >
-          <Ionicons name="timer-outline" size={16} color={colors.primary} />
-          <Text style={[homeStyles.actionBtnText, { color: colors.primary }]}>
-            {hasTimer ? formatDuration(sub.timerDuration!) : 'Set Timer'}
+          <Ionicons name="timer-outline" size={16} color={colors.surfaceText} />
+          <Text style={[homeStyles.actionBtnText, { color: colors.surfaceText }]}>
+            {hasTimer ? formatDuration(sub.timerDuration!) : t.setTimer}
           </Text>
-          <Ionicons name={showTimerPicker ? 'chevron-up' : 'chevron-down'} size={13} color={colors.primary} />
+          <Ionicons name={showTimerPicker ? 'chevron-up' : 'chevron-down'} size={13} color={colors.surfaceText} />
         </TouchableOpacity>
 
         {showTimerPicker && (
@@ -270,6 +289,8 @@ const SubtaskRow = ({
             initialMs={sub.timerDuration}
             maxMs={remainingBudget}
             colors={colors}
+            t={t}
+            isArabic={isArabic}
             onSave={(ms) => {
               onSetTimer(sub._id, ms);
               setShowTimerPicker(false);
@@ -278,18 +299,18 @@ const SubtaskRow = ({
           />
         )}
 
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+        <View style={[{ flexDirection: 'row', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
           <TouchableOpacity
             style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
             onPress={handleSaveEdit}
           >
-            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Save</Text>
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{t.save}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={{ flex: 1, backgroundColor: colors.border, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
             onPress={() => { setIsEditing(false); setShowTimerPicker(false); }}
           >
-            <Text style={{ color: colors.text, fontWeight: '600', fontSize: 13 }}>Cancel</Text>
+            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>{t.cancel}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -298,15 +319,15 @@ const SubtaskRow = ({
 
   // ── COLLAPSED ROW ──
   return (
-    <View style={{ backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden' }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 10 }}>
+    <View style={[{ backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden' }, isArabic && { direction: 'rtl' }]}>
+      <View style={[{ flexDirection: 'row', alignItems: 'center', padding: 10 }, isArabic && { flexDirection: 'row-reverse' }]}>
         {/* Checkbox */}
         <TouchableOpacity onPress={() => onToggleComplete(sub._id, sub.status)}>
           <Ionicons
             name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
             size={22}
             color={isDone ? colors.success : colors.textMuted}
-            style={{ marginRight: 10 }}
+            style={isArabic ? { marginLeft: 10 } : { marginRight: 10 }}
           />
         </TouchableOpacity>
 
@@ -316,12 +337,12 @@ const SubtaskRow = ({
           onPress={() => { setIsEditing(true); setEditText(sub.text); }}
         >
           <Text
-            style={{
-              color: isDone ? colors.textMuted : colors.text,
+            style={[{
+              color: isDone ? colors.surfaceText + '60' : colors.surfaceText,
               textDecorationLine: isDone ? 'line-through' : 'none',
               fontSize: 14,
-              fontWeight: '500',
-            }}
+              fontWeight: '600',
+            }, isArabic && { textAlign: 'right' }]}
             numberOfLines={2}
           >
             {sub.text}
@@ -332,30 +353,31 @@ const SubtaskRow = ({
         {hasTimer && !isDone && (
           <TouchableOpacity
             onPress={() => isRunning ? onPauseSubtask(sub._id) : onStartSubtask(sub._id)}
-            style={{
-              flexDirection: 'row',
+            style={[{
+              flexDirection: isArabic ? 'row-reverse' : 'row',
               alignItems: 'center',
               gap: 5,
-              backgroundColor: isRunning ? colors.warning + '20' : isPaused ? colors.primary + '15' : colors.primary + '12',
+              backgroundColor: isRunning ? colors.warning + '20' : isPaused ? colors.surfaceText + '15' : colors.surfaceText + '10',
               paddingHorizontal: 10,
               paddingVertical: 6,
               borderRadius: 10,
-              marginLeft: 8,
+              marginLeft: isArabic ? 0 : 8,
+              marginRight: isArabic ? 8 : 0,
               borderWidth: 1,
-              borderColor: isRunning ? colors.warning + '50' : colors.primary + '30',
-            }}
+              borderColor: isRunning ? colors.warning + '50' : colors.surfaceText + '30',
+            }]}
           >
             <Ionicons
               name={isRunning ? 'pause' : 'play'}
               size={12}
-              color={isRunning ? colors.warning : colors.primary}
+              color={isRunning ? colors.warning : colors.surfaceText}
             />
             <Text
               style={{
                 fontSize: 12,
                 fontWeight: '800',
                 fontVariant: ['tabular-nums'],
-                color: isRunning ? colors.warning : colors.primary,
+                color: isRunning ? colors.warning : colors.surfaceText,
               }}
             >
               {isRunning || isPaused ? formatTime(subTimeLeft) : formatDuration(sub.timerDuration!)}
@@ -365,17 +387,17 @@ const SubtaskRow = ({
 
         {/* Done badge for timed subtasks */}
         {hasTimer && isDone && (
-          <View style={{
-            flexDirection: 'row', alignItems: 'center', gap: 4,
-            backgroundColor: colors.success + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginLeft: 8
-          }}>
+          <View style={[{
+            flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 4,
+            backgroundColor: colors.success + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginLeft: isArabic ? 0 : 8, marginRight: isArabic ? 8 : 0
+          }]}>
             <Ionicons name="checkmark" size={12} color={colors.success} />
-            <Text style={{ fontSize: 11, color: colors.success, fontWeight: '700' }}>Done</Text>
+            <Text style={{ fontSize: 11, color: colors.success, fontWeight: '800' }}>{t.done}</Text>
           </View>
         )}
 
         {/* Delete */}
-        <TouchableOpacity style={{ paddingLeft: 12 }} onPress={() => onDelete(sub._id)}>
+        <TouchableOpacity style={[{ paddingLeft: isArabic ? 0 : 12, paddingRight: isArabic ? 12 : 0 }]} onPress={() => onDelete(sub._id)}>
           <Ionicons name="trash-outline" size={18} color={colors.danger} />
         </TouchableOpacity>
       </View>
@@ -383,11 +405,12 @@ const SubtaskRow = ({
       {/* Running indicator bar */}
       {isRunning && (
         <View style={{ height: 2, backgroundColor: colors.warning + '30' }}>
-          <View style={{
+          <View style={[{
             height: 2,
             backgroundColor: colors.warning,
+            alignSelf: isArabic ? 'flex-end' : 'flex-start',
             width: sub.timerDuration ? `${Math.min(100, ((sub.timerDuration - subTimeLeft) / sub.timerDuration) * 100)}%` : '0%',
-          }} />
+          }]} />
         </View>
       )}
     </View>
@@ -395,9 +418,10 @@ const SubtaskRow = ({
 };
 
 // ─── Main Card ────────────────────────────────────────────────────────────────
-const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLinkProject, homeStyles, depth = 0 }) => {
+const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLinkProject, homeStyles, depth = 0, isTimelineMode = false }) => {
   const { colors, isDarkMode } = useTheme();
-  const { userId } = useAuth();
+  const { userId, language } = useAuth();
+  const { t, isArabic } = useTranslation(language);
   const updateStatus = useMutation(api.todos.updateStatus);
   const startTimer = useMutation(api.todos.startTimer);
   const pauseTimer = useMutation(api.todos.pauseTimer);
@@ -422,6 +446,8 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const [showSubtasks, setShowSubtasks] = useState(false);
   const [isAddingSub, setIsAddingSub] = useState(false);
   const [newSubText, setNewSubText] = useState("");
+  const [newSubDuration, setNewSubDuration] = useState<number | undefined>(undefined);
+  const [showNewSubTimerPicker, setShowNewSubTimerPicker] = useState(false);
 
   const [lastNotifId, setLastNotifId] = useState<string | null>(null);
 
@@ -476,7 +502,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
         const remaining = Math.max(0, todo.timerDuration! - elapsed);
         setTimeLeft(remaining);
         if (remaining === 0 && todo.status === 'in_progress') {
-          updateStatus({ id: todo._id, status: 'done' });
+          updateStatus({ id: todo._id, status: 'not_done' });
         }
       };
       calculateTimeInfo();
@@ -491,6 +517,13 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
     return () => { if (interval) clearInterval(interval); };
   }, [todo.status, todo.timerDuration, todo.timerStartTime, todo.timeLeftAtPause, subtasks]);
+
+  // Overdue logic: automatically mark as not_done if deadline passed
+  useEffect(() => {
+    if (todo.status !== 'done' && todo.status !== 'not_done' && todo.dueDate && todo.dueDate < Date.now()) {
+      updateStatus({ id: todo._id, status: 'not_done' });
+    }
+  }, [todo.status, todo.dueDate]);
 
   const stats = {
     done: subtasks?.filter((s: any) => s.status === 'done').length || 0,
@@ -542,8 +575,16 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
   const handleAddSubtask = () => {
     if (newSubText.trim() && userId) {
-      addTodo({ userId, text: newSubText.trim(), parentId: todo._id, projectId: todo.projectId });
+      addTodo({
+        userId,
+        text: newSubText.trim(),
+        parentId: todo._id,
+        projectId: todo.projectId,
+        ...(newSubDuration && { timerDuration: newSubDuration })
+      });
       setNewSubText('');
+      setNewSubDuration(undefined);
+      setShowNewSubTimerPicker(false);
       setIsAddingSub(false);
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setShowSubtasks(true);
@@ -556,18 +597,18 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   };
 
   // ─── Status colors ──────────────────────────────────────────────────────────
-  let badgeText = "Not Started";
+  let badgeText = t.notStarted;
   let badgeBg = colors.border;
-  let badgeColor = colors.text;
+  let badgeColor = colors.surfaceText;
   let timerIconColor = colors.primary;
   let timerText = formatTime(timeLeft);
   let cardBg = colors.surface;
 
-  if (todo.status === "in_progress") { badgeText = "In Progress"; badgeBg = colors.primary + '20'; badgeColor = colors.primary; cardBg = colors.taskInProgressBg; }
-  else if (todo.status === "paused") { badgeText = "Paused"; badgeBg = colors.border; badgeColor = colors.text; timerIconColor = colors.textMuted; cardBg = colors.taskPausedBg; }
-  else if (todo.status === "done") { badgeText = "Done"; badgeBg = colors.success + '20'; badgeColor = colors.success; timerText = "Done"; timerIconColor = colors.textMuted; cardBg = colors.taskDoneBg; }
-  else if (todo.status === "not_done") { badgeText = "Not Done"; badgeBg = colors.danger + '20'; badgeColor = colors.danger; timerText = "—"; timerIconColor = colors.danger; cardBg = colors.taskNotDoneBg; }
-  else if (todo.status === "not_started") { cardBg = colors.taskNotStartedBg; badgeBg = colors.textMuted + '20'; badgeColor = colors.textMuted; }
+  if (todo.status === "in_progress") { badgeText = t.inProgress; badgeBg = colors.surfaceText + '15'; badgeColor = colors.surfaceText; cardBg = colors.taskInProgressBg; }
+  else if (todo.status === "paused") { badgeText = t.paused; badgeBg = colors.surfaceText + '10'; badgeColor = colors.surfaceText; timerIconColor = colors.surfaceText + '60'; cardBg = colors.taskPausedBg; }
+  else if (todo.status === "done") { badgeText = t.done; badgeBg = colors.success + '20'; badgeColor = colors.success; timerText = t.done; timerIconColor = colors.success; cardBg = colors.taskDoneBg; }
+  else if (todo.status === "not_done") { badgeText = t.notDone; badgeBg = colors.danger + '20'; badgeColor = colors.danger; timerText = "—"; timerIconColor = colors.danger; cardBg = colors.taskNotDoneBg; }
+  else if (todo.status === "not_started") { cardBg = colors.taskNotStartedBg; badgeBg = colors.surfaceText + '10'; badgeColor = colors.surfaceText; }
 
   const isTimerSet = !!todo.timerDuration;
   const isDueSoon = todo.dueDate && todo.dueDate < Date.now() + 86400000;
@@ -576,23 +617,30 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   // Are any subtasks currently running?
   const anySubtaskRunning = hasSubtasks && subtasks.some((s: any) => s.status === 'in_progress');
 
-  return (
-    <View style={{ marginLeft: depth * 16 }}>
-      <View style={[homeStyles.card, { overflow: 'hidden', position: 'relative', backgroundColor: cardBg }]}>
-        <View style={{ zIndex: 1 }}>
+  const coreCard = (
+    <>
+      <View style={[homeStyles.card, { overflow: 'hidden', position: 'relative', backgroundColor: cardBg, padding: isTimelineMode ? 16 : 12 }]}>
+        {/* Color bar indicator for timeline mode based on priority */}
+        {isTimelineMode && (
+          <View style={{
+            position: 'absolute', left: 0, top: 24, bottom: 24, width: 4, borderRadius: 2,
+            backgroundColor: todo.priority === 'High' ? colors.danger : todo.priority === 'Medium' ? colors.warning : colors.primary
+          }}/>
+        )}
+        <View style={{ zIndex: 1, paddingLeft: isTimelineMode ? 8 : 0 }}>
 
           {/* ─── Header Row: Title + Badge + Circle ─── */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-            <View style={{ flex: 1, paddingRight: 8 }}>
+          <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[{ flex: 1, paddingRight: isArabic ? 0 : 8, paddingLeft: isArabic ? 8 : 0 }, isArabic && { alignItems: 'flex-end' }]}>
               {isEditing ? (
                 /* ─── FULL EDIT PANEL ─── */
-                <View style={{ backgroundColor: colors.bg, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: colors.primary + '40', marginBottom: 8, gap: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: colors.primary, letterSpacing: 0.5, marginBottom: 4 }}>EDITING TASK</Text>
+                <View style={[{ backgroundColor: colors.surfaceText + '08', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: colors.surfaceText + '15', marginBottom: 8, gap: 8 }, isArabic && { direction: 'rtl' }]}>
+                  <Text style={[{ fontSize: 11, fontWeight: '800', color: colors.surfaceText, letterSpacing: 0.5, marginBottom: 4 }, isArabic && { textAlign: 'right' }]}>{t.editingTask}</Text>
 
                   {/* Text edit */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
                     <TextInput
-                      style={{ flex: 1, color: colors.text, fontSize: 15, fontWeight: '600', backgroundColor: colors.surface, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.border }}
+                      style={[{ flex: 1, color: colors.surfaceText, fontSize: 15, fontWeight: '700', backgroundColor: colors.surface, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.surfaceText + '20' }, isArabic && { textAlign: 'right' }]}
                       value={editText}
                       onChangeText={setEditText}
                       autoFocus
@@ -605,12 +653,12 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
                   {/* Timer section */}
                   <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isTimerSet ? colors.primary + '20' : colors.surface, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: isTimerSet ? colors.primary + '40' : colors.border, alignSelf: 'flex-start' }}
+                    style={[{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isTimerSet ? colors.surfaceText + '10' : 'transparent', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: isTimerSet ? colors.surfaceText + '30' : colors.border, alignSelf: isArabic ? 'flex-end' : 'flex-start' }, isArabic && { flexDirection: 'row-reverse' }]}
                     onPress={() => setShowTimerPicker(!showTimerPicker)}
                   >
-                    <Ionicons name="timer-outline" size={16} color={isTimerSet ? colors.primary : colors.textMuted} />
-                    <Text style={{ color: isTimerSet ? colors.primary : colors.textMuted, fontWeight: '600', fontSize: 13 }}>
-                      {isTimerSet ? `Timer: ${formatDuration(todo.timerDuration!)}` : 'Set Timer'}
+                    <Ionicons name="timer-outline" size={16} color={isTimerSet ? colors.surfaceText : colors.textMuted} />
+                    <Text style={{ color: isTimerSet ? colors.surfaceText : colors.textMuted, fontWeight: '700', fontSize: 13 }}>
+                      {isTimerSet ? `${t.timer}: ${formatDuration(todo.timerDuration!)}` : t.setTimer}
                     </Text>
                     <Ionicons name={showTimerPicker ? "chevron-up" : "chevron-down"} size={14} color={colors.textMuted} />
                   </TouchableOpacity>
@@ -619,6 +667,8 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                     <InlineTimerPicker
                       initialMs={todo.timerDuration}
                       colors={colors}
+                      t={t}
+                      isArabic={isArabic}
                       onSave={(ms) => {
                         setTimer({ id: todo._id, duration: ms });
                         setShowTimerPicker(false);
@@ -631,18 +681,18 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                     onPress={handleSaveEdit}
                     style={{ backgroundColor: colors.primary, paddingVertical: 8, borderRadius: 8, alignItems: 'center', marginTop: 4 }}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>Done Editing</Text>
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{t.doneEditing}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
                 <TouchableOpacity onPress={() => setIsEditing(true)} onLongPress={() => onLongPress(todo._id)}>
-                  <Text style={[homeStyles.cardTitle, { marginBottom: 4 }]} numberOfLines={2}>{todo.text}</Text>
+                  <Text style={[homeStyles.cardTitle, { marginBottom: 10, color: colors.surfaceText }, isArabic && { textAlign: 'right' }]} numberOfLines={2}>{todo.text}</Text>
                 </TouchableOpacity>
               )}
 
               <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={[homeStyles.badge, { backgroundColor: badgeBg === colors.border ? colors.surface + '80' : badgeBg, alignSelf: 'flex-start' }]}>
-                  <Text style={[homeStyles.badgeText, { color: badgeColor }]}>{badgeText}</Text>
+                <View style={[homeStyles.badge, { backgroundColor: badgeBg === colors.border ? colors.surfaceText + '15' : badgeBg, alignSelf: 'flex-start' }]}>
+                  <Text style={[homeStyles.badgeText, { color: (badgeColor === colors.text || badgeColor === colors.textMuted) ? colors.surfaceText : badgeColor }]}>{badgeText}</Text>
                 </View>
               </View>
             </View>
@@ -650,10 +700,10 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
             <View style={{ justifyContent: 'center', alignItems: 'center', width: 56 }}>
               <CircularProgress
                 size={56} strokeWidth={4} progress={progress}
-                color={todo.status === 'paused' ? colors.textMuted : timerIconColor}
+                color={todo.status === 'paused' ? colors.textMuted : (todo.status === 'done' || todo.status === 'not_done') ? timerIconColor : colors.surfaceText}
                 unfilledColor={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
               >
-                <Text style={{ fontSize: 10, fontWeight: "700", color: todo.status === 'paused' ? colors.textMuted : timerIconColor, textAlign: 'center' }}>
+                <Text style={{ fontSize: 10, fontWeight: "700", color: todo.status === 'paused' ? colors.textMuted : (todo.status === 'done' || todo.status === 'not_done') ? timerIconColor : colors.surfaceText, textAlign: 'center' }}>
                   {timerText}
                 </Text>
               </CircularProgress>
@@ -663,11 +713,11 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
           {/* ─── Progress Bar (timer-weighted) ─── */}
           {hasSubtasks && isTimerSet && (
             <View style={{ marginBottom: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textMuted, letterSpacing: 0.3 }}>
-                  Progress
+              <View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.surfaceText + '80', letterSpacing: 0.3 }}>
+                  {t.progress}
                 </Text>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: progress >= 100 ? colors.success : colors.primary }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: progress >= 100 ? colors.success : colors.surfaceText }}>
                   {Math.round(progress)}%
                 </Text>
               </View>
@@ -677,41 +727,42 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                 backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
                 overflow: 'hidden',
               }}>
-                <View style={{
+                <View style={[{
                   height: 6,
                   borderRadius: 3,
                   width: `${Math.min(100, progress)}%`,
                   backgroundColor: progress >= 100 ? colors.success : progress >= 50 ? colors.primary : colors.warning,
-                }} />
+                  alignSelf: isArabic ? 'flex-end' : 'flex-start'
+                }]} />
               </View>
             </View>
           )}
 
           {/* ─── Action Row ─── */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
+          <View style={[{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
             {/* Show main task timer controls ONLY when there are NO subtasks with timers */}
             {!hasSubtaskTimers && (
               <>
                 {todo.status === 'not_started' && (
-                  <View style={homeStyles.actionButtons}>
+                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
                     {!isTimerSet ? (
-                      <TouchableOpacity style={[homeStyles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.primary, borderWidth: 1 }]} onPress={() => onSetTimer(todo._id)}>
-                        <Ionicons name="timer-outline" size={16} color={colors.primary} />
-                        <Text style={[homeStyles.actionBtnText, { color: colors.primary }]}>Set Timer</Text>
+                      <TouchableOpacity style={[homeStyles.actionBtn, { backgroundColor: colors.surfaceText + '10', borderColor: colors.surfaceText + '30', borderWidth: 1, flexDirection: isArabic ? 'row-reverse' : 'row' }]} onPress={() => onSetTimer(todo._id)}>
+                        <Ionicons name="timer-outline" size={16} color={colors.surfaceText} />
+                        <Text style={[homeStyles.actionBtnText, { color: colors.surfaceText }]}>{t.setTimer}</Text>
                       </TouchableOpacity>
                     ) : (
-                      <TouchableOpacity style={[homeStyles.actionBtn, { backgroundColor: colors.primary }]} onPress={handleStartTimer}>
+                      <TouchableOpacity style={[homeStyles.actionBtn, { backgroundColor: colors.primary, flexDirection: isArabic ? 'row-reverse' : 'row' }]} onPress={handleStartTimer}>
                         <Ionicons name="play" size={16} color="#fff" />
-                        <Text style={[homeStyles.actionBtnText, { color: '#fff' }]}>Start Task</Text>
+                        <Text style={[homeStyles.actionBtnText, { color: '#fff' }]}>{t.startTask}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
                 )}
 
                 {todo.status === 'in_progress' && (
-                  <View style={homeStyles.actionButtons}>
+                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
                     <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]} onPress={handlePauseTimer}>
-                      <Ionicons name="pause" size={16} color={colors.text} />
+                      <Ionicons name="pause" size={16} color={colors.surfaceText} />
                     </TouchableOpacity>
                     <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.successBg }]} onPress={() => moveToStatus('done')}>
                       <Ionicons name="checkmark" size={18} color={colors.success} />
@@ -723,7 +774,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                 )}
 
                 {todo.status === 'paused' && (
-                  <View style={homeStyles.actionButtons}>
+                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
                     <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.primary }]} onPress={handleStartTimer}>
                       <Ionicons name="play" size={16} color="#fff" />
                     </TouchableOpacity>
@@ -734,32 +785,32 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
             {/* When subtasks have timers, show a status indicator instead */}
             {hasSubtaskTimers && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6 }, isArabic && { flexDirection: 'row-reverse' }]}>
                 {anySubtaskRunning && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.warning + '15', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.warning + '30' }}>
+                  <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.warning + '15', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.warning + '30' }, isArabic && { flexDirection: 'row-reverse' }]}>
                     <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.warning }} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: colors.warning }}>Timer Running</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '800', color: colors.warning }}>{t.timerRunning}</Text>
                   </View>
                 )}
               </View>
             )}
 
             {(todo.status === 'done' || todo.status === 'not_done') && (
-              <View style={homeStyles.actionButtons}>
+              <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
                 <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.infoBg }]} onPress={() => moveToStatus('not_started')}>
                   <Ionicons name="refresh" size={18} color={colors.info} />
                 </TouchableOpacity>
               </View>
             )}
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 'auto', gap: 12 }}>
+            <View style={[{ flexDirection: 'row', alignItems: 'center', marginLeft: isArabic ? 0 : 'auto', marginRight: isArabic ? 'auto' : 0, gap: 12 }, isArabic && { flexDirection: 'row-reverse' }]}>
               {hasSubtasks && (
                 <TouchableOpacity
                   onPress={toggleSubtasks}
-                  style={[homeStyles.actionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30', borderWidth: 1 }]}
+                  style={[homeStyles.actionBtn, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30', borderWidth: 1, flexDirection: isArabic ? 'row-reverse' : 'row' }]}
                 >
-                  <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>
-                    {subtasks.length} Subtask{subtasks.length > 1 ? 's' : ''} {showSubtasks ? '▼' : '▶'}
+                  <Text style={{ color: colors.surfaceText, fontSize: 13, fontWeight: '700' }}>
+                    {stats.total} {stats.total === 1 ? t.subtask : t.subtasks} {showSubtasks ? '▼' : '▶'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -770,12 +821,13 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                   borderWidth: hasSubtasks ? 0 : 1,
                   borderColor: colors.primary + '40',
                   borderStyle: 'dashed',
+                  flexDirection: isArabic ? 'row-reverse' : 'row'
                 }]}
                 onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setIsAddingSub(true); }}
               >
-                <Ionicons name="add-circle-outline" size={16} color={hasSubtasks ? colors.textMuted : colors.primary} />
+                <Ionicons name="add-circle-outline" size={16} color={colors.surfaceText + '60'} />
                 {!hasSubtasks && (
-                  <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '600' }}>Add Subtask</Text>
+                  <Text style={{ color: colors.surfaceText + '90', fontSize: 12, fontWeight: '700' }}>{t.addSubtask}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -784,97 +836,154 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
           <View style={[homeStyles.dividerDashed, { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]} />
 
           {/* ─── Project + Date Row ─── */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }, isArabic && { flexDirection: 'row-reverse' }]}>
             <TouchableOpacity style={homeStyles.projectRow} onPress={() => onLinkProject(todo._id)}>
-              <Ionicons name="link-outline" size={16} color={todo.projectId ? colors.primary : colors.textMuted} />
-              <Text style={[homeStyles.projectText, todo.projectId && { color: colors.primary, fontStyle: 'normal', fontWeight: '600' }]}>
-                {project?.name || todo.projectId || 'No project'}
+              <Ionicons name="link-outline" size={16} color={todo.projectId ? colors.primary : colors.surfaceText + '80'} />
+              <Text style={[homeStyles.projectText, { color: colors.surfaceText + '80' }, todo.projectId && { color: colors.surfaceText, fontStyle: 'normal', fontWeight: '700' }, isArabic && { textAlign: 'right' }]}>
+                {project?.name || todo.projectId || t.noProject}
               </Text>
             </TouchableOpacity>
 
-            {todo.dueDate && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons name="calendar-outline" size={14} color={isDueSoon ? colors.danger : colors.textMuted} />
-                <Text style={{ fontSize: 12, color: isDueSoon ? colors.danger : colors.textMuted, fontWeight: '500' }}>
-                  {new Date(todo.dueDate).toLocaleDateString()}
-                </Text>
-              </View>
-            )}
+            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+              {todo.dueDate && (
+                <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 4 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <Ionicons name="calendar-outline" size={14} color={isDueSoon ? colors.danger : colors.surfaceText + '80'} />
+                  <Text style={[{ fontSize: 12, color: isDueSoon ? colors.danger : colors.surfaceText + '80', fontWeight: '600' }, isArabic && { textAlign: 'right' }]}>
+                    {new Date(todo.dueDate).toLocaleDateString(isArabic ? 'ar-SA' : 'en-US')}
+                  </Text>
+                </View>
+              )}
 
-            {todo.date && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 }}>
-                <Ionicons name="calendar-clear-outline" size={14} color={colors.primary} />
-                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '500' }}>
-                  {new Date(todo.date).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* ─── Footer ─── */}
-          <View style={homeStyles.footerRow}>
-            <View style={homeStyles.footerStats}>
-              {hasSubtasks && (
-                <View style={homeStyles.statItem}>
-                  <Ionicons name="list-outline" size={15} color={colors.textMuted} />
-                  <Text style={homeStyles.statText}>{stats.done}/{stats.total} Subtasks</Text>
+              {todo.date && (
+                <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 4 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <Ionicons name="calendar-clear-outline" size={14} color={colors.surfaceText + '80'} />
+                  <Text style={[{ fontSize: 12, color: colors.surfaceText + '80', fontWeight: '600' }, isArabic && { textAlign: 'right' }]}>
+                    {new Date(todo.date).toLocaleDateString(isArabic ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}
+                  </Text>
                 </View>
               )}
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <TouchableOpacity onPress={() => { setIsEditing(true); setEditText(todo.text); }}>
-                <Ionicons name="create-outline" size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => deleteTodo({ id: todo._id })}>
-                <Ionicons name="trash-outline" size={18} color={colors.danger} />
-              </TouchableOpacity>
-            </View>
           </View>
 
+          {/* ─── Footer ─── */}
+          <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, isArabic && { flexDirection: 'row-reverse' }]}>
+            <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 15 }, isArabic && { flexDirection: 'row-reverse' }]}>
+              {hasSubtasks && (
+                <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 4 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <Ionicons name="list-outline" size={15} color={colors.surfaceText + '80'} />
+                  <Text style={{ fontSize: 12, color: colors.surfaceText + '99', fontWeight: '700' }}>{stats.done}/{stats.total} {isArabic ? 'مهام' : 'Subtasks'}</Text>
+                </View>
+              )}
+              <TouchableOpacity onPress={() => { setIsEditing(true); setEditText(todo.text); }}>
+                <Ionicons name="create-outline" size={18} color={colors.surfaceText + '99'} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity onPress={() => deleteTodo({ id: todo._id })}>
+              <Ionicons name="trash-outline" size={18} color={colors.danger} />
+            </TouchableOpacity>
+          </View>
+
+          {/* ─── Subtask Section (Moved inside card) ─── */}
+          {(isAddingSub || (showSubtasks && hasSubtasks)) && (
+            <View style={[{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.surfaceText + '10' }, isArabic && { direction: 'rtl' }]}>
+              {showSubtasks && hasSubtasks && (
+                <View style={{ gap: 8, marginBottom: isAddingSub ? 16 : 0 }}>
+                  {subtasks.map((sub: any) => (
+                    <SubtaskRow
+                      key={sub._id}
+                      sub={sub}
+                      parentTimerDuration={todo.timerDuration}
+                      colors={colors}
+                      isDarkMode={isDarkMode}
+                      homeStyles={homeStyles}
+                      onStartSubtask={handleStartSubtask}
+                      onPauseSubtask={handlePauseSubtask}
+                      onToggleComplete={handleToggleSubComplete}
+                      onDelete={handleDeleteSub}
+                      onSetTimer={handleSetSubTimer}
+                      onUpdateText={handleUpdateSubText}
+                      onUpdateStatus={(id, status) => updateStatus({ id, status })}
+                    />
+                  ))}
+                </View>
+              )}
+
+              {isAddingSub && (
+                <View style={{ marginBottom: 12 }}>
+                  <View style={[{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', padding: 10, backgroundColor: colors.surfaceText + '08', borderRadius: 10, borderWidth: 1, borderColor: colors.primary + '30' }]}>
+                    <Ionicons name={isArabic ? "return-down-back" : "return-down-forward"} size={18} color={colors.surfaceText + '60'} style={isArabic ? { marginLeft: 8 } : { marginRight: 8 }} />
+                    <TextInput
+                      style={[{ flex: 1, color: colors.surfaceText, fontSize: 14, padding: 0 }, isArabic && { textAlign: 'right' }]}
+                      placeholder={isArabic ? "...ما هي الخطوة الفرعية؟" : "What's a sub-step?"}
+                      placeholderTextColor={colors.surfaceText + '50'}
+                      value={newSubText}
+                      onChangeText={setNewSubText}
+                      autoFocus
+                      onSubmitEditing={handleAddSubtask}
+                      onBlur={() => { if (!newSubText.trim() && !newSubDuration) { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setIsAddingSub(false); } }}
+                    />
+                    <View style={[{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }]}>
+                      <TouchableOpacity 
+                         onPress={() => setShowNewSubTimerPicker(!showNewSubTimerPicker)}
+                         style={newSubDuration ? { backgroundColor: colors.primary + '15', padding: 4, borderRadius: 6 } : {}}
+                      >
+                        <Ionicons name="timer-outline" size={20} color={newSubDuration ? colors.primary : colors.surfaceText + '40'} />
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handleAddSubtask}>
+                        <Ionicons name={isArabic ? "arrow-back-circle" : "arrow-up-circle"} size={24} color={newSubText.trim() ? colors.primary : colors.surfaceText + '30'} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                  
+                  {showNewSubTimerPicker && (
+                    <View style={{ marginTop: 8 }}>
+                      <InlineTimerPicker
+                        initialMs={newSubDuration}
+                        colors={colors}
+                        t={t}
+                        isArabic={isArabic}
+                        onSave={(ms) => {
+                          setNewSubDuration(ms);
+                          setShowNewSubTimerPicker(false);
+                        }}
+                        onCancel={() => setShowNewSubTimerPicker(false)}
+                      />
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </View>
+  </>);
 
-      {/* ─── Add Subtask Input ─── */}
-      {isAddingSub && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, padding: 12, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + '30' }}>
-          <Ionicons name="return-down-forward" size={18} color={colors.textMuted} style={{ marginRight: 8 }} />
-          <TextInput
-            style={{ flex: 1, color: colors.text, fontSize: 14 }}
-            placeholder="What's a sub-step to complete this?"
-            placeholderTextColor={colors.textMuted}
-            value={newSubText}
-            onChangeText={setNewSubText}
-            autoFocus
-            onSubmitEditing={handleAddSubtask}
-            onBlur={() => { if (!newSubText.trim()) { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setIsAddingSub(false); } }}
-          />
-          <TouchableOpacity onPress={handleAddSubtask}>
-            <Ionicons name="arrow-up-circle" size={28} color={newSubText.trim() ? colors.primary : colors.border} />
-          </TouchableOpacity>
+  if (isTimelineMode) {
+    const isPlaying = todo.status === 'in_progress';
+    const progressWidth = isPlaying && todo.timerDuration ? Math.min(100, ((todo.timerDuration - timeLeft) / todo.timerDuration) * 100) : 0;
+    
+    return (
+      <View style={[homeStyles.cardContainer, { marginLeft: depth * 16 }]}>
+        <View style={[homeStyles.timelineColumn, { justifyContent: 'flex-start', paddingTop: 24 }]}>
+          {isPlaying ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', width: 250, zIndex: 10, transform: [{ translateX: -3 }] }}>
+               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.surfaceText, zIndex: 11 }} />
+               <View style={{ flex: 1, height: 2, backgroundColor: colors.surfaceText + '30', marginLeft: -4, zIndex: 10 }}>
+                 <View style={{ width: `${Math.max(1, progressWidth)}%`, height: '100%', backgroundColor: colors.surfaceText }} />
+               </View>
+            </View>
+          ) : (
+            <View style={{ width: 16, height: 2, backgroundColor: colors.border, borderRadius: 1 }} />
+          )}
         </View>
-      )}
+        {coreCard}
+      </View>
+    );
+  }
 
-      {/* ─── Subtask List ─── */}
-      {showSubtasks && hasSubtasks && (
-        <View style={{ marginTop: 8, paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: colors.primary + '40', gap: 8 }}>
-          {subtasks.map((sub: any) => (
-            <SubtaskRow
-              key={sub._id}
-              sub={sub}
-              parentTimerDuration={todo.timerDuration}
-              colors={colors}
-              isDarkMode={isDarkMode}
-              homeStyles={homeStyles}
-              onStartSubtask={handleStartSubtask}
-              onPauseSubtask={handlePauseSubtask}
-              onToggleComplete={handleToggleSubComplete}
-              onDelete={handleDeleteSub}
-              onSetTimer={handleSetSubTimer}
-              onUpdateText={handleUpdateSubText}
-            />
-          ))}
-        </View>
-      )}
+  return (
+    <View style={{ marginLeft: depth * 16 }}>
+      {coreCard}
     </View>
   );
 };

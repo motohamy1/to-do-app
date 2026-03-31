@@ -1,7 +1,7 @@
 import { ColorScheme } from "@/hooks/useTheme";
 import { StyleSheet, Platform } from "react-native";
 
-export const createHomeStyles = (colors: ColorScheme) => {
+export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false) => {
   const styles = StyleSheet.create({
     container: {
       flex: 1,
@@ -19,64 +19,127 @@ export const createHomeStyles = (colors: ColorScheme) => {
       paddingBottom: 12,
     },
     headerLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 12,
+      flexDirection: "column",
+      alignItems: isArabic ? "flex-end" : "flex-start",
+      gap: 4,
     },
-    headerTitle: {
-      fontSize: 16,
-      fontWeight: "800",
-      color: colors.primary,
-      letterSpacing: 0.5,
-      textTransform: "uppercase",
-    },
-    headerCount: {
-      fontSize: 16,
-      fontWeight: "500",
+    headerDate: {
+      fontSize: 14,
+      fontWeight: '600',
       color: colors.textMuted,
     },
+    headerGreeting: {
+      fontSize: isArabic ? 24 : 24,
+      fontWeight: "800",
+      color: colors.text,
+      letterSpacing: -0.5,
+    },
     headerRight: {
-      padding: 4,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.surface + "20", // transparent
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     scrollContent: {
       paddingVertical: 12,
       paddingBottom: 100,
     },
-    section: {
+    
+    // --- Today's Plan Banner ---
+    todaysPlanCard: {
+      backgroundColor: colors.primary,
+      borderRadius: 24,
+      padding: 20,
+      marginHorizontal: 24,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    todaysPlanTitle: {
+      fontSize: isArabic ? 22 : 20,
+      fontWeight: '800',
+      color: '#000000',
+      marginBottom: 4,
+    },
+    todaysPlanSubtitle: {
+      fontSize: isArabic ? 14 : 14,
+      color: 'rgba(0,0,0,0.6)',
+      fontWeight: '700',
+    },
+    
+    // --- Filter Pills ---
+    pillsContainer: {
+      paddingHorizontal: 24,
+      gap: 8,
+      marginBottom: 32,
+    },
+    pill: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    pillActive: {
+      backgroundColor: colors.surface,
+      borderColor: colors.surface,
+    },
+    pillInactive: {
+      backgroundColor: 'transparent',
+      borderColor: 'transparent',
+    },
+    pillText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    pillSubText: {
+      fontSize: 12,
+      color: colors.textMuted,
+      marginTop: 2,
+    },
+
+    // --- Timeline List ---
+    sectionTitleContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 24,
       marginBottom: 16,
     },
-    sectionTitle: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: colors.textMuted,
-      marginBottom: 8,
-      letterSpacing: 1,
-      textTransform: "uppercase",
-      paddingHorizontal: 24, // As ScrollView content no longer has padding
+    sectionTitleText: {
+      fontSize: isArabic ? 20 : 18,
+      fontWeight: '800',
+      color: colors.text,
     },
-    horizontalScrollCardContainer: {
-      paddingHorizontal: 24,
-      gap: 16,
+
+    // --- Old Card styles repurposed for timeline/category cards ---
+    cardContainer: {
+      marginHorizontal: 24,
+      marginBottom: 16,
+      flexDirection: 'row',
+    },
+    timelineColumn: {
+      width: 50,
+      alignItems: 'flex-start',
+    },
+    timelineTime: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.textMuted,
     },
     card: {
+      flex: 1,
       backgroundColor: colors.surface,
-      borderRadius: 12,
-      padding: 12,
-      width: 280, // Fixed width for horizontal scrolling
-      shadowColor: colors.primary,
-      shadowOffset: {
-        width: 0,
-        height: 8,
-      },
-      shadowOpacity: 0.04,
-      shadowRadius: 16,
-      elevation: 4,
-      ...Platform.select({
-        android: {
-          borderWidth: 1,
-          borderColor: colors.border,
-        }
-      })
+      borderRadius: 20,
+      padding: 16,
     },
     cardHeader: {
       flexDirection: "row",
@@ -85,11 +148,13 @@ export const createHomeStyles = (colors: ColorScheme) => {
       marginBottom: 12,
     },
     cardTitle: {
-      fontSize: 16,
-      fontWeight: "700",
-      color: colors.text,
+      fontSize: isArabic ? 20 : 18,
+      fontWeight: "800",
+      color: colors.surfaceText,
       flex: 1,
     },
+    
+    // Utilities
     statusAndActionRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -129,27 +194,6 @@ export const createHomeStyles = (colors: ColorScheme) => {
       alignItems: 'center',
       borderRadius: 16,
     },
-    timerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderRadius: 12,
-      marginBottom: 16,
-    },
-    timerIcon: {
-      marginRight: 8,
-    },
-    timerText: {
-      fontSize: 14,
-      fontWeight: "700",
-      color: colors.primary,
-      flex: 1,
-    },
-    timerLabel: {
-      fontSize: 12,
-      color: colors.textMuted,
-    },
     dividerDashed: {
       height: 1,
       borderStyle: "dashed",
@@ -169,62 +213,24 @@ export const createHomeStyles = (colors: ColorScheme) => {
       color: colors.textMuted,
     },
     footerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 8,
     },
     footerStats: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     statItem: {
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 4,
     },
     statText: {
-      fontSize: 13,
-      color: colors.textMuted,
-      fontWeight: "500",
-    },
-    priorityArrow: {
-      marginLeft: "auto",
-    },
-    addButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: 16,
-      paddingHorizontal: 24,
-      gap: 12,
-    },
-    addButtonText: {
-      fontSize: 16,
-      fontWeight: "500",
-      color: colors.primary,
-    },
-    addInputContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      marginTop: 8,
-      marginHorizontal: 24, // Added to keep it padded since list is no longer fully padded
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
-      elevation: 2,
-    },
-    addInput: {
-      flex: 1,
-      fontSize: 16,
-      color: colors.text,
-      marginLeft: 12,
-      fontWeight: "500",
-      padding: 0,
+      fontSize: 12,
+      color: colors.surfaceText + '99',
+      fontWeight: '500',
     },
     loadingContainer: {
       flex: 1,
@@ -240,7 +246,38 @@ export const createHomeStyles = (colors: ColorScheme) => {
       fontSize: 16,
       color: colors.textMuted,
       fontWeight: "500",
-    }
+    },
+    addButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      marginHorizontal: 24,
+      padding: 16,
+      borderRadius: 16,
+      gap: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 32,
+    },
+    addButtonText: {
+      fontSize: 16,
+      color: colors.textMuted,
+      fontWeight: '600',
+    },
+    addInputContainer: {
+      backgroundColor: colors.surface,
+      marginHorizontal: 24,
+      padding: 16,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      marginBottom: 32,
+    },
+    addInput: {
+      fontSize: 16,
+      color: colors.text,
+      fontWeight: '600',
+    },
   });
 
   return styles;
