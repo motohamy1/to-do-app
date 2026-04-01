@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StatusBar, Animated, StyleSheet, BackHandler } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, Animated, StyleSheet, BackHandler, KeyboardAvoidingView, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
@@ -29,11 +30,12 @@ const months_ar = [
 ];
 
 const Planner = () => {
-  const { colors, isDarkMode, toggleDarkMode } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { userId, language } = useAuth();
   const { t, isArabic } = useTranslation(language);
   const styles = createPlannerStyles(colors, isArabic);
   const homeStyles = createHomeStyles(colors, isArabic);
+  const router = useRouter();
   const months = isArabic ? months_ar : months_en;
   
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
@@ -48,16 +50,16 @@ const Planner = () => {
   const deleteTodoMutation = useMutation(api.todos.deleteTodo);
   const setTimerMutation = useMutation(api.todos.setTimer);
   const linkProjectMutation = useMutation(api.todos.linkProject);
+  const scrollViewRef = useRef<ScrollView>(null);
 
-  // Animated toggle
-  const toggleAnim = useRef(new Animated.Value(isDarkMode ? 1 : 0)).current;
-  useEffect(() => {
-    Animated.timing(toggleAnim, {
-      toValue: isDarkMode ? 1 : 0,
-      duration: 250,
-      useNativeDriver: false,
-    }).start();
-  }, [isDarkMode]);
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 200);
+  };
+
+
+
 
   // Handle system back button
   useEffect(() => {
@@ -80,8 +82,7 @@ const Planner = () => {
 
     return () => backHandler.remove();
   }, [selectedMonth, selectedDay]);
-  const pillTranslate = toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 22] });
-  const trackBg = toggleAnim.interpolate({ inputRange: [0, 1], outputRange: ['#E2E8F0', '#1E2130'] });
+
   
   const todos = useQuery(api.todos.get, userId ? { userId } : "skip") || [];
 
@@ -206,7 +207,13 @@ const Planner = () => {
     const selectedDateTs = new Date(year, month, day).getTime();
 
     return (
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+            ref={scrollViewRef} 
+            contentContainerStyle={{ paddingBottom: 100 }} 
+            showsVerticalScrollIndicator={false} 
+            keyboardShouldPersistTaps="handled"
+        >
+
 
             <View style={[styles.specificDayHeader, isArabic && { alignItems: 'flex-end' }]}>
                 <Text style={styles.specificDayTitle}>{isArabic ? `${day} ${months[month]}` : `${day} ${months[month]}`}</Text>
@@ -295,9 +302,10 @@ const Planner = () => {
                 })}
             </View>
 
-            <View style={styles.addDayTaskContainer}>
-                <TodoInput initialDate={selectedDateTs} />
+            <View style={[styles.addDayTaskContainer, { marginBottom: 40 }]}>
+                <TodoInput initialDate={selectedDateTs} onFocus={scrollToBottom} />
             </View>
+
 
             <TimerModal 
                 visible={isTimerModalVisible}
@@ -317,28 +325,17 @@ const Planner = () => {
 
 
   return (
-    <View style={[styles.container, isArabic && { direction: 'rtl' }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, isArabic && { direction: 'rtl' }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
+
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.bg} />
       <SafeAreaView style={styles.safeArea}>
         <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
             <Text style={styles.headerTitle}>{t.planner}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <TouchableOpacity
-                onPress={toggleDarkMode}
-                activeOpacity={0.85}
-                style={plannerToggleStyles.toggleWrapper}
-              >
-                <Ionicons name="sunny" size={13} color={isDarkMode ? '#7A8099' : '#FFAB00'} />
-                <Ionicons name="moon" size={12} color={isDarkMode ? '#7C5CFF' : '#C4C9E0'} />
-                <Animated.View style={[plannerToggleStyles.track, { backgroundColor: trackBg }]}>
-                  <Animated.View
-                    style={[
-                      plannerToggleStyles.pill,
-                      { transform: [{ translateX: pillTranslate }], backgroundColor: isDarkMode ? '#7C5CFF' : '#6C47FF' },
-                    ]}
-                  />
-                </Animated.View>
-              </TouchableOpacity>
               {(selectedMonth !== null || selectedDay !== null) && (
                 <TouchableOpacity onPress={resetAll}>
                   <Ionicons name="close" size={28} color={colors.text} />
@@ -355,30 +352,18 @@ const Planner = () => {
             renderSpecificDayView(selectedDay, selectedMonth, currentYear)
         )}
       </SafeAreaView>
-    </View>
+
+      {/* Floating Action Button for detailed Reminder */}
+      <TouchableOpacity 
+        style={[homeStyles.fab, isArabic && homeStyles.fabRtl]}
+        onPress={() => router.push('/add-reminder')}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="add" size={32} color="#000000" />
+      </TouchableOpacity>
+    </KeyboardAvoidingView>
   );
 };
-
-const plannerToggleStyles = StyleSheet.create({
-  toggleWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  track: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    marginLeft: 4,
-  },
-  pill: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    position: 'absolute',
-  },
-});
 
 export default Planner;
 

@@ -90,7 +90,8 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
     },
     pillActive: {
       backgroundColor: colors.surface,
-      borderColor: colors.surface,
+      borderColor: colors.primary,
+      borderWidth: 1.5,
     },
     pillInactive: {
       backgroundColor: 'transparent',
@@ -261,9 +262,10 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
     },
     addButtonText: {
       fontSize: 16,
-      color: colors.textMuted,
-      fontWeight: '600',
+      color: colors.text,
+      fontWeight: '700',
     },
+
     addInputContainer: {
       backgroundColor: colors.surface,
       marginHorizontal: 24,
@@ -277,6 +279,27 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       fontSize: 16,
       color: colors.text,
       fontWeight: '600',
+    },
+    fab: {
+      position: 'absolute',
+      bottom: 100,
+      right: 24,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.4,
+      shadowRadius: 10,
+      elevation: 8,
+      zIndex: 100,
+    },
+    fabRtl: {
+      right: undefined,
+      left: 24,
     },
   });
 

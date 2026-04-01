@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StatusBar, Switch, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StatusBar, Switch, Platform, Modal, TextInput, Alert, Image, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useMutation } from 'convex/react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from '@/utils/i18n';
+import * as ImagePicker from 'expo-image-picker';
 
 const Settings = () => {
   const { colors, isDarkMode, toggleDarkMode } = useTheme();
@@ -21,6 +22,80 @@ const Settings = () => {
   
   const userSettings = useQuery(api.auth.getUserSettings, userId ? { userId } : "skip");
   const updateSettings = useMutation(api.auth.updateSettings);
+  const generateUploadUrl = useMutation(api.auth.generateUploadUrl);
+  const updateProfilePicture = useMutation(api.auth.updateProfilePicture);
+
+  const [isEditModalVisible, setIsEditModalVisible] = React.useState(false);
+  const [editName, setEditName] = React.useState('');
+  const [editEmail, setEditEmail] = React.useState('');
+  const [isUploading, setIsUploading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (userSettings) {
+      setEditName(userSettings.name || '');
+      setEditEmail(userSettings.email || '');
+    }
+  }, [userSettings]);
+
+  const handleUpdateProfile = async () => {
+    if (!userId || isAnonymous) return;
+    try {
+      await updateSettings({
+        userId,
+        name: editName,
+        email: editEmail
+      });
+      setIsEditModalVisible(false);
+      Alert.alert("Success", "Profile updated successfully");
+    } catch (e) {
+      Alert.alert("Error", "Failed to update profile");
+    }
+  };
+
+  const handlePickImage = async () => {
+    if (!userId || isAnonymous) return;
+    
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Denied', 'We need camera roll permissions to change your profile picture.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      await uploadImage(result.assets[0].uri);
+    }
+  };
+
+  const uploadImage = async (uri: string) => {
+    setIsUploading(true);
+    try {
+      const postUrl = await generateUploadUrl();
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      const result = await fetch(postUrl, {
+        method: "POST",
+        headers: { "Content-Type": blob.type },
+        body: blob,
+      });
+      const { storageId } = await result.json();
+      
+      await updateProfilePicture({ userId: userId!, storageId });
+      Alert.alert("Success", "Profile picture updated");
+    } catch (e) {
+      console.error(e);
+      Alert.alert("Error", "Failed to upload image");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const todos = useQuery(api.todos.get, userId ? { userId } : "skip") || [];
   const projects = useQuery(api.projects.getCategories, userId ? { userId } : "skip") || [];
@@ -84,10 +159,22 @@ const Settings = () => {
               {t.profile}
             </Text>
             <View style={styles.card}>
-              <View style={[styles.profileHero, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={[styles.avatarContainer, isArabic && { marginLeft: 0, marginRight: 0 }]}>
-                  <Ionicons name="person" size={40} color={colors.primary} />
-                </View>
+                <TouchableOpacity 
+                  style={[styles.avatarContainer, isArabic && { marginLeft: 0, marginRight: 0 }]}
+                  onPress={handlePickImage}
+                  disabled={isUploading}
+                >
+                  {isUploading ? (
+                    <ActivityIndicator color={colors.primary} />
+                  ) : userSettings?.profilePictureUrl ? (
+                    <Image source={{ uri: userSettings.profilePictureUrl }} style={{ width: 64, height: 64, borderRadius: 32 }} />
+                  ) : (
+                    <Ionicons name="person" size={40} color={colors.primary} />
+                  )}
+                  <View style={{ position: 'absolute', bottom: -2, right: -2, backgroundColor: colors.surface, borderRadius: 10, padding: 2, borderWidth: 1, borderColor: colors.border }}>
+                    <Ionicons name="camera" size={14} color={colors.primary} />
+                  </View>
+                </TouchableOpacity>
                 <View style={[styles.profileInfo, isArabic && { alignItems: 'flex-end', marginLeft: 0, marginRight: 20 }]}>
                   <Text style={styles.profileName}>
                     {isAnonymous ? t.guest : (userSettings?.name || '...')}
@@ -101,13 +188,52 @@ const Settings = () => {
                     <Ionicons name={isArabic ? "log-in" : "log-in-outline"} size={24} color={colors.primary} />
                   </TouchableOpacity>
                 ) : (
-                  <TouchableOpacity>
+                  <TouchableOpacity onPress={() => setIsEditModalVisible(true)}>
                     <Ionicons name="create-outline" size={20} color={colors.primary} />
                   </TouchableOpacity>
                 )}
               </View>
             </View>
-          </View>
+
+          {/* Profile Edit Modal */}
+          <Modal visible={isEditModalVisible} transparent animationType="slide" onRequestClose={() => setIsEditModalVisible(false)}>
+            <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+              <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Edit Profile</Text>
+                  <TouchableOpacity onPress={() => setIsEditModalVisible(false)}>
+                    <Ionicons name="close" size={24} color={colors.text} />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.modalBody}>
+                  <Text style={styles.inputLabel}>Display Name</Text>
+                  <TextInput 
+                    style={styles.textInput} 
+                    value={editName} 
+                    onChangeText={setEditName}
+                    placeholder="Enter your name"
+                    placeholderTextColor={colors.textMuted}
+                  />
+                  
+                  <Text style={styles.inputLabel}>Email Address</Text>
+                  <TextInput 
+                    style={styles.textInput} 
+                    value={editEmail} 
+                    onChangeText={setEditEmail}
+                    placeholder="Enter your email"
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                  
+                  <TouchableOpacity style={styles.saveButton} onPress={handleUpdateProfile}>
+                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </Modal>
 
           {/* Preferences */}
           <View style={styles.section}>

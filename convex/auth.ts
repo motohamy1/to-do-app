@@ -96,6 +96,8 @@ export const getUserSettings = query({
       name: user.name,
       email: user.email,
       isAnonymous: user.isAnonymous ?? false,
+      profilePictureUrl: user.profilePictureUrl,
+      profilePictureId: user.profilePictureId,
     };
   },
 });
@@ -105,9 +107,33 @@ export const updateSettings = mutation({
     userId: v.id("users"),
     language: v.optional(v.string()),
     notificationsEnabled: v.optional(v.boolean()),
+    name: v.optional(v.string()),
+    email: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { userId, ...settings } = args;
     await ctx.db.patch(userId, settings);
+  },
+});
+
+export const generateUploadUrl = mutation(async (ctx) => {
+  return await ctx.storage.generateUploadUrl();
+});
+
+export const updateProfilePicture = mutation({
+  args: {
+    userId: v.id("users"),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (user?.profilePictureId) {
+      await ctx.storage.delete(user.profilePictureId);
+    }
+    const url = await ctx.storage.getUrl(args.storageId);
+    await ctx.db.patch(args.userId, {
+      profilePictureId: args.storageId,
+      profilePictureUrl: url ?? undefined,
+    });
   },
 });

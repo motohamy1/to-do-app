@@ -2,11 +2,13 @@ import { createHomeStyles } from "@/assets/styles/home.styles";
 import useTheme from "@/hooks/useTheme";
 import { useMutation, useQuery } from "convex/react";
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState, useMemo } from 'react';
-import { StatusBar, View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo, useRef } from 'react';
+
+import { StatusBar, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from "../../convex/_generated/api";
 import { Id } from '../../convex/_generated/dataModel';
+import { useRouter } from "expo-router";
 import Header from "@/components/Header";
 import TodoInput from "@/components/TodoInput";
 import TodoCard from "@/components/TodoCard";
@@ -22,18 +24,28 @@ const index = () => {
     const { t, isArabic } = useTranslation(language);
     const todos = useQuery(api.todos.get, userId ? { userId } : "skip");
     const deleteTodo = useMutation(api.todos.deleteTodo);
+    const router = useRouter();
     const setTimerMutation = useMutation(api.todos.setTimer);
     const linkProject = useMutation(api.todos.linkProject);
-    const { colors } = useTheme();
+    const { colors, isDarkMode } = useTheme();
 
     const [isTimerModalVisible, setTimerModalVisible] = useState(false);
     const [isProjectModalVisible, setProjectModalVisible] = useState(false);
     const [selectedTodoId, setSelectedTodoId] = useState<Id<"todos"> | null>(null);
     const [activeFilter, setActiveFilter] = useState<'All' | 'In Progress' | 'Done'>('All');
 
+    const scrollViewRef = useRef<ScrollView>(null);
     const homeStyles = createHomeStyles(colors, isArabic);
 
+    const scrollToBottom = () => {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 200);
+    };
+
+
     const normalizedTodos = todos?.map(t => ({
+
       ...t,
       status: t.status || ((t as any).isCompleted ? 'done' : 'not_started')
     })) || [];
@@ -74,7 +86,12 @@ const index = () => {
     }, [todayTodos, activeFilter]);
 
     return (
-        <View style={[homeStyles.container, isArabic && { direction: 'rtl' }]}>
+        <KeyboardAvoidingView 
+            style={[homeStyles.container, isArabic && { direction: 'rtl' }]}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+
             <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.bg} />
             <SafeAreaView style={homeStyles.safeArea}>
                 <Header />
@@ -83,7 +100,13 @@ const index = () => {
                      <ActivityIndicator size="large" color={colors.primary} />
                    </View>
                 ) : (
-                   <ScrollView contentContainerStyle={homeStyles.scrollContent} showsVerticalScrollIndicator={false}>
+                   <ScrollView 
+                     ref={scrollViewRef}
+                     contentContainerStyle={homeStyles.scrollContent} 
+                     showsVerticalScrollIndicator={false} 
+                     keyboardShouldPersistTaps="handled"
+                   >
+
                       
                       {/* Today's Plan Card */}
                       <View style={[homeStyles.todaysPlanCard, isArabic && { flexDirection: 'row-reverse' }]}>
@@ -124,10 +147,10 @@ const index = () => {
                                       style={[homeStyles.pill, isActive ? homeStyles.pillActive : homeStyles.pillInactive]}
                                       onPress={() => setActiveFilter(filter)}
                                   >
-                                      <Text style={[homeStyles.pillText, { color: isActive ? '#000000' : colors.textMuted }]}>
+                                      <Text style={[homeStyles.pillText, { color: isActive ? colors.primary : colors.textMuted }]}>
                                           {filterLabel}
                                       </Text>
-                                      <Text style={[homeStyles.pillSubText, { color: isActive ? 'rgba(0,0,0,0.6)' : colors.textMuted }]}>
+                                      <Text style={[homeStyles.pillSubText, { color: isActive ? colors.primary + 'CC' : colors.textMuted }]}>
                                           {count} {count === 1 ? t.task : t.tasks}
                                       </Text>
                                   </TouchableOpacity>
@@ -163,10 +186,11 @@ const index = () => {
                       ))}
                       
                       {activeFilter === 'All' && (
-                          <View style={{ marginTop: 24 }}>
-                              <TodoInput />
+                          <View style={{ marginTop: 24, marginBottom: 80 }}>
+                              <TodoInput onFocus={scrollToBottom} />
                           </View>
                       )}
+
                    </ScrollView>
                 )}
             </SafeAreaView>
@@ -189,7 +213,8 @@ const index = () => {
               }}
               onSelect={handleSelectProject}
             />
-        </View>
+
+        </KeyboardAvoidingView>
     );
 };
 

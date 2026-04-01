@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery } from "./_generated/server";
+
 
 export const get = query({
   args: { userId: v.id("users") },
@@ -23,6 +24,36 @@ export const getSubtasks = query({
       .collect();
   },
 });
+
+export const getById = query({
+  args: { id: v.id("todos") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
+export const checkDuplicate = query({
+  args: { 
+    userId: v.id("users"), 
+    text: v.string(), 
+    dueDate: v.number() 
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("todos")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .filter((q) => 
+        q.and(
+          q.eq(q.field("text"), args.text),
+          q.eq(q.field("dueDate"), args.dueDate)
+        )
+      )
+      .first();
+    return existing !== null;
+  },
+});
+
+
 
 export const addTodo = mutation({
   args: { 

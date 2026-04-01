@@ -9,6 +9,8 @@ import CircularProgress from './CircularProgress';
 import { scheduleTimerNotification, cancelNotification } from '@/utils/notifications';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/utils/i18n';
+import TaskDetailModal from './TaskDetailModal';
+
 
 interface TodoCardProps {
   todo: {
@@ -218,7 +220,7 @@ const SubtaskRow = ({
         const remaining = Math.max(0, sub.timerDuration! - elapsed);
         setSubTimeLeft(remaining);
         if (remaining === 0 && sub.status === 'in_progress') {
-          onUpdateStatus(sub._id, 'not_done');
+          onUpdateStatus(sub._id, 'done');
         }
       };
       calc();
@@ -450,6 +452,8 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const [showNewSubTimerPicker, setShowNewSubTimerPicker] = useState(false);
 
   const [lastNotifId, setLastNotifId] = useState<string | null>(null);
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+
 
   const hasSubtasks = subtasks && subtasks.length > 0;
 
@@ -502,7 +506,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
         const remaining = Math.max(0, todo.timerDuration! - elapsed);
         setTimeLeft(remaining);
         if (remaining === 0 && todo.status === 'in_progress') {
-          updateStatus({ id: todo._id, status: 'not_done' });
+          updateStatus({ id: todo._id, status: 'done' });
         }
       };
       calculateTimeInfo();
@@ -521,7 +525,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   // Overdue logic: automatically mark as not_done if deadline passed
   useEffect(() => {
     if (todo.status !== 'done' && todo.status !== 'not_done' && todo.dueDate && todo.dueDate < Date.now()) {
-      updateStatus({ id: todo._id, status: 'not_done' });
+      updateStatus({ id: todo._id, status: 'done' });
     }
   }, [todo.status, todo.dueDate]);
 
@@ -604,11 +608,11 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   let timerText = formatTime(timeLeft);
   let cardBg = colors.surface;
 
-  if (todo.status === "in_progress") { badgeText = t.inProgress; badgeBg = colors.surfaceText + '15'; badgeColor = colors.surfaceText; cardBg = colors.taskInProgressBg; }
-  else if (todo.status === "paused") { badgeText = t.paused; badgeBg = colors.surfaceText + '10'; badgeColor = colors.surfaceText; timerIconColor = colors.surfaceText + '60'; cardBg = colors.taskPausedBg; }
-  else if (todo.status === "done") { badgeText = t.done; badgeBg = colors.success + '20'; badgeColor = colors.success; timerText = t.done; timerIconColor = colors.success; cardBg = colors.taskDoneBg; }
-  else if (todo.status === "not_done") { badgeText = t.notDone; badgeBg = colors.danger + '20'; badgeColor = colors.danger; timerText = "—"; timerIconColor = colors.danger; cardBg = colors.taskNotDoneBg; }
-  else if (todo.status === "not_started") { cardBg = colors.taskNotStartedBg; badgeBg = colors.surfaceText + '10'; badgeColor = colors.surfaceText; }
+  if (todo.status === "in_progress") { badgeText = t.inProgress; badgeBg = colors.primary + '15'; badgeColor = isDarkMode ? colors.primary : colors.surfaceText; cardBg = colors.taskInProgressBg; }
+  else if (todo.status === "paused") { badgeText = t.paused; badgeBg = colors.surfaceText + '10'; badgeColor = isDarkMode ? '#FFFFFF' : colors.surfaceText; timerIconColor = colors.surfaceText + '60'; cardBg = colors.taskPausedBg; }
+  else if (todo.status === "done") { badgeText = t.done; badgeBg = colors.success + '20'; badgeColor = isDarkMode ? colors.success : colors.success; timerText = t.done; timerIconColor = colors.success; cardBg = colors.taskDoneBg; }
+  else if (todo.status === "not_done") { badgeText = t.notDone; badgeBg = colors.danger + '20'; badgeColor = isDarkMode ? colors.danger : colors.danger; timerText = "—"; timerIconColor = colors.danger; cardBg = colors.taskNotDoneBg; }
+  else if (todo.status === "not_started") { cardBg = colors.taskNotStartedBg; badgeBg = colors.surfaceText + '10'; badgeColor = isDarkMode ? '#FFFFFF' : colors.surfaceText; }
 
   const isTimerSet = !!todo.timerDuration;
   const isDueSoon = todo.dueDate && todo.dueDate < Date.now() + 86400000;
@@ -685,10 +689,11 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                   </TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity onPress={() => setIsEditing(true)} onLongPress={() => onLongPress(todo._id)}>
+                <TouchableOpacity onPress={() => setIsDetailModalVisible(true)} onLongPress={() => onLongPress(todo._id)}>
                   <Text style={[homeStyles.cardTitle, { marginBottom: 10, color: colors.surfaceText }, isArabic && { textAlign: 'right' }]} numberOfLines={2}>{todo.text}</Text>
                 </TouchableOpacity>
               )}
+
 
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <View style={[homeStyles.badge, { backgroundColor: badgeBg === colors.border ? colors.surfaceText + '15' : badgeBg, alignSelf: 'flex-start' }]}>
@@ -710,33 +715,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
             </View>
           </View>
 
-          {/* ─── Progress Bar (timer-weighted) ─── */}
-          {hasSubtasks && isTimerSet && (
-            <View style={{ marginBottom: 10 }}>
-              <View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }, isArabic && { flexDirection: 'row-reverse' }]}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.surfaceText + '80', letterSpacing: 0.3 }}>
-                  {t.progress}
-                </Text>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: progress >= 100 ? colors.success : colors.surfaceText }}>
-                  {Math.round(progress)}%
-                </Text>
-              </View>
-              <View style={{
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                overflow: 'hidden',
-              }}>
-                <View style={[{
-                  height: 6,
-                  borderRadius: 3,
-                  width: `${Math.min(100, progress)}%`,
-                  backgroundColor: progress >= 100 ? colors.success : progress >= 50 ? colors.primary : colors.warning,
-                  alignSelf: isArabic ? 'flex-end' : 'flex-start'
-                }]} />
-              </View>
-            </View>
-          )}
+
 
           {/* ─── Action Row ─── */}
           <View style={[{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
@@ -977,6 +956,11 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
           )}
         </View>
         {coreCard}
+        <TaskDetailModal 
+          visible={isDetailModalVisible}
+          onClose={() => setIsDetailModalVisible(false)}
+          todoId={todo._id}
+        />
       </View>
     );
   }
@@ -984,6 +968,11 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   return (
     <View style={{ marginLeft: depth * 16 }}>
       {coreCard}
+      <TaskDetailModal 
+        visible={isDetailModalVisible}
+        onClose={() => setIsDetailModalVisible(false)}
+        todoId={todo._id}
+      />
     </View>
   );
 };

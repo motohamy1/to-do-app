@@ -9,6 +9,8 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     language: v.optional(v.string()), // "en", "ar"
     notificationsEnabled: v.optional(v.boolean()),
+    profilePictureUrl: v.optional(v.string()),
+    profilePictureId: v.optional(v.id("_storage")),
   }).index("by_email", ["email"]),
 
   todos: defineTable({

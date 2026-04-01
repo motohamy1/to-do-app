@@ -97,7 +97,9 @@ const AddSubCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState(SUB_CATEGORY_ICONS[0]);
   const [color, setColor] = useState(ACCENT_COLORS[2]);
-  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); onClose(); };
+  const [showCustom, setShowCustom] = useState(false);
+  const [customHex, setCustomHex] = useState(ACCENT_COLORS[2]);
+  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); setShowCustom(false); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
       <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -107,6 +109,35 @@ const AddSubCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
             <Text style={styles.modalTitle}>New Sub-Category</Text>
             <Text style={styles.modalLabel}>Name</Text>
             <TextInput style={styles.modalInput} placeholder="e.g. Frontend, Cardiology, Sci-Fi..." placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus />
+            <Text style={styles.modalLabel}>Color</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPicker}>
+              {ACCENT_COLORS.map(c => (
+                <TouchableOpacity key={c} style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} onPress={() => { setColor(c); setShowCustom(false); }} />
+              ))}
+              <TouchableOpacity 
+                style={[styles.colorSwatch, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }, showCustom && styles.colorSwatchSelected]} 
+                onPress={() => setShowCustom(true)}
+              >
+                <Ionicons name="color-palette-outline" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </ScrollView>
+
+            {showCustom && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.modalLabel}>Custom Hex Color</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={customHex}
+                  onChangeText={(val) => {
+                    setCustomHex(val);
+                    if (val.length === 7 && val.startsWith('#')) setColor(val);
+                  }}
+                  placeholder="#000000"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+            )}
+
             <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleAdd}><Text style={styles.modalPrimaryBtnText}>Create Sub-Category</Text></TouchableOpacity>
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>
@@ -123,7 +154,9 @@ const AddCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState(CATEGORY_ICONS[0]);
   const [color, setColor] = useState(ACCENT_COLORS[0]);
-  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); onClose(); };
+  const [showCustom, setShowCustom] = useState(false);
+  const [customHex, setCustomHex] = useState(ACCENT_COLORS[0]);
+  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); setShowCustom(false); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
       <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -142,11 +175,34 @@ const AddCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
               ))}
             </View>
             <Text style={styles.modalLabel}>Color</Text>
-            <View style={styles.colorPicker}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPicker}>
               {ACCENT_COLORS.map(c => (
-                <TouchableOpacity key={c} style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} onPress={() => setColor(c)} />
+                <TouchableOpacity key={c} style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} onPress={() => { setColor(c); setShowCustom(false); }} />
               ))}
-            </View>
+              <TouchableOpacity 
+                style={[styles.colorSwatch, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }, showCustom && styles.colorSwatchSelected]} 
+                onPress={() => setShowCustom(true)}
+              >
+                <Ionicons name="color-palette-outline" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </ScrollView>
+
+            {showCustom && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.modalLabel}>Custom Hex Color</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={customHex}
+                  onChangeText={(val) => {
+                    setCustomHex(val);
+                    if (val.length === 7 && val.startsWith('#')) setColor(val);
+                  }}
+                  placeholder="#000000"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+            )}
+
             <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleAdd}><Text style={styles.modalPrimaryBtnText}>Create Category</Text></TouchableOpacity>
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>
@@ -164,7 +220,9 @@ const AddProjectModal = ({ visible, onClose, colors, styles, onAdd }: {
   const [desc, setDesc] = useState('');
   const [icon, setIcon] = useState(PROJECT_ICONS[0]);
   const [color, setColor] = useState(ACCENT_COLORS[1]);
-  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), desc.trim(), icon, color); setName(''); setDesc(''); onClose(); };
+  const [showCustom, setShowCustom] = useState(false);
+  const [customHex, setCustomHex] = useState(ACCENT_COLORS[1]);
+  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), desc.trim(), icon, color); setName(''); setDesc(''); setShowCustom(false); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
       <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -176,6 +234,35 @@ const AddProjectModal = ({ visible, onClose, colors, styles, onAdd }: {
             <TextInput style={styles.modalInput} placeholder="e.g. Todo App, Research Paper…" placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus />
             <Text style={styles.modalLabel}>Short Description (optional)</Text>
             <TextInput style={[styles.modalInput, { minHeight: 60, textAlignVertical: 'top' }]} placeholder="What is this project about?" placeholderTextColor={colors.textMuted} value={desc} onChangeText={setDesc} multiline />
+            <Text style={styles.modalLabel}>Color</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPicker}>
+              {ACCENT_COLORS.map(c => (
+                <TouchableOpacity key={c} style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} onPress={() => { setColor(c); setShowCustom(false); }} />
+              ))}
+              <TouchableOpacity 
+                style={[styles.colorSwatch, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }, showCustom && styles.colorSwatchSelected]} 
+                onPress={() => setShowCustom(true)}
+              >
+                <Ionicons name="color-palette-outline" size={20} color={colors.text} />
+              </TouchableOpacity>
+            </ScrollView>
+
+            {showCustom && (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={styles.modalLabel}>Custom Hex Color</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={customHex}
+                  onChangeText={(val) => {
+                    setCustomHex(val);
+                    if (val.length === 7 && val.startsWith('#')) setColor(val);
+                  }}
+                  placeholder="#000000"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+            )}
+
             <TouchableOpacity style={[styles.modalPrimaryBtn, { backgroundColor: color }]} onPress={handleAdd}><Text style={styles.modalPrimaryBtnText}>Create Project</Text></TouchableOpacity>
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>

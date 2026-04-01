@@ -59,7 +59,7 @@ export const createPlannerStyles = (colors: ColorScheme, isArabic: boolean = fal
     monthName: {
       fontSize: isArabic ? 20 : 18,
       fontWeight: '800',
-      color: '#000000',
+      color: colors.text,
       marginBottom: 2,
     },
     selectedMonthName: {
@@ -126,7 +126,7 @@ export const createPlannerStyles = (colors: ColorScheme, isArabic: boolean = fal
       marginBottom: 2,
     },
     todayText: {
-      color: '#FFF',
+      color: '#000000',
     },
     dayStats: {
         fontSize: 10,
@@ -135,7 +135,7 @@ export const createPlannerStyles = (colors: ColorScheme, isArabic: boolean = fal
         textTransform: 'uppercase',
     },
     todayStats: {
-        color: 'rgba(255,255,255,0.7)',
+        color: 'rgba(0,0,0,0.6)',
     },
     taskDot: {
       width: 4,

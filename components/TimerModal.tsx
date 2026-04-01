@@ -43,7 +43,7 @@ const TimerModal: React.FC<TimerModalProps> = ({ visible, onClose, onSave, initi
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
         <View style={[styles.modalContainer, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.title, { color: colors.text }]}>Task Details</Text>
+          <Text style={[styles.title, { color: colors.text }]}>Timer & Deadline</Text>
           
           <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Timer Duration</Text>
           <View style={styles.inputRow}>
@@ -133,14 +133,14 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     width: '100%',
-    borderRadius: 24,
+    borderRadius: 32,
     padding: 24,
     alignItems: 'center',
-    elevation: 8,
+    elevation: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 24,
   },
   title: {
     fontSize: 20,
@@ -205,17 +205,24 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
+    height: 52,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelButton: {
-    borderWidth: 1,
+    borderWidth: 1.5,
   },
-  saveButton: {},
+  saveButton: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
   buttonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '800',
   },
 });
 

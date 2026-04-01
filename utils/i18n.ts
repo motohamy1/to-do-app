@@ -80,7 +80,15 @@ export const translations = {
     notifTaskTitle: "✅ Main Task Completed",
     notifSubtaskBody: "Sub-step is now done: ",
     notifTaskBody: "Your main task is complete: ",
+    addReminder: "Add Reminder",
+    reminderTitle: "Reminder Title",
+    reminderDate: "Date",
+    reminderTime: "Time",
+    duplicateWarningTitle: "Duplicate Reminder",
+    duplicateWarningBody: "A reminder with this exact title and time already exists. Do you want to create it anyway?",
   },
+
+
   ar: {
     todaysPlan: "خطة اليوم",
     tasksCompleted: "مهام مكتملة",
@@ -162,7 +170,15 @@ export const translations = {
     notifTaskTitle: "✅ اكتملت المهمة الرئيسية",
     notifSubtaskBody: "لقد اكتملت الخطوة الفرعية: ",
     notifTaskBody: "لقد اكتملت مهمتك الرئيسية: ",
+    addReminder: "إضافة تذكير",
+    reminderTitle: "عنوان التذكير",
+    reminderDate: "التاريخ",
+    reminderTime: "الوقت",
+    duplicateWarningTitle: "تذكير مكرر",
+    duplicateWarningBody: "يوجد تذكير بهذا العنوان والوقت بالفعل. هل تريد إنشاؤه على أي حال؟",
   }
+
+
 };
 
 export type Language = keyof typeof translations;

@@ -557,7 +557,7 @@ export const createProjectsStyles = (colors: ColorScheme) =>
     modalPrimaryBtnText: {
       fontSize: 16,
       fontWeight: "800",
-      color: "#FFF",
+      color: colors.bg === '#0F0F12' ? '#000000' : '#FFFFFF',
     },
     modalSecondaryBtn: {
       alignItems: "center",

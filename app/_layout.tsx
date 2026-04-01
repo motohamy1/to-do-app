@@ -36,6 +36,13 @@ function RootLayoutContent() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="auth" options={{ presentation: 'modal' }} />
+      <Stack.Screen 
+        name="add-reminder" 
+        options={{ 
+          presentation: 'modal',
+          headerShown: false,
+        }} 
+      />
     </Stack>
   );
 }

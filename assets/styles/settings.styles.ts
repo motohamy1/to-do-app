@@ -168,6 +168,60 @@ export const createSettingsStyles = (colors: ColorScheme, isArabic: boolean = fa
       fontSize: 12,
       fontWeight: '600',
       letterSpacing: 1,
-    }
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: colors.bg,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
+      padding: 24,
+      paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+      minHeight: 400,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: colors.text,
+    },
+    modalBody: {
+      gap: 16,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textMuted,
+      marginBottom: 8,
+    },
+    textInput: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      color: colors.text,
+      fontSize: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    saveButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 16,
+      padding: 16,
+      alignItems: 'center',
+      marginTop: 24,
+    },
+    saveButtonText: {
+      color: colors.bg === '#0F0F12' ? '#000000' : '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '800',
+    },
   });
 };
