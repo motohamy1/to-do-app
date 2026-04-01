@@ -158,7 +158,7 @@ const Settings = () => {
             <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
               {t.profile}
             </Text>
-            <View style={styles.card}>
+            <View style={[styles.card, styles.profileHero]}>
                 <TouchableOpacity 
                   style={[styles.avatarContainer, isArabic && { marginLeft: 0, marginRight: 0 }]}
                   onPress={handlePickImage}
