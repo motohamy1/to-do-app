@@ -4,7 +4,7 @@
     "slug": "do-it",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app_logo_.png",
     "scheme": "todoapp",
     "userInterfaceStyle": "automatic",
     "ios": {
@@ -51,10 +51,7 @@
     },
     "extra": {
       "router": {},
-      "eas": {
-        "projectId": "d9fd5723-c157-43cc-ac0d-1827b2ad7cdb"
-      }
-    },
-    "owner": "motohamy"
+      "eas": {}
+    }
   }
 }
