@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StatusBar, Animated, StyleSheet, BackHandler, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, Animated, StyleSheet, BackHandler, KeyboardAvoidingView, Platform, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -222,88 +222,143 @@ const Planner = () => {
                 </Text>
             </View>
 
-            <View style={{ gap: 12 }}>
-                {tasks.map(task => {
-                    const isExpanded = expandedTodoId === task._id;
-
-                    if (isExpanded) {
-                      return (
-                        <View key={task._id} style={{ marginBottom: 16 }}>
-                          <View style={{ width: '92%', alignSelf: 'center' }}>
-                            <TodoCard 
-                              todo={{ ...task, status: task.status || 'not_started' }} 
-                              homeStyles={homeStyles}
-                              onSetTimer={(id) => { setSelectedTodoId(id as Id<"todos">); setTimerModalVisible(true); }} 
-                              onLongPress={(id) => deleteTodoMutation({ id: id as Id<"todos"> })} 
-                              onLinkProject={(id) => { setSelectedTodoId(id as Id<"todos">); setProjectModalVisible(true); }}
-                            />
-                          </View>
-                          <TouchableOpacity 
-                            style={{ 
-                              alignSelf: 'center', 
-                              marginTop: -16, 
-                              backgroundColor: colors.surface, 
-                              borderRadius: 20, 
-                              padding: 6,
-                              borderWidth: 1,
-                              borderColor: colors.border,
-                              zIndex: 10,
-                              shadowColor: "#000",
-                              shadowOffset: { width: 0, height: 2 },
-                              shadowOpacity: 0.1,
-                              shadowRadius: 4,
-                              elevation: 3,
-                            }}
-                            onPress={() => setExpandedTodoId(null)}
-                          >
-                            <Ionicons name="chevron-up" size={20} color={colors.primary} />
-                          </TouchableOpacity>
-                        </View>
-                      );
-                    }
-
-                    return (
-                        <TouchableOpacity 
-                            key={task._id} 
-                            style={[styles.taskItem, isArabic && { flexDirection: 'row-reverse' }]}
-                            onPress={() => setExpandedTodoId(task._id)}
-                            activeOpacity={0.7}
-                        >
+            {tasks.filter(t => t.type === 'reminder').length > 0 && (
+                <View style={{ marginBottom: 32 }}>
+                    <Text style={[{ fontSize: 20, fontWeight: '800', paddingHorizontal: 24, marginBottom: 16, color: colors.text }, isArabic && { textAlign: 'right' }]}>{isArabic ? 'التذكيرات' : 'Reminders'}</Text>
+                    <FlatList 
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ paddingHorizontal: 16 }}
+                        data={tasks.filter(t => t.type === 'reminder')}
+                        keyExtractor={item => item._id}
+                        renderItem={({ item: task }) => (
                             <TouchableOpacity 
-                                onPress={() => updateTodoStatus({ 
-                                    id: task._id, 
-                                    status: task.status === 'done' ? 'not_started' : 'done' 
-                                })}
-                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                style={[styles.taskItem, { width: 240, marginHorizontal: 8, height: 150, flexDirection: 'column', alignItems: isArabic ? 'flex-end' : 'flex-start', padding: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
+                                onPress={() => router.push({ pathname: '/note-detail', params: { id: task._id, isReminder: 'true' } })}
+                                activeOpacity={0.7}
                             >
-                                <Ionicons 
-                                    name={task.status === 'done' ? "checkmark-circle" : "ellipse-outline"} 
-                                    size={24} 
-                                    color={task.status === 'done' ? colors.success : colors.border} 
-                                />
-                            </TouchableOpacity>
-                            <View style={{ flex: 1, marginHorizontal: 12 }}>
-                                <Text style={[
-                                    styles.taskItemText, 
-                                    task.status === 'done' && { textDecorationLine: 'line-through', color: colors.textMuted, opacity: 0.6 },
-                                    isArabic && { textAlign: 'right' }
-                                ]}>
-                                    {task.text}
-                                </Text>
-                                {task.status !== 'done' && task.status && (
-                                    <Text style={[{ fontSize: 11, color: colors.textMuted, textTransform: 'capitalize', marginTop: 2 }, isArabic && { textAlign: 'right' }]}>
-                                        {isArabic ? (t as any)[task.status] || task.status : task.status.replace('_', ' ')}
+                                <View style={[{ backgroundColor: '#FF6B6B15', width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }]}>
+                                    <Ionicons name="alarm-outline" size={22} color="#FF6B6B" />
+                                </View>
+                                <View style={{ flex: 1, width: '100%', marginTop: 16 }}>
+                                    <Text style={[styles.taskItemText, { fontSize: 16, fontWeight: '600' }, isArabic && { textAlign: 'right' }]} numberOfLines={2}>
+                                        {task.text}
                                     </Text>
-                                )}
-                            </View>
-                            <Ionicons name="create-outline" size={18} color={colors.textMuted} style={{ opacity: 0.5 }} />
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
+                                    {task.dueDate && (
+                                       <Text style={[{ fontSize: 13, color: colors.textMuted, marginTop: 4, fontWeight: '600' }, isArabic && { textAlign: 'right' }]}>
+                                           {new Date(task.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                       </Text>
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        )}
+                    />
+                </View>
+            )}
 
-            <View style={[styles.addDayTaskContainer, { marginBottom: 40 }]}>
-                <TodoInput initialDate={selectedDateTs} onFocus={scrollToBottom} />
+            {tasks.filter(t => t.type === 'note').length > 0 && (
+                <View style={{ marginBottom: 32 }}>
+                    <Text style={[{ fontSize: 20, fontWeight: '800', paddingHorizontal: 24, marginBottom: 16, color: colors.text }, isArabic && { textAlign: 'right' }]}>{isArabic ? 'الملاحظات' : 'Notes'}</Text>
+                    <FlatList 
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={{ paddingHorizontal: 16 }}
+                        data={tasks.filter(t => t.type === 'note')}
+                        keyExtractor={item => item._id}
+                        renderItem={({ item: task }) => (
+                            <TouchableOpacity 
+                                style={[styles.taskItem, { width: 240, marginHorizontal: 8, height: 150, flexDirection: 'column', alignItems: isArabic ? 'flex-end' : 'flex-start', padding: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
+                                onPress={() => router.push({ pathname: '/note-detail', params: { id: task._id, isReminder: 'false' } })}
+                                activeOpacity={0.7}
+                            >
+                                <View style={[{ backgroundColor: colors.primary + '15', width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }]}>
+                                    <Ionicons name="document-text-outline" size={22} color={colors.primary} />
+                                </View>
+                                <View style={{ flex: 1, width: '100%', marginTop: 16 }}>
+                                    <Text style={[styles.taskItemText, { fontSize: 16, fontWeight: '600' }, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
+                                        {task.text}
+                                    </Text>
+                                    {task.description && (
+                                       <Text style={[{ fontSize: 13, color: colors.textMuted, marginTop: 4, fontWeight: '500' }, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
+                                           {task.description}
+                                       </Text>
+                                    )}
+                                </View>
+                            </TouchableOpacity>
+                        )}
+                    />
+                </View>
+            )}
+
+            <View style={{ marginBottom: 40 }}>
+                {tasks.filter(t => t.type !== 'note' && t.type !== 'reminder').length > 0 && (
+                    <View style={{ marginBottom: 24 }}>
+                        <Text style={[{ fontSize: 20, fontWeight: '800', paddingHorizontal: 24, marginBottom: 16, color: colors.text }, isArabic && { textAlign: 'right' }]}>{t.tasks}</Text>
+                        <FlatList 
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ paddingHorizontal: 16 }}
+                            data={tasks.filter(t => t.type !== 'note' && t.type !== 'reminder')}
+                            keyExtractor={item => item._id}
+                            renderItem={({ item: task }) => {
+                                const isExpanded = expandedTodoId === task._id;
+                                return (
+                                    <View style={{ width: 240, marginHorizontal: 8 }}>
+                                        <TouchableOpacity 
+                                            style={[styles.taskItem, { width: '100%', height: 150, flexDirection: 'column', alignItems: 'flex-start', padding: 16, backgroundColor: isExpanded ? colors.primary + '10' : colors.surface, borderWidth: 1, borderColor: isExpanded ? colors.primary : colors.border }]}
+                                            onPress={() => setExpandedTodoId(isExpanded ? null : task._id)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <TouchableOpacity 
+                                                    onPress={() => updateTodoStatus({ id: task._id, status: task.status === 'done' ? 'not_started' : 'done' })}
+                                                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                                                >
+                                                    <Ionicons 
+                                                        name={task.status === 'done' ? "checkmark-circle" : "ellipse-outline"} 
+                                                        size={26} 
+                                                        color={task.status === 'done' ? colors.success : colors.border} 
+                                                    />
+                                                </TouchableOpacity>
+                                            </View>
+                                            <View style={{ flex: 1, width: '100%', marginTop: 16 }}>
+                                                <Text style={[
+                                                    styles.taskItemText, 
+                                                    task.status === 'done' && { textDecorationLine: 'line-through', color: colors.textMuted, opacity: 0.6 },
+                                                    isArabic && { textAlign: 'right' },
+                                                    { fontSize: 16, fontWeight: '600' }
+                                                ]} numberOfLines={2}>
+                                                    {task.text}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    </View>
+                                );
+                            }}
+                        />
+                        {expandedTodoId && tasks.find(t => t._id === expandedTodoId && t.type !== 'note' && t.type !== 'reminder') && (
+                            <View style={{ paddingHorizontal: 24, marginTop: 24 }}>
+                                <TodoCard 
+                                  todo={{ ...tasks.find(t => t._id === expandedTodoId), status: tasks.find(t => t._id === expandedTodoId)?.status || 'not_started' } as any} 
+                                  homeStyles={homeStyles}
+                                  onSetTimer={(id) => { setSelectedTodoId(id as Id<"todos">); setTimerModalVisible(true); }} 
+                                  onLongPress={(id) => deleteTodoMutation({ id: id as Id<"todos"> })} 
+                                  onLinkProject={(id) => { setSelectedTodoId(id as Id<"todos">); setProjectModalVisible(true); }}
+                                />
+                                <TouchableOpacity 
+                                  style={{ alignSelf: 'center', marginTop: -16, backgroundColor: colors.surface, borderRadius: 20, padding: 6, borderWidth: 1, borderColor: colors.border, zIndex: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}
+                                  onPress={() => setExpandedTodoId(null)}
+                                >
+                                  <Ionicons name="chevron-up" size={20} color={colors.primary} />
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                <View style={[styles.addDayTaskContainer, tasks.filter(t => t.type !== 'note' && t.type !== 'reminder').length === 0 && { marginTop: 0 }]}>
+                    <TodoInput initialDate={selectedDateTs} onFocus={scrollToBottom} />
+                </View>
             </View>
 
 
@@ -353,14 +408,7 @@ const Planner = () => {
         )}
       </SafeAreaView>
 
-      {/* Floating Action Button for detailed Reminder */}
-      <TouchableOpacity 
-        style={[homeStyles.fab, isArabic && homeStyles.fabRtl]}
-        onPress={() => router.push('/add-reminder')}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={32} color="#000000" />
-      </TouchableOpacity>
+
     </KeyboardAvoidingView>
   );
 };

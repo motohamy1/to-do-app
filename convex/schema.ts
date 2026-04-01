@@ -30,6 +30,7 @@ export default defineSchema({
     priority: v.optional(v.string()), 
     date: v.optional(v.number()), 
     parentId: v.optional(v.id("todos")),
+    type: v.optional(v.string()), // 'task' | 'note' | 'reminder'
   }).index("by_user", ["userId"])
     .index("by_parent", ["parentId"]),
 

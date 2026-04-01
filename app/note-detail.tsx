@@ -85,7 +85,9 @@ export default function NoteDetailScreen() {
             text: title.trim(),
             description: body.trim(),
             dueDate: dueDate || undefined,
-            status: 'not_started'
+            date: dueDate || Date.now(),
+            status: 'not_started',
+            type: isReminder === 'true' ? 'reminder' : 'note',
           });
         }
       } catch (err) {

@@ -71,6 +71,7 @@ export const addTodo = mutation({
     meetingLink: v.optional(v.string()),
     priority: v.optional(v.string()),
     categoryId: v.optional(v.id("projectCategories")),
+    type: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const todoId = await ctx.db.insert("todos", {
@@ -88,6 +89,7 @@ export const addTodo = mutation({
       ...(args.meetingLink !== undefined && { meetingLink: args.meetingLink }),
       ...(args.priority !== undefined && { priority: args.priority }),
       ...(args.categoryId !== undefined && { categoryId: args.categoryId }),
+      ...(args.type !== undefined && { type: args.type }),
     });
     return todoId;
   },
@@ -273,6 +275,7 @@ export const updateTodo = mutation({
     meetingLink: v.optional(v.string()),
     priority: v.optional(v.string()),
     categoryId: v.optional(v.id("projectCategories")),
+    type: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;

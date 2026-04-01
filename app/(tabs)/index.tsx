@@ -44,7 +44,7 @@ const index = () => {
     };
 
 
-    const normalizedTodos = todos?.map(t => ({
+    const normalizedTodos = todos?.filter(t => t.type !== 'note' && t.type !== 'reminder').map(t => ({
 
       ...t,
       status: t.status || ((t as any).isCompleted ? 'done' : 'not_started')

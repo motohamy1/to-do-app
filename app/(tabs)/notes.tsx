@@ -37,8 +37,8 @@ export default function NotesScreen() {
   }
 
   // Filter notes vs reminders
-  const reminders = todos.filter(t => t.dueDate && t.dueDate > 0);
-  const notes = todos.filter(t => !t.dueDate || t.dueDate === 0);
+  const reminders = todos.filter(t => t.type === 'reminder' || (!t.type && t.dueDate && t.dueDate > 0 && !t.categoryId && !t.priority && !t.timerDuration));
+  const notes = todos.filter(t => t.type === 'note' || (!t.type && (!t.dueDate || t.dueDate === 0) && !t.categoryId && !t.priority && !t.timerDuration && !t.isCompleted));
 
   const chunkArray = (arr: any[], size: number) => {
     return Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
