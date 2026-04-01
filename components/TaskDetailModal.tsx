@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Platform, LayoutAnimation, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Platform, LayoutAnimation, ActivityIndicator, KeyboardAvoidingView, Alert } from 'react-native';
 import useTheme from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from 'convex/react';
@@ -69,8 +69,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   }, [todo?.status, todo?.timerStartTime, todo?.timerDuration, todo?.timeLeftAtPause]);
 
 
+  // Only initialize form state when navigating to a *different* task
+  const [initializedForId, setInitializedForId] = useState<string | null>(null);
   useEffect(() => {
-    if (todo) {
+    if (todo && todo._id !== initializedForId) {
       setEditText(todo.text);
       setDescription(todo.description || "");
       setPriority(todo.priority || "Medium");
@@ -83,8 +85,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
         setHours("0");
         setMinutes("0");
       }
+      setInitializedForId(todo._id);
     }
-  }, [todo]);
+  }, [todo?._id]);
 
   useEffect(() => {
     if (visible && todoId && todoStack.length === 0) {
@@ -94,6 +97,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
 
   const handleClose = () => {
     setTodoStack([]);
+    setInitializedForId(null);
     onClose();
   };
 
@@ -141,8 +145,31 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
     return ms > 0 ? ms : undefined;
   }, [newSubHours, newSubMinutes]);
 
+  // Remaining timer budget for new subtasks in modal
+  const modalSubBudget = useMemo(() => {
+    if (!todo?.timerDuration || !subtasks) return undefined;
+    const usedDuration = subtasks.reduce((sum: number, s: any) => sum + (s.timerDuration || 0), 0);
+    return Math.max(0, todo.timerDuration - usedDuration);
+  }, [todo?.timerDuration, subtasks]);
+
   const handleAddSubtask = () => {
     if (newSubtaskText.trim() && userId && currentTodoId) {
+      // Validate subtask timer against parent budget
+      if (newSubDuration && todo?.timerDuration) {
+        const usedDuration = subtasks ? subtasks.reduce((sum: number, s: any) => sum + (s.timerDuration || 0), 0) : 0;
+        const available = Math.max(0, todo.timerDuration - usedDuration);
+        if (newSubDuration > available) {
+          const availH = Math.floor(available / 3600000);
+          const availM = Math.floor((available % 3600000) / 60000);
+          Alert.alert(
+            isArabic ? 'الوقت غير كافٍ' : 'Time Budget Exceeded',
+            isArabic
+              ? `المتاح: ${availH > 0 ? availH + 'س ' : ''}${availM}د`
+              : `Available: ${availH > 0 ? availH + 'h ' : ''}${availM}m`
+          );
+          return;
+        }
+      }
       addTodo({
         userId: userId!,
         text: newSubtaskText.trim(),

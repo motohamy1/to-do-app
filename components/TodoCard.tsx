@@ -575,8 +575,31 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     setShowTimerPicker(false);
   };
 
+  // Remaining timer budget for new subtasks
+  const newSubBudget = useMemo(() => {
+    if (!todo.timerDuration || !subtasks) return undefined;
+    const usedDuration = subtasks.reduce((sum: number, s: any) => sum + (s.timerDuration || 0), 0);
+    return Math.max(0, todo.timerDuration - usedDuration);
+  }, [todo.timerDuration, subtasks]);
+
   const handleAddSubtask = () => {
     if (newSubText.trim() && userId) {
+      // Validate subtask timer against parent budget
+      if (newSubDuration && todo.timerDuration) {
+        const usedDuration = subtasks ? subtasks.reduce((sum: number, s: any) => sum + (s.timerDuration || 0), 0) : 0;
+        const available = Math.max(0, todo.timerDuration - usedDuration);
+        if (newSubDuration > available) {
+          const availH = Math.floor(available / 3600000);
+          const availM = Math.floor((available % 3600000) / 60000);
+          Alert.alert(
+            isArabic ? 'الوقت غير كافٍ' : 'Time Budget Exceeded',
+            isArabic
+              ? `المتاح: ${availH > 0 ? availH + 'س ' : ''}${availM}د`
+              : `Available: ${availH > 0 ? availH + 'h ' : ''}${availM}m`
+          );
+          return;
+        }
+      }
       addTodo({
         userId,
         text: newSubText.trim(),
@@ -615,6 +638,22 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const isTimerSet = !!todo.timerDuration;
   const isDueSoon = todo.dueDate && todo.dueDate < Date.now() + 86400000;
   if (!isTimerSet && hasSubtasks) timerText = `${stats.done}/${stats.total}`;
+
+  // Timer-based circular progress (how much time elapsed)
+  const timerCircularProgress = useMemo(() => {
+    if (isTimerSet && todo.timerDuration) {
+      return Math.min(100, ((todo.timerDuration - timeLeft) / todo.timerDuration) * 100);
+    }
+    return 0;
+  }, [isTimerSet, todo.timerDuration, timeLeft]);
+
+  // Circular progress: timer-based when timer exists, subtask count when only subtasks
+  const circularProgressValue = isTimerSet ? timerCircularProgress : (hasSubtasks ? countProgress : 0);
+  const circularProgressColor = todo.status === 'done' ? colors.success
+    : todo.status === 'not_done' ? colors.danger
+    : todo.status === 'paused' ? colors.textMuted
+    : todo.status === 'in_progress' ? colors.primary
+    : colors.surfaceText + '40';
 
   // Are any subtasks currently running?
   const anySubtaskRunning = hasSubtasks && subtasks.some((s: any) => s.status === 'in_progress');
@@ -702,16 +741,38 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
             <View style={{ justifyContent: 'center', alignItems: 'center', width: 56 }}>
               <CircularProgress
-                size={56} strokeWidth={4} progress={progress}
-                color={todo.status === 'paused' ? colors.textMuted : (todo.status === 'done' || todo.status === 'not_done') ? timerIconColor : colors.surfaceText}
+                size={56} strokeWidth={4} progress={circularProgressValue}
+                color={circularProgressColor}
                 unfilledColor={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
               >
-                <Text style={{ fontSize: 10, fontWeight: "700", color: todo.status === 'paused' ? colors.textMuted : (todo.status === 'done' || todo.status === 'not_done') ? timerIconColor : colors.surfaceText, textAlign: 'center' }}>
+                <Text style={{ fontSize: 10, fontWeight: "700", color: circularProgressColor, textAlign: 'center' }}>
                   {timerText}
                 </Text>
               </CircularProgress>
             </View>
           </View>
+
+          {/* ─── Subtask Completion Progress Bar — only shown when there is progress ─── */}
+          {hasSubtasks && countProgress > 0 && (
+            <View style={{ marginTop: 8, marginBottom: 4 }}>
+              <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.surfaceText + '80' }}>
+                  {isArabic ? 'تقدم المهام الفرعية' : 'Subtask Progress'}
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: countProgress >= 100 ? colors.success : colors.primary }}>
+                  {Math.round(countProgress)}%
+                </Text>
+              </View>
+              <View style={{ height: 6, borderRadius: 3, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                <View style={{
+                  height: '100%',
+                  width: `${Math.min(100, countProgress)}%`,
+                  borderRadius: 3,
+                  backgroundColor: countProgress >= 100 ? colors.success : colors.primary,
+                }} />
+              </View>
+            </View>
+          )}
 
 
 
@@ -810,7 +871,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
             </View>
           </View>
 
-          <View style={[homeStyles.dividerDashed, { borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }]} />
+          <View style={{ height: 12 }} />
 
           {/* ─── Project + Date Row ─── */}
           <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }, isArabic && { flexDirection: 'row-reverse' }]}>
@@ -862,7 +923,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
           {/* ─── Subtask Section (Moved inside card) ─── */}
           {(isAddingSub || (showSubtasks && hasSubtasks)) && (
-            <View style={[{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.surfaceText + '10' }, isArabic && { direction: 'rtl' }]}>
+            <View style={[{ marginTop: 12, paddingTop: 8 }, isArabic && { direction: 'rtl' }]}>
               {showSubtasks && hasSubtasks && (
                 <View style={{ gap: 8, marginBottom: isAddingSub ? 16 : 0 }}>
                   {subtasks.map((sub: any) => (
@@ -916,6 +977,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                     <View style={{ marginTop: 8 }}>
                       <InlineTimerPicker
                         initialMs={newSubDuration}
+                        maxMs={newSubBudget}
                         colors={colors}
                         t={t}
                         isArabic={isArabic}
@@ -937,21 +999,11 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
   if (isTimelineMode) {
     const isPlaying = todo.status === 'in_progress';
-    const progressWidth = isPlaying && todo.timerDuration ? Math.min(100, ((todo.timerDuration - timeLeft) / todo.timerDuration) * 100) : 0;
     
     return (
       <View style={[homeStyles.cardContainer, { marginLeft: depth * 16 }]}>
         <View style={[homeStyles.timelineColumn, { justifyContent: 'flex-start', paddingTop: 24 }]}>
-          {isPlaying ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', width: 250, zIndex: 10, transform: [{ translateX: -3 }] }}>
-               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.surfaceText, zIndex: 11 }} />
-               <View style={{ flex: 1, height: 2, backgroundColor: colors.surfaceText + '30', marginLeft: -4, zIndex: 10 }}>
-                 <View style={{ width: `${Math.max(1, progressWidth)}%`, height: '100%', backgroundColor: colors.surfaceText }} />
-               </View>
-            </View>
-          ) : (
-            <View style={{ width: 16, height: 2, backgroundColor: colors.border, borderRadius: 1 }} />
-          )}
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPlaying ? colors.surfaceText : colors.surfaceText + '20', transform: [{ translateX: -3 }] }} />
         </View>
         {coreCard}
         <TaskDetailModal 
