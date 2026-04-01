@@ -22,7 +22,7 @@ import { useRouter } from "expo-router";
 const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }) => {
   const router = useRouter();
 
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { userId, language } = useAuth();
   const { t, isArabic } = useTranslation(language);
   const homeStyles = createHomeStyles(colors, isArabic);
@@ -96,8 +96,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
   };
 
   const statusOptions = [
-    { id: 'not_started', label: t.notStarted, icon: 'ellipse-outline', color: "#000000" },
-
+    { id: 'not_started', label: t.notStarted, icon: 'ellipse-outline', color: colors.surfaceText },
     { id: 'in_progress', label: t.inProgress, icon: 'play-circle-outline', color: colors.info },
     { id: 'done', label: t.done, icon: 'checkmark-circle-outline', color: colors.success },
   ];
@@ -130,7 +129,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
 
               if (!newTodo.trim() && !timerDuration && pendingSubtasks.length === 0) setIsAdding(false);
             }}
-            placeholderTextColor="#00000070"
+            placeholderTextColor={colors.surfaceText + '70'}
 
             autoFocus
             returnKeyType="done"
@@ -142,18 +141,18 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
                 params: { initialTitle: newTodo, initialDate: selectedDate }
               })}
             >
-              <Ionicons name="expand-outline" size={20} color="#000000" />
+              <Ionicons name="expand-outline" size={20} color={colors.surfaceText} />
             </TouchableOpacity>
 
             <TouchableOpacity 
               onPress={() => { setActiveTimerIndex(null); setTimerModalVisible(true); }}
               style={timerDuration ? { backgroundColor: colors.primary + '15', padding: 4, borderRadius: 6 } : {}}
             >
-              <Ionicons name="timer-outline" size={24} color={timerDuration ? colors.primary : "#000000"} />
+              <Ionicons name="timer-outline" size={24} color={timerDuration ? colors.primary : colors.surfaceText} />
 
             </TouchableOpacity>
             <TouchableOpacity onPress={handleAddTodo}>
-              <Ionicons name={isArabic ? "arrow-back-circle" : "arrow-up-circle"} size={28} color={newTodo.trim() ? colors.primary : "#000000a0"} />
+              <Ionicons name={isArabic ? "arrow-back-circle" : "arrow-up-circle"} size={28} color={newTodo.trim() ? colors.primary : colors.surfaceText + 'a0'} />
 
             </TouchableOpacity>
           </View>
@@ -164,7 +163,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
           <View style={[{ gap: 8, marginTop: 8, paddingLeft: isArabic ? 0 : 12, paddingRight: isArabic ? 12 : 0, borderLeftWidth: isArabic ? 0 : 2, borderRightWidth: isArabic ? 2 : 0, borderColor: colors.primary + '40' }]}>
             {pendingSubtasks.map((sub, idx) => (
               <View key={idx} style={[{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', backgroundColor: colors.surface, padding: 8, borderRadius: 8 }]}>
-                <Ionicons name="ellipse-outline" size={16} color="#000000" style={isArabic ? { marginLeft: 8 } : { marginRight: 8 }} />
+                <Ionicons name="ellipse-outline" size={16} color={colors.surfaceText} style={isArabic ? { marginLeft: 8 } : { marginRight: 8 }} />
 
                 <Text style={[{ flex: 1, color: colors.surfaceText, fontSize: 14, fontWeight: '600' }, isArabic && { textAlign: 'right' }]}>{sub.text}</Text>
                 
@@ -172,7 +171,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
                    style={[{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 4, backgroundColor: sub.timerDuration ? colors.primary + '20' : 'transparent', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 6 }, isArabic ? { marginLeft: 8 } : { marginRight: 8 }]}
                    onPress={() => { setActiveTimerIndex(idx); setTimerModalVisible(true); }}
                 >
-                  <Ionicons name="timer-outline" size={14} color={sub.timerDuration ? colors.primary : "#000000"} />
+                  <Ionicons name="timer-outline" size={14} color={sub.timerDuration ? colors.primary : colors.surfaceText} />
 
                   {!!sub.timerDuration && <Text style={{ fontSize: 11, color: colors.primary, fontWeight: '700' }}>{Math.floor(sub.timerDuration / 60000)}m</Text>}
                 </TouchableOpacity>
@@ -187,12 +186,12 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
 
         {/* Add Subtask Input */}
         <View style={[{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', marginTop: 8, paddingLeft: isArabic ? 0 : 12, paddingRight: isArabic ? 12 : 0, borderLeftWidth: isArabic ? 0 : 2, borderRightWidth: isArabic ? 2 : 0, borderColor: colors.border }]}>
-           <Ionicons name={isArabic ? "return-down-back" : "return-down-forward"} size={16} color="#000000" style={isArabic ? { marginLeft: 8 } : { marginRight: 8 }} />
+           <Ionicons name={isArabic ? "return-down-back" : "return-down-forward"} size={16} color={colors.surfaceText} style={isArabic ? { marginLeft: 8 } : { marginRight: 8 }} />
 
            <TextInput
              style={[homeStyles.addInput, { flex: 1, paddingVertical: 4, fontSize: 14, fontWeight: '600' }, isArabic && { textAlign: 'right' }]}
              placeholder={isArabic ? "...إضافة مهمة فرعية" : "Add a sub-task..."}
-             placeholderTextColor="#00000070"
+             placeholderTextColor={colors.surfaceText + '70'}
 
              value={newSubtaskText}
              onChangeText={setNewSubtaskText}
@@ -206,59 +205,32 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
              }}
            />
            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
-             <TouchableOpacity 
-               onPress={() => { 
-                 if (newSubtaskText.trim()) {
-                   const newIndex = pendingSubtasks.length;
-                   setPendingSubtasks(prev => [...prev, { text: newSubtaskText.trim() }]);
-                   setNewSubtaskText("");
-                   setActiveTimerIndex(newIndex);
-                   setTimerModalVisible(true);
-                 }
-               }}
-             >
-               <Ionicons name="timer-outline" size={20} color="#000000" />
+              <TouchableOpacity 
+                onPress={() => { 
+                  if (newSubtaskText.trim()) {
+                    const newIndex = pendingSubtasks.length;
+                    setPendingSubtasks(prev => [...prev, { text: newSubtaskText.trim() }]);
+                    setNewSubtaskText("");
+                    setActiveTimerIndex(newIndex);
+                    setTimerModalVisible(true);
+                  }
+                }}
+              >
+                <Ionicons name="timer-outline" size={20} color={colors.surfaceText} />
 
-             </TouchableOpacity>
-             <TouchableOpacity onPress={() => {
-               if (newSubtaskText.trim()) {
-                   setPendingSubtasks(prev => [...prev, { text: newSubtaskText.trim() }]);
-                   setNewSubtaskText("");
-               }
-             }}>
-               <Ionicons name="add-circle" size={24} color={newSubtaskText.trim() ? colors.primary : "#000000a0"} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => {
+                if (newSubtaskText.trim()) {
+                    setPendingSubtasks(prev => [...prev, { text: newSubtaskText.trim() }]);
+                    setNewSubtaskText("");
+                }
+              }}>
+                <Ionicons name="add-circle" size={24} color={newSubtaskText.trim() ? colors.primary : colors.surfaceText + 'a0'} />
 
-             </TouchableOpacity>
+              </TouchableOpacity>
            </View>
         </View>
 
-        {/* Quick Timer Presets */}
-        <View style={[{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginTop: 12, marginBottom: 4 }, isArabic && { direction: 'rtl' }]}>
-          <Text style={[{ fontSize: 13, fontWeight: '700', color: colors.surfaceText }, isArabic && { textAlign: 'right' }]}>
-
-            {isArabic ? 'مؤقت سريع:' : 'Quick Timer:'}
-          </Text>
-          <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', gap: 6 }}>
-            {[5, 10, 30].map(mins => (
-              <TouchableOpacity 
-                key={mins}
-                onPress={() => setTimerDuration(mins * 60000)}
-                style={{ 
-                  backgroundColor: timerDuration === mins * 60000 ? colors.primary : colors.primary + '10', 
-                  paddingHorizontal: 12, 
-                  paddingVertical: 5, 
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: timerDuration === mins * 60000 ? colors.primary : 'transparent'
-                }}
-              >
-                <Text style={{ color: timerDuration === mins * 60000 ? '#FFF' : colors.primary, fontSize: 12, fontWeight: '800' }}>
-                  {mins}{isArabic ? ' د' : 'm'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
 
         {/* Status Selection Row */}
         <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', gap: 8, marginTop: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border + '40', flexWrap: 'wrap' }}>
@@ -278,8 +250,8 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
                         borderColor: status === opt.id ? opt.color : colors.border
                     }}
                 >
-                    <Ionicons name={opt.icon as any} size={16} color={status === opt.id ? opt.color : "#000000"} />
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: status === opt.id ? opt.color : "#000000" }}>{opt.label}</Text>
+                    <Ionicons name={opt.icon as any} size={16} color={status === opt.id ? opt.color : colors.surfaceText} />
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: status === opt.id ? opt.color : colors.surfaceText }}>{opt.label}</Text>
 
                 </TouchableOpacity>
             ))}
@@ -293,8 +265,8 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
               style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, backgroundColor: timerDuration ? colors.primary + '20' : 'transparent', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }} 
               onPress={() => { setActiveTimerIndex(null); setTimerModalVisible(true); }}
             >
-              <Ionicons name="timer-outline" size={18} color={timerDuration ? colors.primary : "#000000"} />
-              <Text style={{ fontSize: 14, color: timerDuration ? colors.primary : "#000000", fontWeight: '700' }}>
+              <Ionicons name="timer-outline" size={18} color={timerDuration ? colors.primary : colors.surfaceText} />
+              <Text style={{ fontSize: 14, color: timerDuration ? colors.primary : colors.surfaceText, fontWeight: '700' }}>
                 {timerDuration ? `${Math.floor(timerDuration / 60000)}${isArabic ? 'د' : 'm'} ${isArabic ? 'محدد' : 'set'}` : (isArabic ? 'ضبط مؤقت' : 'Set Timer')}
               </Text>
 
@@ -305,8 +277,8 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
                 style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, backgroundColor: autoStart ? colors.primary + '20' : 'transparent', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 }}
                 onPress={() => setAutoStart(!autoStart)}
               >
-                <Ionicons name={autoStart ? "play" : "play-outline"} size={18} color={autoStart ? colors.primary : "#000000"} />
-                <Text style={{ fontSize: 13, color: autoStart ? colors.primary : "#000000", fontWeight: '700' }}>
+                <Ionicons name={autoStart ? "play" : "play-outline"} size={18} color={autoStart ? colors.primary : colors.surfaceText} />
+                <Text style={{ fontSize: 13, color: autoStart ? colors.primary : colors.surfaceText, fontWeight: '700' }}>
                   {autoStart ? (isArabic ? 'تشغيل تلقائي' : 'Auto-Start ON') : (isArabic ? 'تشغيل يدوي' : 'Auto-Start OFF')}
                 </Text>
 

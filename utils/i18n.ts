@@ -86,6 +86,10 @@ export const translations = {
     reminderTime: "Time",
     duplicateWarningTitle: "Duplicate Reminder",
     duplicateWarningBody: "A reminder with this exact title and time already exists. Do you want to create it anyway?",
+    error: "Error",
+    saveFailed: "Failed to save reminder",
+    deadline: "Deadline",
+    remove: "Remove",
   },
 
 
@@ -176,6 +180,10 @@ export const translations = {
     reminderTime: "الوقت",
     duplicateWarningTitle: "تذكير مكرر",
     duplicateWarningBody: "يوجد تذكير بهذا العنوان والوقت بالفعل. هل تريد إنشاؤه على أي حال؟",
+    error: "خطأ",
+    saveFailed: "فشل حفظ التذكير",
+    deadline: "الموعد النهائي",
+    remove: "إزالة",
   }
 
 

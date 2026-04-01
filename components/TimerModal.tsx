@@ -12,7 +12,7 @@ interface TimerModalProps {
 }
 
 const TimerModal: React.FC<TimerModalProps> = ({ visible, onClose, onSave, initialDate }) => {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const [hours, setHours] = useState('0');
   const [minutes, setMinutes] = useState('0');
   const [dueDate, setDueDate] = useState<Date | null>(null);
@@ -114,7 +114,7 @@ const TimerModal: React.FC<TimerModalProps> = ({ visible, onClose, onSave, initi
               <Text style={[styles.buttonText, { color: colors.textMuted }]}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.button, styles.saveButton, { backgroundColor: colors.primary }]} onPress={handleSave}>
-              <Text style={[styles.buttonText, { color: '#fff' }]}>Save Settings</Text>
+              <Text style={[styles.buttonText, { color: isDarkMode ? '#000' : '#FFF' }]}>Save Settings</Text>
             </TouchableOpacity>
           </View>
         </View>

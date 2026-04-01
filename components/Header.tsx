@@ -34,6 +34,17 @@ const Header = () => {
             <TouchableOpacity
                 activeOpacity={0.85}
                 style={homeStyles.headerRight}
+                onPress={() => {
+                  import('@/utils/notifications').then(({ requestPermissionsAsync }) => {
+                    requestPermissionsAsync().then(granted => {
+                      if (granted) {
+                        alert(isArabic ? 'الإشعارات مفعلة ✅' : 'Notifications enabled ✅');
+                      } else {
+                        alert(isArabic ? 'يرجى مراجعة إعدادات الجهاز لتفعيل الإشعارات' : 'Please check device settings to enable notifications');
+                      }
+                    });
+                  });
+                }}
             >
                 <Ionicons
                     name="notifications-outline"

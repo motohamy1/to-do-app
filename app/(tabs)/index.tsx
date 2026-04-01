@@ -88,12 +88,12 @@ const index = () => {
     return (
         <KeyboardAvoidingView 
             style={[homeStyles.container, isArabic && { direction: 'rtl' }]}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : -110}
         >
 
             <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.bg} />
-            <SafeAreaView style={homeStyles.safeArea}>
+            <SafeAreaView style={homeStyles.safeArea} edges={['top']}>
                 <Header />
                 {todos === undefined ? (
                    <View style={homeStyles.loadingContainer}>
@@ -186,7 +186,7 @@ const index = () => {
                       ))}
                       
                       {activeFilter === 'All' && (
-                          <View style={{ marginTop: 24, marginBottom: 80 }}>
+                          <View style={{ marginTop: 24, marginBottom: 0 }}>
                               <TodoInput onFocus={scrollToBottom} />
                           </View>
                       )}

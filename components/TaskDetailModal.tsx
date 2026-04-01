@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Platform, LayoutAnimation, ActivityIndicator } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Platform, LayoutAnimation, ActivityIndicator, KeyboardAvoidingView } from 'react-native';
 import useTheme from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery } from 'convex/react';
@@ -45,10 +45,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const [newSubtaskText, setNewSubtaskText] = useState("");
   const [timeLeft, setTimeLeft] = useState(0);
   const [isEditingTimer, setIsEditingTimer] = useState(false);
+  const [hours, setHours] = useState("0");
+  const [minutes, setMinutes] = useState("0");
+  const [datePickerMode, setDatePickerMode] = useState<'dueDate'>('dueDate');
 
   useEffect(() => {
 
-    let interval: NodeJS.Timeout;
+    let interval: any;
     if (todo?.status === 'in_progress' && todo?.timerStartTime && todo?.timerDuration) {
       const tick = () => {
         const elapsed = Date.now() - todo.timerStartTime!;
@@ -71,6 +74,15 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
       setEditText(todo.text);
       setDescription(todo.description || "");
       setPriority(todo.priority || "Medium");
+      
+      // Initialize hours and minutes from timerDuration
+      if (todo.timerDuration) {
+        setHours(String(Math.floor(todo.timerDuration / 3600000)));
+        setMinutes(String(Math.floor((todo.timerDuration % 3600000) / 60000)));
+      } else {
+        setHours("0");
+        setMinutes("0");
+      }
     }
   }, [todo]);
 
@@ -118,16 +130,48 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
     }
   };
 
+  const [newSubHours, setNewSubHours] = useState("0");
+  const [newSubMinutes, setNewSubMinutes] = useState("0");
+  const [showNewSubTimerPicker, setShowNewSubTimerPicker] = useState(false);
+
+  const newSubDuration = useMemo(() => {
+    const h = parseInt(newSubHours) || 0;
+    const m = parseInt(newSubMinutes) || 0;
+    const ms = (h * 3600 + m * 60) * 1000;
+    return ms > 0 ? ms : undefined;
+  }, [newSubHours, newSubMinutes]);
+
   const handleAddSubtask = () => {
     if (newSubtaskText.trim() && userId && currentTodoId) {
       addTodo({
-        userId,
+        userId: userId!,
         text: newSubtaskText.trim(),
-        parentId: currentTodoId,
+        parentId: currentTodoId!,
         projectId: todo?.projectId,
+        ...(newSubDuration && { timerDuration: newSubDuration })
       });
       setNewSubtaskText("");
+      setNewSubHours("0");
+      setNewSubMinutes("0");
+      setShowNewSubTimerPicker(false);
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
+  };
+
+  const handleSaveCustomTimer = () => {
+    const h = parseInt(hours) || 0;
+    const m = parseInt(minutes) || 0;
+    const ms = (h * 3600 + m * 60) * 1000;
+    if (currentTodoId) {
+      setTimer({ id: currentTodoId, duration: ms });
+      setIsEditingTimer(false);
+    }
+  };
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate && currentTodoId) {
+      setTimer({ id: currentTodoId, dueDate: selectedDate.getTime() });
     }
   };
 
@@ -139,8 +183,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleBack}>
       <View style={styles.overlay}>
         <View style={[styles.container, { backgroundColor: colors.bg }]}>
-          
-          {/* Header */}
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+            style={{ flex: 1 }}
+          >
+            {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.border + '40' }, isArabic && { flexDirection: 'row-reverse' }]}>
             <TouchableOpacity onPress={handleBack} style={styles.headerIcon}>
               <Ionicons name={todoStack.length > 1 ? (isArabic ? "chevron-forward" : "chevron-back") : "close"} size={26} color={colors.text} />
@@ -164,7 +211,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
 
             <TouchableOpacity onPress={() => {
               if (currentTodoId) {
-                const confirmDelete = () => deleteTodo({ id: currentTodoId }).then(handleBack);
+                const confirmDelete = () => deleteTodo({ id: currentTodoId! }).then(handleBack);
                 if (Platform.OS === 'web') confirmDelete();
                 else {
                   // In a real mobile app we'd use Alert.alert here, but for now we'll just delete
@@ -214,8 +261,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
 
                     {isEditingTimer && (todo?.timerDuration ?? 0) > 0 && (
                       <TouchableOpacity onPress={() => {
-
-
                         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                         setIsEditingTimer(false);
                       }}>
@@ -223,42 +268,77 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       </TouchableOpacity>
                     )}
                   </View>
-                  <View style={[styles.timerPresets, isArabic && { flexDirection: 'row-reverse' }]}>
-                    {[5, 10, 30, 45, 60].map(mins => (
-                      <TouchableOpacity 
-                        key={mins}
-                        onPress={() => {
-                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                          currentTodoId && setTimer({ id: currentTodoId, duration: mins * 60000 });
-                          setIsEditingTimer(false);
-                        }}
-                        style={[
-                          styles.timerPreset, 
-                          { 
-                            backgroundColor: todo?.timerDuration === mins * 60000 ? projectColor : colors.surface, 
-                            borderColor: todo?.timerDuration === mins * 60000 ? projectColor : colors.border,
-                            borderWidth: 1.5
-                          }
-                        ]}
-                      >
-                        <Text style={[styles.timerPresetText, { color: todo?.timerDuration === mins * 60000 ? '#000' : colors.text }]}>
-                          {mins}{isArabic ? ' د' : 'm'}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                    
+
+                  {/* Custom Timer Input Row */}
+                  <View style={[styles.customTimerRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <View style={styles.customTimerInputGroup}>
+                      <TextInput
+                        style={[styles.customTimerInput, { color: colors.text, borderColor: colors.border }]}
+                        keyboardType="numeric"
+                        value={hours}
+                        onChangeText={setHours}
+                        maxLength={2}
+                        selectTextOnFocus
+                      />
+                      <Text style={[styles.customTimerSubLabel, { color: colors.textMuted }]}>{t.hours}</Text>
+                    </View>
+                    <Text style={[styles.customTimerColon, { color: colors.text }]}>:</Text>
+                    <View style={styles.customTimerInputGroup}>
+                      <TextInput
+                        style={[styles.customTimerInput, { color: colors.text, borderColor: colors.border }]}
+                        keyboardType="numeric"
+                        value={minutes}
+                        onChangeText={setMinutes}
+                        maxLength={2}
+                        selectTextOnFocus
+                      />
+                      <Text style={[styles.customTimerSubLabel, { color: colors.textMuted }]}>{t.minutes}</Text>
+                    </View>
                     <TouchableOpacity 
-                      style={[styles.timerPreset, { borderColor: projectColor, borderStyle: 'dashed', borderWidth: 1.5 }]}
-                      onPress={() => setShowDatePicker(true)}
+                      style={[styles.customTimerSaveButton, { backgroundColor: projectColor }]}
+                      onPress={handleSaveCustomTimer}
                     >
-                      <Ionicons name="time-outline" size={16} color={projectColor} />
+                      <Ionicons name="checkmark" size={20} color={isDarkMode ? "#000" : "#FFF"} />
                     </TouchableOpacity>
                   </View>
                 </View>
               )}
 
+              {/* Deadline Selection */}
+              <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
+                <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{t.deadline || (isArabic ? 'الموعد النهائي' : 'Deadline')}</Text>
+                  {todo?.dueDate && (
+                    <TouchableOpacity onPress={() => currentTodoId && setTimer({ id: currentTodoId, dueDate: undefined })}>
+                      <Text style={{ fontSize: 13, color: colors.danger, fontWeight: '700' }}>{t.remove || (isArabic ? 'إزالة' : 'Remove')}</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                
+                <TouchableOpacity 
+                  style={[styles.deadlineButton, { borderColor: todo?.dueDate ? projectColor : colors.border, backgroundColor: todo?.dueDate ? projectColor + '10' : 'transparent' }, isArabic && { flexDirection: 'row-reverse' }]}
+                  onPress={() => setShowDatePicker(true)}
+                >
+                  <Ionicons name="calendar-outline" size={20} color={todo?.dueDate ? projectColor : colors.textMuted} />
+                  <Text style={[styles.deadlineButtonText, { color: todo!.dueDate ? colors.text : colors.textMuted }]}>
+                    {todo!.dueDate ? new Date(todo!.dueDate).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : (isArabic ? 'تحديد موعد نهائي' : 'Set a deadline')}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={todo?.dueDate ? new Date(todo.dueDate) : new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={onDateChange}
+                    minimumDate={new Date()}
+                  />
+                )}
+              </View>
+
               {/* Circular Timer Visualization */}
-              {!!todo.timerDuration && !isEditingTimer && (
+              {!!todo!.timerDuration && !isEditingTimer && (
                 <View style={styles.timerContainer}>
                   <Svg width="200" height="200" viewBox="0 0 220 220">
                     <G rotation="-90" origin="110, 110">
@@ -280,7 +360,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                         stroke={projectColor}
                         strokeWidth="12"
                         fill="none"
-                        strokeDasharray={`${(timeLeft / (todo?.timerDuration || 1)) * 565}, 565`}
+                        strokeDasharray={`${(timeLeft / (todo!.timerDuration || 1)) * 565}, 565`}
                         strokeLinecap="round"
                       />
                     </G>
@@ -306,7 +386,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       textAnchor="middle"
                       opacity={0.8}
                     >
-                      {todo.status === 'in_progress' ? (isArabic ? 'جاهز؟ ركز!' : 'Stay Focused') : (isArabic ? 'جاهز للبدء؟' : 'Ready to start?')}
+                      {todo!.status === 'in_progress' ? (isArabic ? 'جاهز؟ ركز!' : 'Stay Focused') : (isArabic ? 'جاهز للبدء؟' : 'Ready to start?')}
                     </SvgText>
                   </Svg>
 
@@ -314,19 +394,19 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     <TouchableOpacity 
                       style={[styles.mainControlButton, { backgroundColor: projectColor }]}
                       onPress={() => {
-                        if (todo.status === 'in_progress') pauseTimer({ id: currentTodoId! });
+                        if (todo!.status === 'in_progress') pauseTimer({ id: currentTodoId! });
                         else startTimer({ id: currentTodoId! });
                       }}
                     >
-                      <Ionicons name={todo.status === 'in_progress' ? "pause" : "play"} size={22} color={isDarkMode ? "#000" : "#FFF"} />
+                      <Ionicons name={todo!.status === 'in_progress' ? "pause" : "play"} size={22} color={isDarkMode ? "#000" : "#FFF"} />
                       <Text style={[styles.mainControlButtonText, { color: isDarkMode ? "#000" : "#FFF" }]}>
-                        {todo.status === 'in_progress' ? (isArabic ? 'إيقاف' : 'Pause Task') : (isArabic ? 'ابدأ المهمة' : 'Start Task')}
+                        {todo!.status === 'in_progress' ? (isArabic ? 'إيقاف' : 'Pause Task') : (isArabic ? 'ابدأ المهمة' : 'Start Task')}
                       </Text>
                     </TouchableOpacity>
                     
                     <TouchableOpacity 
                       style={[styles.secondaryButton, { borderColor: projectColor + '40', backgroundColor: colors.surface }]}
-                      onPress={() => setTimer({ id: currentTodoId!, duration: todo.timerDuration })}
+                      onPress={() => setTimer({ id: currentTodoId!, duration: todo!.timerDuration })}
                     >
                       <Ionicons name="refresh" size={20} color={projectColor} />
                     </TouchableOpacity>
@@ -371,14 +451,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                   <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{isArabic ? "الحالة" : "Status"}</Text>
 
                   <TouchableOpacity 
-                    style={[styles.statusButton, { backgroundColor: todo.status === 'done' ? colors.success + '20' : colors.surface, borderColor: todo.status === 'done' ? colors.success : colors.border }]}
-                    onPress={() => updateStatus({ id: currentTodoId!, status: todo.status === 'done' ? 'not_started' : 'done' })}
+                    style={[styles.statusButton, { backgroundColor: todo!.status === 'done' ? colors.success + '20' : colors.surface, borderColor: todo!.status === 'done' ? colors.success : colors.border }]}
+                    onPress={() => updateStatus({ id: currentTodoId!, status: todo!.status === 'done' ? 'not_started' : 'done' })}
                   >
 
-                    <Ionicons name={todo.status === 'done' ? "checkmark-circle" : "ellipse-outline"} size={18} color={todo.status === 'done' ? colors.success : colors.textMuted} />
+                    <Ionicons name={todo!.status === 'done' ? "checkmark-circle" : "ellipse-outline"} size={18} color={todo!.status === 'done' ? colors.success : colors.textMuted} />
 
-                    <Text style={[styles.statusText, { color: todo.status === 'done' ? (isDarkMode ? '#FFFFFF' : colors.success) : colors.text }]}>
-                      {todo.status === 'done' ? t.done : t.notStarted}
+                    <Text style={[styles.statusText, { color: todo!.status === 'done' ? (isDarkMode ? '#FFFFFF' : colors.success) : colors.text }]}>
+                      {todo!.status === 'done' ? t.done : t.notStarted}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -451,21 +531,83 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     </TouchableOpacity>
                   ))}
 
-                  <View style={[styles.addSubtaskContainer, { backgroundColor: colors.surface, borderColor: projectColor + '30' }, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[{ backgroundColor: colors.surface, borderRadius: 20, borderWidth: 1, borderColor: projectColor + '30', overflow: 'hidden' }]}>
+                    <View style={[styles.addSubtaskContainer, { borderBottomWidth: showNewSubTimerPicker ? 1 : 0, borderBottomColor: colors.border + '20' }, isArabic && { flexDirection: 'row-reverse' }]}>
                       <TextInput
                         style={[styles.addSubtaskInput, { color: colors.text }, isArabic && { textAlign: 'right' }]}
-                      placeholder={isArabic ? "إضافة مهمة فرعية..." : "Add a subtask..."}
-                      placeholderTextColor={isDarkMode ? "#FFFFFF40" : "#00000040"}
+                        placeholder={isArabic ? "إضافة مهمة فرعية..." : "Add a subtask..."}
+                        placeholderTextColor={isDarkMode ? "#FFFFFF40" : "#00000040"}
+                        value={newSubtaskText}
+                        onChangeText={setNewSubtaskText}
+                        onSubmitEditing={() => {
+                          if (newSubtaskText.trim()) {
+                            if (newSubDuration) handleAddSubtask();
+                            else setShowNewSubTimerPicker(true);
+                          }
+                        }}
+                      />
 
-                      value={newSubtaskText}
-                      onChangeText={setNewSubtaskText}
-                      onSubmitEditing={handleAddSubtask}
-                    />
+                      <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 6 }}>
+                        <TouchableOpacity 
+                          onPress={() => setShowNewSubTimerPicker(!showNewSubTimerPicker)}
+                          style={newSubDuration ? { backgroundColor: projectColor + '20', padding: 4, borderRadius: 6 } : {}}
+                        >
+                          <Ionicons name="timer-outline" size={22} color={newSubDuration ? projectColor : colors.textMuted} />
+                        </TouchableOpacity>
 
+                        <TouchableOpacity onPress={handleAddSubtask}>
+                          <Ionicons name="add-circle" size={32} color={projectColor} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
 
-                    <TouchableOpacity onPress={handleAddSubtask}>
-                      <Ionicons name="add-circle" size={28} color={projectColor} />
-                    </TouchableOpacity>
+                    {showNewSubTimerPicker && (
+                      <View style={{ padding: 12, backgroundColor: colors.bg + '50' }}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: colors.textMuted, marginBottom: 12, textTransform: 'uppercase' }}>
+                          {isArabic ? "ضبط وقت المهمة الفرعية" : "Subtask Duration"}
+                        </Text>
+                        
+                        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 12 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                          <View style={{ alignItems: 'center', gap: 4 }}>
+                            <TextInput
+                              style={{ width: 60, height: 44, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, color: colors.text, textAlign: 'center', fontSize: 18, fontWeight: '800' }}
+                              keyboardType="numeric"
+                              value={newSubHours}
+                              onChangeText={setNewSubHours}
+                              maxLength={2}
+                              selectTextOnFocus
+                            />
+                            <Text style={{ fontSize: 9, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>{t.hours}</Text>
+                          </View>
+                          
+                          <Text style={{ fontSize: 20, fontWeight: '900', color: colors.text, marginTop: -15 }}>:</Text>
+                          
+                          <View style={{ alignItems: 'center', gap: 4 }}>
+                            <TextInput
+                              style={{ width: 60, height: 44, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, color: colors.text, textAlign: 'center', fontSize: 18, fontWeight: '800' }}
+                              keyboardType="numeric"
+                              value={newSubMinutes}
+                              onChangeText={setNewSubMinutes}
+                              maxLength={2}
+                              selectTextOnFocus
+                            />
+                            <Text style={{ fontSize: 9, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase' }}>{t.minutes}</Text>
+                          </View>
+
+                          <TouchableOpacity 
+                            onPress={() => {
+                              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                              setNewSubHours("0");
+                              setNewSubMinutes("0");
+                              setShowNewSubTimerPicker(false);
+                            }}
+                            style={{ marginLeft: 'auto', padding: 8 }}
+                          >
+                            <Ionicons name="close-circle" size={24} color={colors.danger} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 </View>
               </View>
@@ -473,10 +615,12 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
             </ScrollView>
           )}
 
+          </KeyboardAvoidingView>
+
           {/* Bottom Action */}
-          <View style={[styles.footer, { borderTopColor: colors.border + '40' }]}>
+          <View style={[styles.footer, { borderTopColor: colors.border + '40', backgroundColor: colors.bg }]}>
             <TouchableOpacity style={[styles.doneButton, { backgroundColor: projectColor }]} onPress={handleClose}>
-              <Text style={styles.doneButtonText}>{isArabic ? "تم" : "Done"}</Text>
+              <Text style={[styles.doneButtonText, { color: isDarkMode ? '#000' : '#FFF' }]}>{isArabic ? "تم" : "Done"}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -600,6 +744,56 @@ const styles = StyleSheet.create({
   },
   halfSection: {
     flex: 1,
+  },
+  customTimerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    gap: 12,
+  },
+  customTimerInputGroup: {
+    alignItems: 'center',
+  },
+  customTimerInput: {
+    width: 60,
+    height: 50,
+    borderWidth: 1.5,
+    borderRadius: 12,
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  customTimerSubLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 4,
+    textTransform: 'uppercase',
+  },
+  customTimerColon: {
+    fontSize: 24,
+    fontWeight: '900',
+    marginTop: -16,
+  },
+  customTimerSaveButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 'auto',
+  },
+  deadlineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    gap: 12,
+  },
+  deadlineButtonText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
   },
   timerContainer: {
     alignItems: 'center',

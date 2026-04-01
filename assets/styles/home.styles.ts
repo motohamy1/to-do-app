@@ -46,7 +46,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
     },
     scrollContent: {
       paddingVertical: 12,
-      paddingBottom: 100,
+      paddingBottom: 110,
     },
     
     // --- Today's Plan Banner ---
@@ -258,7 +258,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       gap: 12,
       borderWidth: 1,
       borderColor: colors.border,
-      marginBottom: 32,
+      marginBottom: 12,
     },
     addButtonText: {
       fontSize: 16,
@@ -273,7 +273,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       borderRadius: 20,
       borderWidth: 1,
       borderColor: colors.primary,
-      marginBottom: 32,
+      marginBottom: 0,
     },
     addInput: {
       fontSize: 16,

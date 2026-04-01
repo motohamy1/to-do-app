@@ -57,6 +57,7 @@ const InlineTimerPicker = ({
   t: any;
   isArabic: boolean;
 }) => {
+  const { isDarkMode } = useTheme();
   const init = initialMs || 0;
   const [hours, setHours] = useState(String(Math.floor(init / 3600000)));
   const [minutes, setMinutes] = useState(String(Math.floor((init % 3600000) / 60000)));
@@ -135,7 +136,7 @@ const InlineTimerPicker = ({
           onPress={handleSave}
           style={[{ flex: 1, backgroundColor: colors.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }, isArabic && { flexDirection: 'row-reverse' }]}
         >
-          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14 }}>✓ {t.setTimer}</Text>
+          <Text style={{ color: isDarkMode ? '#000' : '#FFF', fontWeight: '800', fontSize: 14 }}>✓ {t.setTimer}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={onCancel}
@@ -306,7 +307,7 @@ const SubtaskRow = ({
             style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
             onPress={handleSaveEdit}
           >
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{t.save}</Text>
+            <Text style={{ color: isDarkMode ? '#000' : '#FFF', fontWeight: '800', fontSize: 13 }}>{t.save}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={{ flex: 1, backgroundColor: colors.border, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
@@ -358,22 +359,30 @@ const SubtaskRow = ({
             style={[{
               flexDirection: isArabic ? 'row-reverse' : 'row',
               alignItems: 'center',
-              gap: 5,
-              backgroundColor: isRunning ? colors.warning + '20' : isPaused ? colors.surfaceText + '15' : colors.surfaceText + '10',
-              paddingHorizontal: 10,
+              gap: 8,
+              backgroundColor: isRunning ? colors.warning + '15' : isPaused ? colors.surfaceText + '10' : colors.surfaceText + '08',
+              paddingHorizontal: 12,
               paddingVertical: 6,
-              borderRadius: 10,
+              borderRadius: 12,
               marginLeft: isArabic ? 0 : 8,
               marginRight: isArabic ? 8 : 0,
               borderWidth: 1,
-              borderColor: isRunning ? colors.warning + '50' : colors.surfaceText + '30',
+              borderColor: isRunning ? colors.warning + '30' : colors.surfaceText + '20',
             }]}
           >
-            <Ionicons
-              name={isRunning ? 'pause' : 'play'}
-              size={12}
+            <CircularProgress
+              size={24}
+              strokeWidth={2}
+              progress={sub.timerDuration ? ((sub.timerDuration - subTimeLeft) / sub.timerDuration) * 100 : 0}
               color={isRunning ? colors.warning : colors.surfaceText}
-            />
+              unfilledColor={colors.surfaceText + '10'}
+            >
+              <Ionicons
+                name={isRunning ? 'pause' : 'play'}
+                size={10}
+                color={isRunning ? colors.warning : colors.surfaceText}
+              />
+            </CircularProgress>
             <Text
               style={{
                 fontSize: 12,
@@ -404,17 +413,6 @@ const SubtaskRow = ({
         </TouchableOpacity>
       </View>
 
-      {/* Running indicator bar */}
-      {isRunning && (
-        <View style={{ height: 2, backgroundColor: colors.warning + '30' }}>
-          <View style={[{
-            height: 2,
-            backgroundColor: colors.warning,
-            alignSelf: isArabic ? 'flex-end' : 'flex-start',
-            width: sub.timerDuration ? `${Math.min(100, ((sub.timerDuration - subTimeLeft) / sub.timerDuration) * 100)}%` : '0%',
-          }]} />
-        </View>
-      )}
     </View>
   );
 };
@@ -685,7 +683,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                     onPress={handleSaveEdit}
                     style={{ backgroundColor: colors.primary, paddingVertical: 8, borderRadius: 8, alignItems: 'center', marginTop: 4 }}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{t.doneEditing}</Text>
+                    <Text style={{ color: isDarkMode ? '#000' : '#FFF', fontWeight: '800', fontSize: 13 }}>{t.doneEditing}</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
@@ -731,8 +729,8 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                       </TouchableOpacity>
                     ) : (
                       <TouchableOpacity style={[homeStyles.actionBtn, { backgroundColor: colors.primary, flexDirection: isArabic ? 'row-reverse' : 'row' }]} onPress={handleStartTimer}>
-                        <Ionicons name="play" size={16} color="#fff" />
-                        <Text style={[homeStyles.actionBtnText, { color: '#fff' }]}>{t.startTask}</Text>
+                        <Ionicons name="play" size={16} color={isDarkMode ? '#000' : '#FFF'} />
+                        <Text style={[homeStyles.actionBtnText, { color: isDarkMode ? '#000' : '#FFF' }]}>{t.startTask}</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -755,7 +753,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                 {todo.status === 'paused' && (
                   <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
                     <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: colors.primary }]} onPress={handleStartTimer}>
-                      <Ionicons name="play" size={16} color="#fff" />
+                      <Ionicons name="play" size={16} color={isDarkMode ? '#000' : '#FFF'} />
                     </TouchableOpacity>
                   </View>
                 )}
