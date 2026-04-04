@@ -13,11 +13,13 @@ import {
   BackHandler,
   KeyboardAvoidingView,
   Platform,
+  Share,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/utils/i18n';
 import { createProjectsStyles } from '@/assets/styles/projects.styles';
 import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import { useOfflineMutation } from '@/hooks/useOfflineMutation';
@@ -25,6 +27,7 @@ import { api } from '@/convex/_generated/api';
 import { Id, Doc } from '@/convex/_generated/dataModel';
 import TodoInput from '@/components/TodoInput';
 import TodoCard from '@/components/TodoCard';
+import ActionModal from '@/components/ActionModal';
 import TimerModal from '@/components/TimerModal';
 import ProjectPickerModal from '@/components/ProjectPickerModal';
 import { createHomeStyles } from '@/assets/styles/home.styles';
@@ -311,10 +314,11 @@ const AddResourceModal = ({ visible, onClose, colors, styles, onAdd }: {
 
 // ─── Layer 1: Categories View (Full Width) ───────────────────────────────────
 
-const CategoriesView = ({ styles, colors, onSelectCategory, onAddCategory, userId }: {
+const CategoriesView = ({ styles, colors, onSelectCategory, onAddCategory, onOpenAction, userId }: {
   styles: any; colors: any;
   onSelectCategory: (id: Id<'projectCategories'>, name: string, color: string) => void;
   onAddCategory: () => void;
+  onOpenAction: (config: any) => void;
   userId: Id<'users'> | null;
 }) => {
   const categories = useOfflineQuery<any[]>('projects.getCategories', api.projects.getCategories, userId ? { userId } : 'skip');
@@ -340,8 +344,26 @@ const CategoriesView = ({ styles, colors, onSelectCategory, onAddCategory, userI
               <Text style={styles.categoryCardCount}>Tap to explore</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.categoryDeleteBtn} onPress={() => deleteCategory({ id: cat._id })}>
-            <Ionicons name="trash-outline" size={16} color={colors.danger} />
+          <TouchableOpacity 
+            style={styles.categoryDeleteBtn} 
+            onPress={() => onOpenAction({
+              title: cat.name,
+              options: [
+                {
+                  label: 'Share Category',
+                  icon: 'share-social-outline',
+                  onPress: () => Share.share({ message: `Check out my project category: ${cat.name}` })
+                },
+                {
+                  label: 'Delete Category',
+                  icon: 'trash-outline',
+                  variant: 'destructive',
+                  onPress: () => deleteCategory({ id: cat._id })
+                }
+              ]
+            })}
+          >
+            <Ionicons name="ellipsis-vertical" size={16} color={colors.textMuted} />
           </TouchableOpacity>
         </TouchableOpacity>
       ))}
@@ -360,7 +382,7 @@ const CategoriesView = ({ styles, colors, onSelectCategory, onAddCategory, userI
 
 const CategoryDetailView = ({
   styles, colors, categoryId, categoryName,
-  onSelectSubCategory, onSelectProject, onAddSubCategory, onAddProject, onDeleteCategory, userId
+  onSelectSubCategory, onSelectProject, onAddSubCategory, onAddProject, onDeleteCategory, onOpenAction, userId
 }: {
   styles: any; colors: any;
   categoryId: Id<'projectCategories'>; categoryName: string;
@@ -369,6 +391,7 @@ const CategoryDetailView = ({
   onAddSubCategory: () => void;
   onAddProject: () => void;
   onDeleteCategory: (id: Id<'projectCategories'>) => void;
+  onOpenAction: (config: any) => void;
   userId: Id<'users'> | null;
 }) => {
   const subCategories = useOfflineQuery<any[]>('projects.getSubCategories', api.projects.getSubCategories, { categoryId });
@@ -390,19 +413,25 @@ const CategoryDetailView = ({
       {/* Category Header Actions */}
       <View style={{ paddingHorizontal: 24, paddingVertical: 12, flexDirection: 'row', justifyContent: 'flex-end', gap: 12 }}>
          <TouchableOpacity 
-           style={[styles.headerBtn, { borderColor: colors.danger + '40' }]} 
-           onPress={() => {
-              Alert.alert(
-                "Delete Category?",
-                `This will delete "${categoryName}" and all its projects/sub-categories.`,
-                [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Delete", style: "destructive", onPress: () => onDeleteCategory(categoryId) }
-                ]
-              );
-           }}
+           style={[styles.headerBtn, { borderColor: colors.border }]} 
+           onPress={() => onOpenAction({
+             title: categoryName,
+             options: [
+               {
+                 label: 'Share Category',
+                 icon: 'share-social-outline',
+                 onPress: () => Share.share({ message: `Category: ${categoryName}` })
+               },
+               {
+                 label: 'Delete Category',
+                 icon: 'trash-outline',
+                 variant: 'destructive',
+                 onPress: () => onDeleteCategory(categoryId)
+               }
+             ]
+           })}
          >
-           <Ionicons name="trash-outline" size={20} color={colors.danger} />
+           <Ionicons name="ellipsis-vertical" size={20} color={colors.textMuted} />
          </TouchableOpacity>
       </View>
       {/* Sub-categories Section */}
@@ -471,13 +500,14 @@ const CategoryDetailView = ({
 
 const SubCategoryProjectsView = ({
   styles, colors, subCategoryId, subCategoryName,
-  onSelectProject, onAddProject, onDeleteSubCategory, userId
+  onSelectProject, onAddProject, onDeleteSubCategory, onOpenAction, userId
 }: {
   styles: any; colors: any;
   subCategoryId: Id<'projectSubCategories'>; subCategoryName: string;
   onSelectProject: (id: Id<'projects'>) => void;
   onAddProject: () => void;
   onDeleteSubCategory: (id: Id<'projectSubCategories'>) => void;
+  onOpenAction: (config: any) => void;
   userId: Id<'users'> | null;
 }) => {
   const projects = useOfflineQuery<any[]>('projects.getProjectsBySubCategory', api.projects.getProjectsBySubCategory, { subCategoryId });
@@ -498,18 +528,24 @@ const SubCategoryProjectsView = ({
       <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 6, marginBottom: 8 }}>
         <Text style={[styles.sectionLabel, { paddingHorizontal: 0, marginBottom: 0 }]}>Projects in {subCategoryName}</Text>
         <TouchableOpacity 
-           onPress={() => {
-              Alert.alert(
-                "Delete Sub-Category?",
-                `Delete "${subCategoryName}" and all its projects?`,
-                [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Delete", style: "destructive", onPress: () => onDeleteSubCategory(subCategoryId) }
-                ]
-              );
-           }}
+           onPress={() => onOpenAction({
+             title: subCategoryName,
+             options: [
+               {
+                 label: 'Share Sub-Category',
+                 icon: 'share-social-outline',
+                 onPress: () => Share.share({ message: `Sub-Category: ${subCategoryName}` })
+               },
+               {
+                 label: 'Delete Sub-Category',
+                 icon: 'trash-outline',
+                 variant: 'destructive',
+                 onPress: () => onDeleteSubCategory(subCategoryId)
+               }
+             ]
+           })}
         >
-          <Ionicons name="trash-outline" size={18} color={colors.danger} />
+          <Ionicons name="ellipsis-vertical" size={18} color={colors.textMuted} />
         </TouchableOpacity>
       </View>
       {projects.map(project => {
@@ -535,6 +571,8 @@ const SubCategoryProjectsView = ({
 // ─── Layer 4: Project Detail View ───────────────────────────────────────────
 
 const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId }: { styles: any; colors: any; projectId: Id<'projects'>, onDeleteProject: (id: Id<'projects'>) => void, userId: Id<'users'> | null }) => {
+  const { language } = useAuth();
+  const { t, isArabic } = useTranslation(language);
   const project = useOfflineQuery<any>('projects.getProject', api.projects.getProject, { id: projectId });
   const resources = useOfflineQuery<any[]>('projects.getProjectResources', api.projects.getProjectResources, { projectId });
   const checklists = useOfflineQuery<any[]>('projects.getChecklists', api.projects.getChecklists, { projectId });
@@ -564,6 +602,13 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId 
   const [selectedTodoId, setSelectedTodoId] = useState<Id<"todos"> | null>(null);
 
   const [expandedTodoId, setExpandedTodoId] = useState<Id<"todos"> | null>(null);
+
+  const [isActionModalVisible, setActionModalVisible] = useState(false);
+  const [actionConfig, setActionConfig] = useState<{ 
+    title: string, 
+    options: any[], 
+    type?: 'project' | 'task' | 'resource' 
+  } | null>(null);
 
   const homeStyles = createHomeStyles(colors);
 
@@ -611,13 +656,32 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId 
             </View>
             <TouchableOpacity 
               onPress={() => {
-                Alert.alert("Delete Project?", `Delete "${project.name}"?`, [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Delete", style: "destructive", onPress: () => onDeleteProject(project._id) }
-                ]);
+                setActionConfig({
+                  title: project.name,
+                  type: 'project',
+                  options: [
+                    {
+                      label: isArabic ? 'تعديل الوصف' : 'Edit Description',
+                      icon: 'create-outline',
+                      onPress: () => setEditingDesc(true)
+                    },
+                    {
+                      label: isArabic ? 'مشاركة المشروع' : 'Share Project',
+                      icon: 'share-social-outline',
+                      onPress: () => Share.share({ message: `Project: ${project.name}\n${project.description || ''}` })
+                    },
+                    {
+                      label: isArabic ? 'حذف المشروع' : 'Delete Project',
+                      icon: 'trash-outline',
+                      variant: 'destructive',
+                      onPress: () => onDeleteProject(project._id)
+                    }
+                  ]
+                });
+                setActionModalVisible(true);
               }}
             >
-              <Ionicons name="trash-outline" size={22} color={colors.danger} />
+              <Ionicons name="ellipsis-vertical" size={22} color={colors.textMuted} />
             </TouchableOpacity>
           </View>
           <View style={styles.detailProgressTrack}><View style={[styles.detailProgressFill, { width: `${pct}%`, backgroundColor: project.color }]} /></View>
@@ -729,7 +793,18 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId 
                            todo={{ ...t, status: t.status || 'not_started' }} 
                            homeStyles={homeStyles}
                            onSetTimer={(id) => { setSelectedTodoId(id); setTimerModalVisible(true); }} 
-                           onLongPress={(id) => deleteTodoMutation({ id })} 
+                           onLongPress={(id) => {
+                              setActionConfig({
+                                title: t.taskOptions || (isArabic ? 'خيارات المهمة' : 'Task Options'),
+                                type: 'task',
+                                options: [
+                                  { label: isArabic ? 'تعديل' : 'Edit', icon: 'create-outline', onPress: () => { setSelectedTodoId(t._id); setTimerModalVisible(true); } },
+                                  { label: isArabic ? 'مشاركة' : 'Share', icon: 'share-social-outline', onPress: () => Share.share({ message: t.text }) },
+                                  { label: isArabic ? 'حذف' : 'Delete', icon: 'trash-outline', variant: 'destructive', onPress: () => deleteTodoMutation({ id: t._id }) }
+                                ]
+                              });
+                              setActionModalVisible(true);
+                            }} 
                            onLinkProject={(id) => { setSelectedTodoId(id); setProjectModalVisible(true); }}
                          />
                          <TouchableOpacity 
@@ -797,7 +872,17 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId 
              <View key={res._id} style={styles.resourceCard}>
                <Ionicons name="link" size={20} color={colors.primary} />
                <View style={styles.resourceInfo}><Text style={styles.resourceTitle}>{res.title}</Text><Text style={styles.resourceUrl} numberOfLines={1}>{res.url || res.note}</Text></View>
-               <TouchableOpacity onPress={() => deleteResource({ id: res._id })}><Ionicons name="trash-outline" size={16} color={colors.danger} /></TouchableOpacity>
+               <TouchableOpacity onPress={() => {
+                  setActionConfig({
+                    title: res.title,
+                    type: 'resource',
+                    options: [
+                      { label: isArabic ? 'فتح الرابط' : 'Open Link', icon: 'open-outline', onPress: () => res.url && Linking.openURL(res.url) },
+                      { label: isArabic ? 'حذف' : 'Delete', icon: 'trash-outline', variant: 'destructive', onPress: () => deleteResource({ id: res._id }) }
+                    ]
+                  });
+                  setActionModalVisible(true);
+                }}><Ionicons name="ellipsis-vertical" size={16} color={colors.textMuted} /></TouchableOpacity>
              </View>
            ))}
         </View>
@@ -815,6 +900,14 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId 
         visible={isProjectModalVisible}
         onClose={() => { setProjectModalVisible(false); setSelectedTodoId(null); }}
         onSelect={(id) => { if (selectedTodoId) linkProjectMutation({ id: selectedTodoId, projectId: id }); }}
+      />
+
+      <ActionModal 
+        visible={isActionModalVisible}
+        onClose={() => { setActionModalVisible(false); setActionConfig(null); }}
+        title={actionConfig?.title || ''}
+        isArabic={isArabic}
+        options={actionConfig?.options || []}
       />
     </>
   );
@@ -835,6 +928,9 @@ const Projects: React.FC = () => {
   const [selectedSubId, setSelectedSubId] = useState<Id<'projectSubCategories'> | null>(null);
   const [selectedSubName, setSelectedSubName] = useState('');
   const [selectedProjId, setSelectedProjId] = useState<Id<'projects'> | null>(null);
+
+  const [isActionModalVisible, setActionModalVisible] = useState(false);
+  const [actionConfig, setActionConfig] = useState<{ title: string, options: any[] } | null>(null);
 
   const [showAddCat, setShowAddCat] = useState(false);
   const [showAddSub, setShowAddSub] = useState(false);
@@ -894,7 +990,7 @@ const Projects: React.FC = () => {
         </View>
 
 
-        {layer === 'categories' && <CategoriesView styles={styles} colors={colors} userId={userId} onAddCategory={() => setShowAddCat(true)} onSelectCategory={(id, name) => { setSelectedCatId(id); setSelectedCatName(name); setLayer('categoryDetail'); }} />}
+        {layer === 'categories' && <CategoriesView styles={styles} colors={colors} userId={userId} onAddCategory={() => setShowAddCat(true)} onSelectCategory={(id, name) => { setSelectedCatId(id); setSelectedCatName(name); setLayer('categoryDetail'); }} onOpenAction={(config) => { setActionConfig(config); setActionModalVisible(true); }} />}
         
         {layer === 'categoryDetail' && selectedCatId && (
           <CategoryDetailView 
@@ -904,11 +1000,11 @@ const Projects: React.FC = () => {
             onAddSubCategory={() => setShowAddSub(true)}
             onAddProject={() => setShowAddProj(true)}
             onDeleteCategory={(id) => {
-              // Note: deleteCategory doesn't strictly need userId for logic, but let's be safe
               deleteCatMutation({ id });
               setLayer('categories');
               setSelectedCatId(null);
             }}
+            onOpenAction={(config) => { setActionConfig(config); setActionModalVisible(true); }}
           />
         )}
 
@@ -918,10 +1014,10 @@ const Projects: React.FC = () => {
             onSelectProject={(id) => { setSelectedProjId(id); setLayer('detail'); }}
             onAddProject={() => setShowAddProj(true)}
             onDeleteSubCategory={(id) => {
-               deleteSubCatMutation({ id });
                setLayer('categoryDetail');
                setSelectedSubId(null);
             }}
+            onOpenAction={(config) => { setActionConfig(config); setActionModalVisible(true); }}
           />
         )}
 
@@ -950,6 +1046,14 @@ const Projects: React.FC = () => {
           }}
         />
       )}
+
+      <ActionModal 
+        visible={isActionModalVisible}
+        onClose={() => { setActionModalVisible(false); setActionConfig(null); }}
+        title={actionConfig?.title || ''}
+        isArabic={false} // Use state if needed, but categories usually en
+        options={actionConfig?.options || []}
+      />
     </View>
   );
 };

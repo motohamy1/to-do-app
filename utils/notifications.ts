@@ -1,10 +1,10 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import type * as NotificationsType from 'expo-notifications';
 
-// In SDK 55, executionEnvironment is a string: 'storeClient' | 'standalone' | 'bare'
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
-function getNotificationsAPI() {
+function getNotificationsAPI(): typeof NotificationsType | null {
   if (isExpoGo && Platform.OS === 'android') {
     return null;
   }
@@ -25,7 +25,9 @@ if (Notifications) {
         shouldShowAlert: true,
         shouldPlaySound: true,
         shouldSetBadge: true,
-      }),
+        shouldShowBanner: true,
+        shouldShowList: true,
+      } as any),
     });
   } catch (error) {
     console.warn("Error setting notification handler:", error);
@@ -34,7 +36,7 @@ if (Notifications) {
 
 export async function requestPermissionsAsync() {
   if (!Notifications) {
-    console.warn("Notifications not supported in this environment (likely Expo Go Android).");
+    console.warn("Notifications bypassed for Expo Go Android.");
     return false;
   }
 
@@ -42,13 +44,13 @@ export async function requestPermissionsAsync() {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('tasks', {
         name: 'Task Timers',
-        importance: 5, // AndroidImportance.MAX
+        importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 500, 200, 500],
         lightColor: '#FF231F7C',
       });
       await Notifications.setNotificationChannelAsync('subtasks', {
         name: 'Subtask Timers',
-        importance: 4, // AndroidImportance.HIGH
+        importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 150, 250],
         lightColor: '#D4F82D',
       });
@@ -83,13 +85,12 @@ export async function scheduleTimerNotification(title: string, durationMs: numbe
         body: (isSubtask ? t.notifSubtaskBody : t.notifTaskBody) + `"${title}"`,
         sound: true,
         priority: 'max',
-        android: {
-          channelId: isSubtask ? 'subtasks' : 'tasks',
-        }
-      },
+      } as any, // bypassing deprecated shouldShowAlert / android object properties
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: seconds > 0 ? seconds : 1,
-      },
+        channelId: isSubtask ? 'subtasks' : 'tasks',
+      } as any,
     });
     return id;
   } catch (error) {
@@ -112,8 +113,6 @@ export async function scheduleDailyReminders() {
   if (!Notifications) return;
 
   try {
-    // Only cancel previously scheduled daily reminders (by identifier prefix),
-    // NOT timer notifications — cancelAllScheduled was wiping those too.
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const n of scheduled) {
       if (
@@ -130,10 +129,10 @@ export async function scheduleDailyReminders() {
         body: "Check your tasks and plan your day.",
       },
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: 9,
         minute: 0,
-        repeats: true,
-      },
+      } as any,
     });
 
     await Notifications.scheduleNotificationAsync({
@@ -142,10 +141,10 @@ export async function scheduleDailyReminders() {
         body: "How did you do today? Check off your completed tasks!",
       },
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: 20,
         minute: 0,
-        repeats: true,
-      },
+      } as any,
     });
   } catch (error) {
     console.warn("Error scheduling daily reminders:", error);

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StatusBar, Animated, StyleSheet, BackHandler, KeyboardAvoidingView, Platform, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, Animated, StyleSheet, BackHandler, KeyboardAvoidingView, Platform, FlatList, Share } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,7 @@ import TodoInput from '@/components/TodoInput';
 import TodoCard from '@/components/TodoCard';
 import TimerModal from '@/components/TimerModal';
 import ProjectPickerModal from '@/components/ProjectPickerModal';
+import ActionModal from '@/components/ActionModal';
 import { createHomeStyles } from '@/assets/styles/home.styles';
 import { Id } from '@/convex/_generated/dataModel';
 
@@ -46,6 +47,9 @@ const Planner = () => {
   const [isTimerModalVisible, setTimerModalVisible] = useState(false);
   const [isProjectModalVisible, setProjectModalVisible] = useState(false);
   const [selectedTodoId, setSelectedTodoId] = useState<Id<"todos"> | null>(null);
+  
+  const [isActionModalVisible, setActionModalVisible] = useState(false);
+  const [selectedItemForAction, setSelectedItemForAction] = useState<any>(null);
 
   const updateTodoStatus = useOfflineMutation(api.todos.updateStatus, "todos:updateStatus");
   const deleteTodoMutation = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
@@ -238,6 +242,10 @@ const Planner = () => {
                             <TouchableOpacity 
                                 style={[styles.taskItem, { width: 240, marginHorizontal: 8, height: 150, flexDirection: 'column', alignItems: isArabic ? 'flex-end' : 'flex-start', padding: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
                                 onPress={() => router.push({ pathname: '/note-detail', params: { id: task._id, isReminder: 'true' } })}
+                                onLongPress={() => {
+                                    setSelectedItemForAction(task);
+                                    setActionModalVisible(true);
+                                }}
                                 activeOpacity={0.7}
                             >
                                 <View style={[{ backgroundColor: '#FF6B6B15', width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }]}>
@@ -272,6 +280,10 @@ const Planner = () => {
                             <TouchableOpacity 
                                 style={[styles.taskItem, { width: 240, marginHorizontal: 8, height: 150, flexDirection: 'column', alignItems: isArabic ? 'flex-end' : 'flex-start', padding: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}
                                 onPress={() => router.push({ pathname: '/note-detail', params: { id: task._id, isReminder: 'false' } })}
+                                onLongPress={() => {
+                                    setSelectedItemForAction(task);
+                                    setActionModalVisible(true);
+                                }}
                                 activeOpacity={0.7}
                             >
                                 <View style={[{ backgroundColor: colors.primary + '15', width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' }]}>
@@ -376,6 +388,35 @@ const Planner = () => {
                 visible={isProjectModalVisible}
                 onClose={() => { setProjectModalVisible(false); setSelectedTodoId(null); }}
                 onSelect={(id) => { if (selectedTodoId) linkProjectMutation({ id: selectedTodoId, projectId: id }); }}
+            />
+
+            <ActionModal 
+                visible={isActionModalVisible}
+                onClose={() => { setActionModalVisible(false); setSelectedItemForAction(null); }}
+                title={selectedItemForAction?.text || (selectedItemForAction?.type === 'reminder' ? (isArabic ? 'تذكير' : 'Reminder') : (isArabic ? 'ملاحظة' : 'Note'))}
+                isArabic={isArabic}
+                options={[
+                    { 
+                        label: isArabic ? 'تعديل' : 'Edit', 
+                        icon: 'create-outline', 
+                        onPress: () => router.push({ pathname: '/note-detail', params: { id: selectedItemForAction?._id, isReminder: selectedItemForAction?.type === 'reminder' ? 'true' : 'false' } }) 
+                    },
+                    { 
+                        label: isArabic ? 'مشاركة' : 'Share', 
+                        icon: 'share-social-outline', 
+                        onPress: () => Share.share({ message: `${selectedItemForAction?.text || 'Untitled'}\n\n${selectedItemForAction?.description || ''}` }) 
+                    },
+                    { 
+                        label: isArabic ? 'حذف' : 'Delete', 
+                        icon: 'trash-outline', 
+                        variant: 'destructive',
+                        onPress: () => {
+                            if (selectedItemForAction) {
+                                deleteTodoMutation({ id: selectedItemForAction._id });
+                            }
+                        }
+                    }
+                ]}
             />
         </ScrollView>
     );

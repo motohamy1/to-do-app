@@ -5,7 +5,7 @@ import { useOfflineQuery } from "@/hooks/useOfflineQuery";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import React, { useState, useMemo, useRef } from 'react';
 
-import { StatusBar, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { StatusBar, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, KeyboardAvoidingView, Platform, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from "../../convex/_generated/api";
 import { Id } from '../../convex/_generated/dataModel';
@@ -15,6 +15,7 @@ import TodoInput from "@/components/TodoInput";
 import TodoCard from "@/components/TodoCard";
 import TimerModal from "@/components/TimerModal";
 import ProjectPickerModal from "@/components/ProjectPickerModal";
+import ActionModal from "@/components/ActionModal";
 import CircularProgress from "@/components/CircularProgress";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -34,6 +35,9 @@ const index = () => {
     const [isProjectModalVisible, setProjectModalVisible] = useState(false);
     const [selectedTodoId, setSelectedTodoId] = useState<Id<"todos"> | null>(null);
     const [activeFilter, setActiveFilter] = useState<'All' | 'In Progress' | 'Done'>('All');
+    
+    const [isActionModalVisible, setActionModalVisible] = useState(false);
+    const [selectedTodoForAction, setSelectedTodoForAction] = useState<any>(null);
 
     const scrollViewRef = useRef<ScrollView>(null);
     const homeStyles = createHomeStyles(colors, isArabic);
@@ -179,7 +183,10 @@ const index = () => {
                               key={todo._id} 
                               todo={todo} 
                               onSetTimer={handleOpenTimerModal}
-                              onLongPress={(id) => deleteTodo({ id })}
+                              onLongPress={(id) => {
+                                  setSelectedTodoForAction(todo);
+                                  setActionModalVisible(true);
+                              }}
                               onLinkProject={handleOpenProjectModal}
                               homeStyles={homeStyles}
                               isTimelineMode={true}
@@ -213,6 +220,44 @@ const index = () => {
                 setSelectedTodoId(null);
               }}
               onSelect={handleSelectProject}
+            />
+
+            <ActionModal 
+              visible={isActionModalVisible}
+              onClose={() => { setActionModalVisible(false); setSelectedTodoForAction(null); }}
+              title={selectedTodoForAction?.text || (isArabic ? 'خيارات المهمة' : 'Task Options')}
+              isArabic={isArabic}
+              options={[
+                { 
+                  label: isArabic ? 'تعديل التفاصيل' : 'Edit Details', 
+                  icon: 'create-outline', 
+                  onPress: () => {
+                    // This could open the timer modal or a new detail modal
+                    // For now, let's allow editing using existing modals if applicable
+                    handleOpenTimerModal(selectedTodoForAction?._id);
+                  } 
+                },
+                {
+                  label: isArabic ? 'ربط بمشروع' : 'Link Project',
+                  icon: 'folder-outline',
+                  onPress: () => handleOpenProjectModal(selectedTodoForAction?._id)
+                },
+                { 
+                  label: isArabic ? 'مشاركة' : 'Share', 
+                  icon: 'share-social-outline', 
+                  onPress: () => Share.share({ message: `${selectedTodoForAction?.text || 'Untitled'}\n\n${selectedTodoForAction?.description || ''}` }) 
+                },
+                { 
+                  label: isArabic ? 'حذف' : 'Delete', 
+                  icon: 'trash-outline', 
+                  variant: 'destructive',
+                  onPress: () => {
+                    if (selectedTodoForAction?._id) {
+                      deleteTodo({ id: selectedTodoForAction._id });
+                    }
+                  }
+                }
+              ]}
             />
 
         </KeyboardAvoidingView>

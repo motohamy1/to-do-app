@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, Alert, Dimensions, FlatList, Platform, Share, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import ActionModal, { ActionOption } from '@/components/ActionModal';
 
 // Helper to get random pastel colors for cards
 const getRandomColor = (index: number, isDarkMode: boolean) => {
@@ -29,6 +30,9 @@ export default function NotesScreen() {
 
   const todos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip');
   const deleteTodo = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
+
+  const [isActionModalVisible, setActionModalVisible] = React.useState(false);
+  const [selectedItem, setSelectedItem] = React.useState<any>(null);
 
   if (todos === undefined) {
     return (
@@ -108,17 +112,8 @@ export default function NotesScreen() {
         activeOpacity={0.7}
         onPress={() => router.push({ pathname: '/note-detail', params: { id: item._id } })}
         onLongPress={() => {
-          Alert.alert(
-            item.text || "Note Options",
-            "Choose an action",
-            [
-              { text: "Cancel", style: "cancel" },
-              { text: "Edit", onPress: () => router.push({ pathname: '/note-detail', params: { id: item._id } }) },
-              { text: "Share", onPress: () => Share.share({ message: `${item.text || 'Untitled'}\n\n${item.description || ''}` }) },
-              { text: "Delete", style: "destructive", onPress: () => deleteTodo({ id: item._id }) }
-            ],
-            { cancelable: true }
-          )
+          setSelectedItem(item);
+          setActionModalVisible(true);
         }}
       >
         <Text style={[styles.cardTitle, { color: isDarkMode ? '#FFFFFF' : '#000000' }]} numberOfLines={2}>
@@ -201,6 +196,35 @@ export default function NotesScreen() {
           />
         </View>
       </View>
+
+      <ActionModal 
+        visible={isActionModalVisible}
+        onClose={() => { setActionModalVisible(false); setSelectedItem(null); }}
+        title={selectedItem?.text || (selectedItem?.type === 'reminder' ? 'Reminder Options' : 'Note Options')}
+        isArabic={isArabic}
+        options={[
+          { 
+            label: isArabic ? 'تعديل' : 'Edit', 
+            icon: 'create-outline', 
+            onPress: () => router.push({ pathname: '/note-detail', params: { id: selectedItem?._id } }) 
+          },
+          { 
+            label: isArabic ? 'مشاركة' : 'Share', 
+            icon: 'share-social-outline', 
+            onPress: () => Share.share({ message: `${selectedItem?.text || 'Untitled'}\n\n${selectedItem?.description || ''}` }) 
+          },
+          { 
+            label: isArabic ? 'حذف' : 'Delete', 
+            icon: 'trash-outline', 
+            variant: 'destructive',
+            onPress: () => {
+              if (selectedItem) {
+                deleteTodo({ id: selectedItem._id });
+              }
+            }
+          }
+        ]}
+      />
     </SafeAreaView>
   );
 }
