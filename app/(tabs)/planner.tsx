@@ -6,7 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { createPlannerStyles } from '@/assets/styles/planner.styles';
-import { useMutation, useQuery } from 'convex/react';
+import { useOfflineMutation } from '@/hooks/useOfflineMutation';
+import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import { api } from '@/convex/_generated/api';
 import TodoInput from '@/components/TodoInput';
 import TodoCard from '@/components/TodoCard';
@@ -46,10 +47,10 @@ const Planner = () => {
   const [isProjectModalVisible, setProjectModalVisible] = useState(false);
   const [selectedTodoId, setSelectedTodoId] = useState<Id<"todos"> | null>(null);
 
-  const updateTodoStatus = useMutation(api.todos.updateStatus);
-  const deleteTodoMutation = useMutation(api.todos.deleteTodo);
-  const setTimerMutation = useMutation(api.todos.setTimer);
-  const linkProjectMutation = useMutation(api.todos.linkProject);
+  const updateTodoStatus = useOfflineMutation(api.todos.updateStatus, "todos:updateStatus");
+  const deleteTodoMutation = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
+  const setTimerMutation = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
+  const linkProjectMutation = useOfflineMutation(api.todos.linkProject, "todos:linkProject");
   const scrollViewRef = useRef<ScrollView>(null);
 
   const scrollToBottom = () => {
@@ -84,7 +85,7 @@ const Planner = () => {
   }, [selectedMonth, selectedDay]);
 
   
-  const todos = useQuery(api.todos.get, userId ? { userId } : "skip") || [];
+  const todos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : "skip") || [];
 
   const currentYear = new Date().getFullYear();
 
@@ -94,8 +95,9 @@ const Planner = () => {
 
   const getTasksForDay = (day: number, month: number, year: number) => {
     return todos.filter(todo => {
-      if (!todo.date) return false;
-      const todoDate = new Date(todo.date);
+      const targetDate = todo.dueDate || todo.date;
+      if (!targetDate) return false;
+      const todoDate = new Date(targetDate);
       return todoDate.getDate() === day && 
              todoDate.getMonth() === month && 
              todoDate.getFullYear() === year;
@@ -109,8 +111,9 @@ const Planner = () => {
 
   const getTasksForMonth = (monthIndex: number) => {
     return todos.filter(todo => {
-      if (!todo.date) return false;
-      const todoDate = new Date(todo.date);
+      const targetDate = todo.dueDate || todo.date;
+      if (!targetDate) return false;
+      const todoDate = new Date(targetDate);
       return todoDate.getMonth() === monthIndex && todoDate.getFullYear() === currentYear;
     });
   };
@@ -356,7 +359,7 @@ const Planner = () => {
                     </View>
                 )}
 
-                <View style={[styles.addDayTaskContainer, tasks.filter(t => t.type !== 'note' && t.type !== 'reminder').length === 0 && { marginTop: 0 }]}>
+                <View style={[styles.addDayTaskContainer, tasks.filter(t => t.type !== 'note' && t.type !== 'reminder' && !t.dueDate).length === 0 && { marginTop: 0 }]}>
                     <TodoInput initialDate={selectedDateTs} onFocus={scrollToBottom} />
                 </View>
             </View>

@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
 import { useTranslation } from '@/utils/i18n';
 import { useAuth } from '@/hooks/useAuth';
-import { useMutation } from 'convex/react';
+import { useOfflineMutation } from '@/hooks/useOfflineMutation';
 import { api } from '@/convex/_generated/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
@@ -28,7 +28,7 @@ const AddReminderScreen = () => {
   const { colors, isDarkMode } = useTheme();
   const { language, userId } = useAuth();
   const { t, isArabic } = useTranslation(language);
-  const addTodo = useMutation(api.todos.addTodo);
+  const addTodo = useOfflineMutation(api.todos.addTodo, "todos:addTodo");
 
   const [title, setTitle] = useState(initialTitle || "");
   const [dueDate, setDueDate] = useState<number | undefined>(initialDate ? parseInt(initialDate) : undefined);

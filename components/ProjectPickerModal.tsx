@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, SectionList } from 'react-native';
 import useTheme from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from 'convex/react';
+import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 
@@ -24,14 +24,14 @@ const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({ visible, onClos
   const [selectedSubId, setSelectedSubId] = useState<Id<'projectSubCategories'> | null>(null);
 
   // Queries
-  const categories = useQuery(api.projects.getCategories, userId ? { userId } : "skip");
-  const subCategories = useQuery(api.projects.getSubCategories, 
+  const categories = useOfflineQuery<any[]>('projects.getCategories', api.projects.getCategories, userId ? { userId } : "skip");
+  const subCategories = useOfflineQuery<any[]>('projects.getSubCategories', api.projects.getSubCategories, 
     selectedCatId ? { categoryId: selectedCatId } : "skip"
   );
-  const directProjects = useQuery(api.projects.getProjectsByCategory,
+  const directProjects = useOfflineQuery<any[]>('projects.getProjectsByCategory', api.projects.getProjectsByCategory,
     selectedCatId ? { categoryId: selectedCatId } : "skip"
   );
-  const subProjects = useQuery(api.projects.getProjectsBySubCategory,
+  const subProjects = useOfflineQuery<any[]>('projects.getProjectsBySubCategory', api.projects.getProjectsBySubCategory,
     selectedSubId ? { subCategoryId: selectedSubId } : "skip"
   );
 

@@ -2,7 +2,7 @@ import { createHomeStyles } from '@/assets/styles/home.styles'
 import useTheme from '@/hooks/useTheme'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/hooks/useAuth'
-import { useQuery } from 'convex/react'
+import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import { api } from '@/convex/_generated/api'
 import React from 'react'
 import { Text, View, TouchableOpacity } from 'react-native'
@@ -12,7 +12,7 @@ const Header = () => {
     const { colors } = useTheme();
     const { userId, language, isAnonymous } = useAuth();
     const { t, isArabic } = useTranslation(language);
-    const userSettings = useQuery(api.auth.getUserSettings, userId ? { userId } : "skip");
+    const userSettings = useOfflineQuery<any>('auth.getUserSettings', api.auth.getUserSettings, userId ? { userId } : "skip");
     const homeStyles = createHomeStyles(colors, isArabic);
 
     const now = new Date();

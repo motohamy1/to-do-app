@@ -1,14 +1,15 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, FlatList, ActivityIndicator, Dimensions } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useQuery } from 'convex/react';
-import { api } from '@/convex/_generated/api';
-import useTheme from '@/hooks/useTheme';
 import { createNotesStyles } from '@/assets/styles/notes.styles';
-import { Ionicons } from '@expo/vector-icons';
+import { api } from '@/convex/_generated/api';
 import { useAuth } from '@/hooks/useAuth';
+import { useOfflineMutation } from '@/hooks/useOfflineMutation';
+import { useOfflineQuery } from '@/hooks/useOfflineQuery';
+import useTheme from '@/hooks/useTheme';
 import { useTranslation } from '@/utils/i18n';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Platform, Share, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Helper to get random pastel colors for cards
 const getRandomColor = (index: number, isDarkMode: boolean) => {
@@ -26,7 +27,8 @@ export default function NotesScreen() {
   const styles = createNotesStyles(colors, isArabic);
   const insets = useSafeAreaInsets();
 
-  const todos = useQuery(api.todos.get, userId ? { userId } : 'skip');
+  const todos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip');
+  const deleteTodo = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
 
   if (todos === undefined) {
     return (
@@ -51,15 +53,48 @@ export default function NotesScreen() {
 
   const renderCard = (item: any, globalIndex: number) => {
     if (item.isAdd) {
+      const isRem = item._id === 'add_new_rem';
       return (
-        <TouchableOpacity 
+        <TouchableOpacity
           key={item._id}
-          style={[styles.card, { backgroundColor: isDarkMode ? colors.surface : colors.bg, borderWidth: 2, borderStyle: 'dashed', borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }]}
+          style={[
+            styles.card,
+            {
+              backgroundColor: colors.surface,
+              borderWidth: 0,
+              padding: 0,
+              borderRadius: 32,
+              justifyContent: 'center',
+              alignItems: 'center',
+              shadowColor: "#000",
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
+              elevation: 4
+            }
+          ]}
           activeOpacity={0.7}
-          onPress={() => router.push({ pathname: '/note-detail', params: { isReminder: item._id === 'add_new_rem' ? 'true' : 'false' } })}
+          onPress={() => router.push({ pathname: '/note-detail', params: { isReminder: isRem ? 'true' : 'false' } })}
         >
-          <Ionicons name={item._id === 'add_new_rem' ? 'alarm-outline' : 'document-text-outline'} size={32} color={colors.textMuted} />
-          <Text style={{ color: colors.textMuted, marginTop: 8, fontSize: 16, fontWeight: '500' }}>{item._id === 'add_new_rem' ? 'Add Reminder' : 'Add Note'}</Text>
+          <View style={{
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: isRem ? colors.bg : 'transparent',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginBottom: 12,
+            overflow: 'hidden'
+          }}>
+            <Ionicons name={isRem ? 'alarm' : 'add'} size={32} color={colors.primary} />
+          </View>
+          <Text style={{
+            color: colors.text,
+            fontSize: 16,
+            fontWeight: '700',
+            fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif'
+          }}>
+            {isRem ? 'New Reminder' : 'Quick Note'}
+          </Text>
         </TouchableOpacity>
       );
     }
@@ -67,11 +102,24 @@ export default function NotesScreen() {
     const bgColor = getRandomColor(globalIndex, isDarkMode);
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         key={item._id}
         style={[styles.card, { backgroundColor: bgColor }]}
         activeOpacity={0.7}
         onPress={() => router.push({ pathname: '/note-detail', params: { id: item._id } })}
+        onLongPress={() => {
+          Alert.alert(
+            item.text || "Note Options",
+            "Choose an action",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Edit", onPress: () => router.push({ pathname: '/note-detail', params: { id: item._id } }) },
+              { text: "Share", onPress: () => Share.share({ message: `${item.text || 'Untitled'}\n\n${item.description || ''}` }) },
+              { text: "Delete", style: "destructive", onPress: () => deleteTodo({ id: item._id }) }
+            ],
+            { cancelable: true }
+          )
+        }}
       >
         <Text style={[styles.cardTitle, { color: isDarkMode ? '#FFFFFF' : '#000000' }]} numberOfLines={2}>
           {item.text || 'Untitled'}
@@ -80,7 +128,7 @@ export default function NotesScreen() {
           {item.description || '...'}
         </Text>
         {item.dueDate ? (
-          <Text style={[styles.cardDate, { color: isDarkMode ? colors.primary : colors.primary }]}>
+          <Text style={[styles.cardDate, { color: colors.primary }]}>
             {new Date(item.dueDate).toLocaleDateString()}
           </Text>
         ) : null}
@@ -103,17 +151,16 @@ export default function NotesScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { overflow: 'hidden' }]} edges={['left', 'right', 'bottom']}>
       <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }, { paddingTop: Math.max(insets.top, 16) }]}>
-        <Text style={styles.headerTitle}>Notes & Reminders</Text>
+        <Text style={[styles.headerTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif', fontSize: 32 }]}>Notes & Reminders</Text>
       </View>
 
       <View style={{ flex: 1, paddingBottom: 20 }}>
-        {/* Reminders Section */}
         <View style={styles.sectionContainer}>
           <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={styles.sectionTitle}>Reminders</Text>
+            <Text style={[styles.sectionTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif' }]}>Reminders</Text>
             <Text style={{ color: colors.textMuted, fontSize: 16 }}>{reminders.length}</Text>
           </View>
-          
+
           <FlatList
             ListHeaderComponent={() => (
               <View style={{ height: '100%', justifyContent: 'center', paddingRight: 4 }}>
@@ -131,13 +178,12 @@ export default function NotesScreen() {
           />
         </View>
 
-        {/* Notes Section */}
         <View style={styles.sectionContainer}>
           <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={styles.sectionTitle}>Notes</Text>
+            <Text style={[styles.sectionTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif' }]}>Notes</Text>
             <Text style={{ color: colors.textMuted, fontSize: 16 }}>{notes.length}</Text>
           </View>
-          
+
           <FlatList
             ListHeaderComponent={() => (
               <View style={{ height: '100%', justifyContent: 'center', paddingRight: 4 }}>

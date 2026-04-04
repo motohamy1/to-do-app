@@ -1,4 +1,4 @@
-import { StyleSheet, Dimensions } from "react-native";
+import { StyleSheet, Dimensions, Platform } from 'react-native';
 import { ColorScheme } from "@/hooks/useTheme";
 
 const { width } = Dimensions.get('window');
@@ -114,10 +114,18 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
     detailHeaderBtn: {
       width: 44,
       height: 44,
-      borderRadius: 14,
-      backgroundColor: colors.surface,
+      borderRadius: 22, // perfect circle
+      backgroundColor: colors.surface, // subtle background for icon containers
       justifyContent: 'center',
       alignItems: 'center',
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    detailHeaderBtnIcon: {
+      color: colors.text, // icon matches the text color
     },
     detailHeaderRight: {
       flexDirection: 'row',
@@ -129,17 +137,88 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
       paddingTop: 16,
     },
     titleInput: {
-      fontSize: 32,
+      fontSize: 34,
       fontWeight: '800',
+      fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif',
       color: colors.text,
-      marginBottom: 20,
+      marginBottom: 8,
+    },
+    dateSubtitle: {
+      fontSize: 16,
+      color: colors.textMuted,
+      marginBottom: 24,
+      fontWeight: '500',
     },
     bodyInput: {
       fontSize: 18,
-      color: colors.textMuted,
+      color: colors.text,
       flex: 1,
       textAlignVertical: 'top',
       lineHeight: 28,
+      paddingBottom: 100, // space for toolbar
+    },
+    
+    // Rich Toolbar
+    toolbarWrapper: {
+      position: 'absolute',
+      bottom: 20,
+      left: 20,
+      right: 20,
+      backgroundColor: '#1C1C1E', // Charcoal dark
+      borderRadius: 24,
+      padding: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.3,
+      shadowRadius: 20,
+      elevation: 10,
+    },
+    toolbarHeader: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginBottom: 12,
+    },
+    toolbarDismiss: {
+       padding: 4,
+    },
+    toolbarRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    toolbarFontSelector: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#2C2C2E',
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 12,
+      gap: 8,
+    },
+    toolbarFontText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    toolbarIconRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-around',
+      gap: 12,
+    },
+    toolbarIconBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 10,
+      backgroundColor: '#2C2C2E',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    toolbarIconBtnActive: {
+      backgroundColor: '#3A3A3C',
+      borderWidth: 1,
+      borderColor: colors.primary,
     },
     
     // Reminder Modal Styles
@@ -283,7 +362,36 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
     createReminderText: {
       fontSize: 18,
       fontWeight: '800',
-      color: '#000000', // Assuming we make it bright
+      color: '#000000', 
+    },
+    // Checklist Styles
+    checklistContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: 4,
+      gap: 12,
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    checkboxChecked: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    checklistText: {
+      fontSize: 18,
+      color: colors.text,
+      flex: 1,
+    },
+    checklistTextDone: {
+      textDecorationLine: 'line-through',
+      color: colors.textMuted,
     }
   });
 };

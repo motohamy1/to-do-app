@@ -63,9 +63,9 @@ const _layout = () => {
         }}
       />
         <Tabs.Screen
-          name="notes"
+          name="add"
           options={{
-            title: 'Notes',
+            title: 'Add',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="add-circle" size={size + 4} color={color} />
             ),

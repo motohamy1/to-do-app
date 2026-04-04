@@ -19,7 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { createProjectsStyles } from '@/assets/styles/projects.styles';
-import { useMutation, useQuery } from 'convex/react';
+import { useOfflineQuery } from '@/hooks/useOfflineQuery';
+import { useOfflineMutation } from '@/hooks/useOfflineMutation';
 import { api } from '@/convex/_generated/api';
 import { Id, Doc } from '@/convex/_generated/dataModel';
 import TodoInput from '@/components/TodoInput';
@@ -102,7 +103,7 @@ const AddSubCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
   const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); setShowCustom(false); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
@@ -159,7 +160,7 @@ const AddCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
   const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); setShowCustom(false); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
@@ -225,7 +226,7 @@ const AddProjectModal = ({ visible, onClose, colors, styles, onAdd }: {
   const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), desc.trim(), icon, color); setName(''); setDesc(''); setShowCustom(false); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
@@ -283,7 +284,7 @@ const AddResourceModal = ({ visible, onClose, colors, styles, onAdd }: {
   const handleAdd = () => { if (!title.trim()) return; onAdd(resType, title.trim(), url.trim() || undefined, note.trim() || undefined); setTitle(''); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
@@ -316,8 +317,8 @@ const CategoriesView = ({ styles, colors, onSelectCategory, onAddCategory, userI
   onAddCategory: () => void;
   userId: Id<'users'> | null;
 }) => {
-  const categories = useQuery(api.projects.getCategories, userId ? { userId } : 'skip');
-  const deleteCategory = useMutation(api.projects.deleteCategory);
+  const categories = useOfflineQuery<any[]>('projects.getCategories', api.projects.getCategories, userId ? { userId } : 'skip');
+  const deleteCategory = useOfflineMutation(api.projects.deleteCategory, "projects:deleteCategory");
   if (!categories) return <View style={styles.emptyContainer}><Ionicons name="hourglass-outline" size={40} color={colors.border} /></View>;
   return (
     <ScrollView contentContainerStyle={styles.categoriesGrid} showsVerticalScrollIndicator={false}>
@@ -370,9 +371,9 @@ const CategoryDetailView = ({
   onDeleteCategory: (id: Id<'projectCategories'>) => void;
   userId: Id<'users'> | null;
 }) => {
-  const subCategories = useQuery(api.projects.getSubCategories, { categoryId });
-  const directProjects = useQuery(api.projects.getProjectsByCategory, { categoryId });
-  const allTodos = useQuery(api.todos.get, userId ? { userId } : 'skip');
+  const subCategories = useOfflineQuery<any[]>('projects.getSubCategories', api.projects.getSubCategories, { categoryId });
+  const directProjects = useOfflineQuery<any[]>('projects.getProjectsByCategory', api.projects.getProjectsByCategory, { categoryId });
+  const allTodos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip');
 
   const getProgress = (projectId: string) => {
     if (!allTodos) return { done: 0, total: 0, pct: 0 };
@@ -479,8 +480,8 @@ const SubCategoryProjectsView = ({
   onDeleteSubCategory: (id: Id<'projectSubCategories'>) => void;
   userId: Id<'users'> | null;
 }) => {
-  const projects = useQuery(api.projects.getProjectsBySubCategory, { subCategoryId });
-  const allTodos = useQuery(api.todos.get, userId ? { userId } : 'skip');
+  const projects = useOfflineQuery<any[]>('projects.getProjectsBySubCategory', api.projects.getProjectsBySubCategory, { subCategoryId });
+  const allTodos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip');
 
   const getProgress = (projectId: string) => {
     if (!allTodos) return { pct: 0 };
@@ -534,21 +535,21 @@ const SubCategoryProjectsView = ({
 // ─── Layer 4: Project Detail View ───────────────────────────────────────────
 
 const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId }: { styles: any; colors: any; projectId: Id<'projects'>, onDeleteProject: (id: Id<'projects'>) => void, userId: Id<'users'> | null }) => {
-  const project = useQuery(api.projects.getProject, { id: projectId });
-  const resources = useQuery(api.projects.getProjectResources, { projectId });
-  const checklists = useQuery(api.projects.getChecklists, { projectId });
-  const linkedTodos = useQuery(api.projects.getTodosByProject, project ? { projectId: project._id } : 'skip');
+  const project = useOfflineQuery<any>('projects.getProject', api.projects.getProject, { id: projectId });
+  const resources = useOfflineQuery<any[]>('projects.getProjectResources', api.projects.getProjectResources, { projectId });
+  const checklists = useOfflineQuery<any[]>('projects.getChecklists', api.projects.getChecklists, { projectId });
+  const linkedTodos = useOfflineQuery<any[]>('projects.getTodosByProject', api.projects.getTodosByProject, project ? { projectId: project._id } : 'skip');
   
-  const addResource = useMutation(api.projects.addResource);
-  const deleteResource = useMutation(api.projects.deleteResource);
-  const updateTodoStatus = useMutation(api.todos.updateStatus);
-  const updateProject = useMutation(api.projects.updateProject);
-  const addCheckItem = useMutation(api.projects.addChecklistItem);
-  const toggleCheckItem = useMutation(api.projects.toggleChecklistItem);
-  const deleteCheckItem = useMutation(api.projects.deleteChecklistItem);
-  const setTimerMutation = useMutation(api.todos.setTimer);
-  const linkProjectMutation = useMutation(api.todos.linkProject);
-  const deleteTodoMutation = useMutation(api.todos.deleteTodo);
+  const addResource = useOfflineMutation(api.projects.addResource, "projects:addResource");
+  const deleteResource = useOfflineMutation(api.projects.deleteResource, "projects:deleteResource");
+  const updateTodoStatus = useOfflineMutation(api.todos.updateStatus, "todos:updateStatus");
+  const updateProject = useOfflineMutation(api.projects.updateProject, "projects:updateProject");
+  const addCheckItem = useOfflineMutation(api.projects.addChecklistItem, "projects:addChecklistItem");
+  const toggleCheckItem = useOfflineMutation(api.projects.toggleChecklistItem, "projects:toggleChecklistItem");
+  const deleteCheckItem = useOfflineMutation(api.projects.deleteChecklistItem, "projects:deleteChecklistItem");
+  const setTimerMutation = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
+  const linkProjectMutation = useOfflineMutation(api.todos.linkProject, "todos:linkProject");
+  const deleteTodoMutation = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
 
   const [tasksOpen, setTasksOpen] = useState(true);
   const [checklistOpen, setChecklistOpen] = useState(true);
@@ -839,12 +840,12 @@ const Projects: React.FC = () => {
   const [showAddSub, setShowAddSub] = useState(false);
   const [showAddProj, setShowAddProj] = useState(false);
 
-  const addCat = useMutation(api.projects.addCategory);
-  const addSub = useMutation(api.projects.addSubCategory);
-  const addProj = useMutation(api.projects.addProject);
-  const deleteCatMutation = useMutation(api.projects.deleteCategory);
-  const deleteSubCatMutation = useMutation(api.projects.deleteSubCategory);
-  const deleteProjMutation = useMutation(api.projects.deleteProject);
+  const addCat = useOfflineMutation(api.projects.addCategory, "projects:addCategory");
+  const addSub = useOfflineMutation(api.projects.addSubCategory, "projects:addSubCategory");
+  const addProj = useOfflineMutation(api.projects.addProject, "projects:addProject");
+  const deleteCatMutation = useOfflineMutation(api.projects.deleteCategory, "projects:deleteCategory");
+  const deleteSubCatMutation = useOfflineMutation(api.projects.deleteSubCategory, "projects:deleteSubCategory");
+  const deleteProjMutation = useOfflineMutation(api.projects.deleteProject, "projects:deleteProject");
 
   const handleBack = () => {
     if (layer === 'detail') {

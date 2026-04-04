@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Platform, LayoutAnimation, ActivityIndicator, KeyboardAvoidingView, Alert } from 'react-native';
 import useTheme from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery } from 'convex/react';
+import { useOfflineQuery } from '@/hooks/useOfflineQuery';
+import { useOfflineMutation } from '@/hooks/useOfflineMutation';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,17 +27,17 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const [todoStack, setTodoStack] = useState<Id<"todos">[]>([]);
   const currentTodoId = todoStack.length > 0 ? todoStack[todoStack.length - 1] : todoId;
 
-  const todo = useQuery(api.todos.getById, currentTodoId ? { id: currentTodoId } : "skip");
-  const subtasks = useQuery(api.todos.getSubtasks, currentTodoId ? { parentId: currentTodoId } : "skip");
-  const project = useQuery(api.projects.getProjectMetadata, todo?.projectId ? { id: todo.projectId } : "skip");
+  const todo = useOfflineQuery<any>('todos.getById', api.todos.getById, currentTodoId ? { id: currentTodoId } : "skip");
+  const subtasks = useOfflineQuery<any[]>('todos.getSubtasks', api.todos.getSubtasks, currentTodoId ? { parentId: currentTodoId } : "skip");
+  const project = useOfflineQuery<any>('projects.getProjectMetadata', api.projects.getProjectMetadata, todo?.projectId ? { id: todo.projectId } : "skip");
 
-  const updateTodo = useMutation(api.todos.updateTodo);
-  const updateStatus = useMutation(api.todos.updateStatus);
-  const setTimer = useMutation(api.todos.setTimer);
-  const startTimer = useMutation(api.todos.startTimer);
-  const pauseTimer = useMutation(api.todos.pauseTimer);
-  const addTodo = useMutation(api.todos.addTodo);
-  const deleteTodo = useMutation(api.todos.deleteTodo);
+  const updateTodo = useOfflineMutation(api.todos.updateTodo, "todos:updateTodo");
+  const updateStatus = useOfflineMutation(api.todos.updateStatus, "todos:updateStatus");
+  const setTimer = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
+  const startTimer = useOfflineMutation(api.todos.startTimer, "todos:startTimer");
+  const pauseTimer = useOfflineMutation(api.todos.pauseTimer, "todos:pauseTimer");
+  const addTodo = useOfflineMutation(api.todos.addTodo, "todos:addTodo");
+  const deleteTodo = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
 
   const [editText, setEditText] = useState("");
   const [description, setDescription] = useState("");
@@ -427,7 +428,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     >
                       <Ionicons name={todo!.status === 'in_progress' ? "pause" : "play"} size={22} color={isDarkMode ? "#000" : "#FFF"} />
                       <Text style={[styles.mainControlButtonText, { color: isDarkMode ? "#000" : "#FFF" }]}>
-                        {todo!.status === 'in_progress' ? (isArabic ? 'إيقاف' : 'Pause Task') : (isArabic ? 'ابدأ المهمة' : 'Start Task')}
+                        {todo!.status === 'in_progress' ? (isArabic ? 'إيقاف' : 'Pause Task') : todo!.status === 'paused' ? (isArabic ? 'استئناف المهمة' : 'Resume Task') : (isArabic ? 'ابدأ المهمة' : 'Start Task')}
                       </Text>
                     </TouchableOpacity>
                     

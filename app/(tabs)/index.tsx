@@ -1,7 +1,8 @@
 import { createHomeStyles } from "@/assets/styles/home.styles";
 import useTheme from "@/hooks/useTheme";
-import { useMutation, useQuery } from "convex/react";
 import { Ionicons } from '@expo/vector-icons';
+import { useOfflineQuery } from "@/hooks/useOfflineQuery";
+import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import React, { useState, useMemo, useRef } from 'react';
 
 import { StatusBar, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
@@ -22,11 +23,11 @@ import { useTranslation } from "@/utils/i18n";
 const index = () => {
     const { userId, language } = useAuth();
     const { t, isArabic } = useTranslation(language);
-    const todos = useQuery(api.todos.get, userId ? { userId } : "skip");
-    const deleteTodo = useMutation(api.todos.deleteTodo);
+    const todos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : "skip");
+    const deleteTodo = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
     const router = useRouter();
-    const setTimerMutation = useMutation(api.todos.setTimer);
-    const linkProject = useMutation(api.todos.linkProject);
+    const setTimerMutation = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
+    const linkProject = useOfflineMutation(api.todos.linkProject, "todos:linkProject");
     const { colors, isDarkMode } = useTheme();
 
     const [isTimerModalVisible, setTimerModalVisible] = useState(false);

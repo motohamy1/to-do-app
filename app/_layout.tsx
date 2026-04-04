@@ -12,12 +12,14 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 import { LayoutAnimation, Platform, UIManager } from "react-native";
 import { requestPermissionsAsync, scheduleDailyReminders } from "@/utils/notifications";
+import { useSyncManager } from "@/hooks/useSyncManager";
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
 function RootLayoutContent() {
+  useSyncManager();
   const { isLoading } = useAuth();
 
   useEffect(() => {

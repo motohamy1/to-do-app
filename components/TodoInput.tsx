@@ -2,7 +2,7 @@ import { createHomeStyles } from "@/assets/styles/home.styles";
 import { api } from "@/convex/_generated/api";
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation } from "convex/react";
+import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import { useState, useEffect } from "react";
 import { Alert, TextInput, TouchableOpacity, View, Text, Platform } from "react-native";
 import TimerModal from "./TimerModal";
@@ -47,7 +47,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
     }
   }, [initialDate]);
 
-  const addTodo = useMutation(api.todos.addTodo);
+  const addTodo = useOfflineMutation(api.todos.addTodo, "todos:addTodo");
 
   const handleAddTodo = async () => {
     if (!userId) {

@@ -99,8 +99,34 @@ export const updateStatus = mutation({
   args: { id: v.id("todos"), status: v.string() },
   handler: async (ctx, args) => {
     const todo = await ctx.db.get(args.id);
-    if (todo) {
-      await ctx.db.patch(args.id, { status: args.status });
+    if (!todo) return;
+    
+    await ctx.db.patch(args.id, { status: args.status });
+
+    // If a parent is marked done or not_done or paused, cascade to subtasks.
+    if (args.status === "done" || args.status === "not_done" || args.status === "paused" || args.status === "not_started") {
+      const subtasks = await ctx.db
+        .query("todos")
+        .withIndex("by_parent", (q) => q.eq("parentId", args.id))
+        .collect();
+      
+      for (const sub of subtasks) {
+        if (sub.status === "in_progress") {
+          // If pausing parent, pause running subtasks
+          if (args.status === "paused") {
+            if (sub.timerStartTime && sub.timerDuration) {
+              const subElapsed = Date.now() - sub.timerStartTime;
+              const subRemaining = Math.max(0, sub.timerDuration - subElapsed);
+              await ctx.db.patch(sub._id, { status: "paused", timeLeftAtPause: subRemaining });
+            } else {
+              await ctx.db.patch(sub._id, { status: "paused" });
+            }
+          } else {
+            // For done/not_done/not_started, just align status
+            await ctx.db.patch(sub._id, { status: args.status });
+          }
+        }
+      }
     }
   },
 });
@@ -175,6 +201,23 @@ export const pauseTimer = mutation({
       status: "paused",
       timeLeftAtPause: remaining
     });
+
+    // Cascade pause to any running subtasks
+    const subtasks = await ctx.db
+      .query("todos")
+      .withIndex("by_parent", (q) => q.eq("parentId", args.id))
+      .collect();
+
+    for (const sub of subtasks) {
+      if (sub.status === "in_progress" && sub.timerStartTime && sub.timerDuration) {
+        const subElapsed = Date.now() - sub.timerStartTime;
+        const subRemaining = Math.max(0, sub.timerDuration - subElapsed);
+        await ctx.db.patch(sub._id, {
+          status: "paused",
+          timeLeftAtPause: subRemaining
+        });
+      }
+    }
   }
 });
 

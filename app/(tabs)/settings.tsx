@@ -4,11 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
 import { createSettingsStyles } from '@/assets/styles/settings.styles';
-import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-
+import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import { useAuth } from '@/hooks/useAuth';
 import { useMutation } from 'convex/react';
+import { useOfflineMutation } from '@/hooks/useOfflineMutation';
 import { useRouter } from 'expo-router';
 import { useTranslation } from '@/utils/i18n';
 import * as ImagePicker from 'expo-image-picker';
@@ -20,8 +20,8 @@ const Settings = () => {
   const styles = createSettingsStyles(colors, isArabic);
   const router = useRouter();
   
-  const userSettings = useQuery(api.auth.getUserSettings, userId ? { userId } : "skip");
-  const updateSettings = useMutation(api.auth.updateSettings);
+  const userSettings = useOfflineQuery<any>('auth.getUserSettings', api.auth.getUserSettings, userId ? { userId } : "skip");
+  const updateSettings = useOfflineMutation(api.auth.updateSettings, "auth:updateSettings");
   const generateUploadUrl = useMutation(api.auth.generateUploadUrl);
   const updateProfilePicture = useMutation(api.auth.updateProfilePicture);
 
@@ -97,8 +97,8 @@ const Settings = () => {
     }
   };
 
-  const todos = useQuery(api.todos.get, userId ? { userId } : "skip") || [];
-  const projects = useQuery(api.projects.getCategories, userId ? { userId } : "skip") || [];
+  const todos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : "skip") || [];
+  const projects = useOfflineQuery<any[]>('projects.getCategories', api.projects.getCategories, userId ? { userId } : "skip") || [];
 
   const handleToggleNotifications = async () => {
     if (!userId || !userSettings) return;

@@ -2,7 +2,8 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, TextInput, LayoutAnimation, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
-import { useMutation, useQuery } from 'convex/react';
+import { useOfflineQuery } from '@/hooks/useOfflineQuery';
+import { useOfflineMutation } from '@/hooks/useOfflineMutation';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import CircularProgress from './CircularProgress';
@@ -204,7 +205,7 @@ const SubtaskRow = ({
   const [subTimeLeft, setSubTimeLeft] = useState(sub.timerDuration || 0);
 
   // Compute remaining budget for this subtask's timer picker
-  const subtasks = useQuery(api.todos.getSubtasks, sub.parentId ? { parentId: sub.parentId } : "skip");
+  const subtasks = useOfflineQuery<any[]>('todos.getSubtasks', api.todos.getSubtasks, sub.parentId ? { parentId: sub.parentId } : "skip");
   const remainingBudget = useMemo(() => {
     if (!parentTimerDuration || !subtasks) return undefined;
     const otherSubsDuration = subtasks
@@ -422,15 +423,15 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const { colors, isDarkMode } = useTheme();
   const { userId, language } = useAuth();
   const { t, isArabic } = useTranslation(language);
-  const updateStatus = useMutation(api.todos.updateStatus);
-  const startTimer = useMutation(api.todos.startTimer);
-  const pauseTimer = useMutation(api.todos.pauseTimer);
-  const startSubtaskTimer = useMutation(api.todos.startSubtaskTimer);
-  const pauseSubtaskTimer = useMutation(api.todos.pauseSubtaskTimer);
-  const deleteTodo = useMutation(api.todos.deleteTodo);
-  const updateTodo = useMutation(api.todos.updateTodo);
-  const setTimer = useMutation(api.todos.setTimer);
-  const addTodo = useMutation(api.todos.addTodo);
+  const updateStatus = useOfflineMutation(api.todos.updateStatus, "todos:updateStatus");
+  const startTimer = useOfflineMutation(api.todos.startTimer, "todos:startTimer");
+  const pauseTimer = useOfflineMutation(api.todos.pauseTimer, "todos:pauseTimer");
+  const startSubtaskTimer = useOfflineMutation(api.todos.startSubtaskTimer, "todos:startSubtaskTimer");
+  const pauseSubtaskTimer = useOfflineMutation(api.todos.pauseSubtaskTimer, "todos:pauseSubtaskTimer");
+  const deleteTodo = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
+  const updateTodo = useOfflineMutation(api.todos.updateTodo, "todos:updateTodo");
+  const setTimer = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
+  const addTodo = useOfflineMutation(api.todos.addTodo, "todos:addTodo");
 
   // Main task edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -438,8 +439,8 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const [showTimerPicker, setShowTimerPicker] = useState(false);
 
   // Subtask state
-  const project = useQuery(api.projects.getProjectMetadata, todo.projectId ? { id: todo.projectId } : "skip");
-  const subtasks = useQuery(api.todos.getSubtasks, { parentId: todo._id });
+  const project = useOfflineQuery<any>('projects.getProjectMetadata', api.projects.getProjectMetadata, todo.projectId ? { id: todo.projectId } : "skip");
+  const subtasks = useOfflineQuery<any[]>('todos.getSubtasks', api.todos.getSubtasks, { parentId: todo._id });
 
   const [timeLeft, setTimeLeft] = useState(todo.timerDuration || 0);
 
@@ -494,7 +495,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
       if (totalSubtasks > 0 && completedSubtasks === totalSubtasks && todo.status !== 'done') {
         updateStatus({ id: todo._id, status: 'done' });
       } else if (completedSubtasks < totalSubtasks && todo.status === 'done') {
-        updateStatus({ id: todo._id, status: 'in_progress' });
+        updateStatus({ id: todo._id, status: 'not_started' });
       }
     }
 
@@ -656,11 +657,16 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     : colors.surfaceText + '40';
 
   // Are any subtasks currently running?
-  const anySubtaskRunning = hasSubtasks && subtasks.some((s: any) => s.status === 'in_progress');
+  const anySubtaskRunning = hasSubtasks && subtasks.some((s: any) => s.status === 'in_progress' && !!s.timerDuration);
 
   const coreCard = (
     <>
-      <View style={[homeStyles.card, { overflow: 'hidden', position: 'relative', backgroundColor: cardBg, padding: isTimelineMode ? 16 : 12 }]}>
+      <TouchableOpacity 
+        activeOpacity={0.95}
+        onPress={() => { if (!isEditing) setIsDetailModalVisible(true); }}
+        onLongPress={() => { if (!isEditing) onLongPress(todo._id); }}
+        style={[homeStyles.card, { overflow: 'hidden', position: 'relative', backgroundColor: cardBg, padding: isTimelineMode ? 16 : 12 }]}
+      >
         {/* Color bar indicator for timeline mode based on priority */}
         {isTimelineMode && (
           <View style={{
@@ -726,9 +732,9 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                   </TouchableOpacity>
                 </View>
               ) : (
-                <TouchableOpacity onPress={() => setIsDetailModalVisible(true)} onLongPress={() => onLongPress(todo._id)}>
+                <View>
                   <Text style={[homeStyles.cardTitle, { marginBottom: 10, color: colors.surfaceText }, isArabic && { textAlign: 'right' }]} numberOfLines={2}>{todo.text}</Text>
-                </TouchableOpacity>
+                </View>
               )}
 
 
@@ -994,7 +1000,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
             </View>
           )}
         </View>
-      </View>
+      </TouchableOpacity>
   </>);
 
   if (isTimelineMode) {

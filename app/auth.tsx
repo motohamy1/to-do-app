@@ -150,7 +150,7 @@ const AuthScreen = () => {
                 {loading ? (
                   <ActivityIndicator color="#FFF" />
                 ) : (
-                  <Text style={styles.buttonText}>{isLogin ? (isArabic ? 'تسجيل الدخول' : 'Sign In') : (isArabic ? 'إنشاء حساب' : 'Sign Up')}</Text>
+                  <Text style={[styles.buttonText, { color: isDarkMode ? '#000' : '#FFF' }]}>{isLogin ? (isArabic ? 'تسجيل الدخول' : 'Sign In') : (isArabic ? 'إنشاء حساب' : 'Sign Up')}</Text>
                 )}
               </TouchableOpacity>
  
