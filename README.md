@@ -1,50 +1,55 @@
-# Welcome to your Expo app 👋
+# ✨ To-Do & Reminders App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Welcome to our modern, distraction-free **To-Do & Reminders** application! Built with Expo and React Native, this app is designed to help you capture your thoughts and stay on top of your schedule with ease.
 
-## Get started
+## 🚀 Key Features
 
-1. Install dependencies
+- **Quick Reminders:** Easily add reminders with specific dates and times using a focused, intuitive interface.
+- **Smart Notes:** Capture detailed notes and keep them organized.
+- **Seamless Sync:** Powered by **Convex**, your data stays in sync across sessions.
+- **Modern UI/UX:** Enjoy a smooth experience with Reanimated transitions, haptic feedback, and a clean layout.
+- **Native Experience:** Optimized for both iOS and Android with platform-specific refinements.
 
-   ```bash
-   npm install
-   ```
+## 🛠 Tech Stack
 
-2. Start the app
+- **Framework:** [Expo](https://expo.dev) & [React Native](https://reactnative.dev)
+- **Navigation:** [Expo Router](https://docs.expo.dev/router/introduction/) (File-based routing)
+- **Backend:** [Convex](https://www.convex.dev/) (Real-time database & functions)
+- **Animations:** [React Native Reanimated](https://docs.swmansion.com/react-native-reanimated/)
+- **Styling:** Native Flexbox & Expo Linear Gradient
 
-   ```bash
-   npx expo start
-   ```
+## 🏁 Getting Started
 
-In the output, you'll find options to open the app in a
+### 1. Prerequisites
+Ensure you have Node.js installed and the Expo Go app on your mobile device.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+### 2. Installation
+Clone the repository and install dependencies:
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 3. Setup Convex
+This app uses Convex for its backend. If you haven't set it up yet:
+```bash
+npx convex dev
+```
 
-## Learn more
+### 4. Run the App
+Start the development server:
+```bash
+npx expo start
+```
+Scan the QR code with your camera (iOS) or Expo Go app (Android) to see it in action!
 
-To learn more about developing your project with Expo, look at the following resources:
+## 📂 Project Structure
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- `app/`: Contains the main screens and file-based routes.
+- `components/`: Reusable UI components.
+- `convex/`: Backend schema and functions.
+- `hooks/`: Custom React hooks for shared logic.
+- `utils/`: Helper functions and constants.
 
-## Join the community
+---
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Built with ❤️ for productivity.
