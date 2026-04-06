@@ -19,6 +19,7 @@ export default defineSchema({
     isCompleted: v.optional(v.boolean()), 
     status: v.optional(v.string()), 
     timerDuration: v.optional(v.number()), 
+    timerDirection: v.optional(v.string()), // 'up' | 'down'
     timerStartTime: v.optional(v.number()), 
     timeLeftAtPause: v.optional(v.number()), 
     dueDate: v.optional(v.number()), 

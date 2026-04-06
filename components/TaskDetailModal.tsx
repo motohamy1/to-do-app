@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/utils/i18n';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Svg, { Circle, Path, G, Text as SvgText } from 'react-native-svg';
+import { SubtaskRow } from './SubtaskRow';
 
 
 interface TaskDetailModalProps {
@@ -23,10 +24,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const { userId, language } = useAuth();
   const { t, isArabic } = useTranslation(language);
 
-  // Stack navigation for subtasks
-  const [todoStack, setTodoStack] = useState<Id<"todos">[]>([]);
-  const currentTodoId = todoStack.length > 0 ? todoStack[todoStack.length - 1] : todoId;
-
+  const currentTodoId = todoId;
   const todo = useOfflineQuery<any>('todos.getById', api.todos.getById, currentTodoId ? { id: currentTodoId } : "skip");
   const subtasks = useOfflineQuery<any[]>('todos.getSubtasks', api.todos.getSubtasks, currentTodoId ? { parentId: currentTodoId } : "skip");
   const project = useOfflineQuery<any>('projects.getProjectMetadata', api.projects.getProjectMetadata, todo?.projectId ? { id: todo.projectId } : "skip");
@@ -91,29 +89,16 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   }, [todo?._id]);
 
   useEffect(() => {
-    if (visible && todoId && todoStack.length === 0) {
-      setTodoStack([todoId]);
-    }
+    // Left empty since we removed todoStack
   }, [visible, todoId]);
 
   const handleClose = () => {
-    setTodoStack([]);
     setInitializedForId(null);
     onClose();
   };
 
   const handleBack = () => {
-    if (todoStack.length > 1) {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setTodoStack(prev => prev.slice(0, -1));
-    } else {
-      handleClose();
-    }
-  };
-
-  const navigateToSubtask = (id: Id<"todos">) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setTodoStack(prev => [...prev, id]);
+    handleClose();
   };
 
   const saveText = () => {
@@ -152,6 +137,18 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
     const usedDuration = subtasks.reduce((sum: number, s: any) => sum + (s.timerDuration || 0), 0);
     return Math.max(0, todo.timerDuration - usedDuration);
   }, [todo?.timerDuration, subtasks]);
+
+  // Subtask handlers for SubtaskRow
+  const handleStartSubtask = (id: Id<"todos">) => startTimer({ id });
+  const handlePauseSubtask = (id: Id<"todos">) => pauseTimer({ id });
+  const handleToggleSubComplete = (id: Id<"todos">, currentStatus: string) => 
+    updateStatus({ id, status: currentStatus === 'done' ? 'not_started' : 'done' });
+  const handleDeleteSub = (id: Id<"todos">) => deleteTodo({ id });
+  const handleSetSubTimer = (id: Id<"todos">, ms: number, direction: string) => 
+    setTimer({ id, duration: ms, timerDirection: direction });
+  const handleUpdateSubText = (id: Id<"todos">, text: string) => 
+    updateTodo({ id, text });
+
 
   const handleAddSubtask = () => {
     if (newSubtaskText.trim() && userId && currentTodoId) {
@@ -216,23 +213,15 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
             style={{ flex: 1 }}
           >
             {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.border + '40' }, isArabic && { flexDirection: 'row-reverse' }]}>
+           <View style={[styles.header, { borderBottomColor: colors.border + '40' }, isArabic && { flexDirection: 'row-reverse' }]}>
             <TouchableOpacity onPress={handleBack} style={styles.headerIcon}>
-              <Ionicons name={todoStack.length > 1 ? (isArabic ? "chevron-forward" : "chevron-back") : "close"} size={26} color={colors.text} />
+              <Ionicons name={"close"} size={26} color={colors.text} />
             </TouchableOpacity>
             
             <View style={{ flex: 1, alignItems: 'center' }}>
                <View style={[styles.breadcrumb, isArabic && { flexDirection: 'row-reverse' }]}>
-                 {todoStack.length > 1 && (
-                   <>
-                     <Text style={[styles.breadcrumbText, { color: colors.textMuted }]} numberOfLines={1}>
-                       {isArabic ? "المهمة الأساسية" : "Parent"}
-                     </Text>
-                     <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={12} color={colors.textMuted} />
-                   </>
-                 )}
                  <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-                   {todoStack.length > 1 ? (isArabic ? "تفاصيل فرعية" : "Subtask") : (isArabic ? "تفاصيل المهمة" : "Task Details")}
+                   {isArabic ? "تفاصيل المهمة" : "Task Details"}
                  </Text>
                </View>
             </View>
@@ -541,22 +530,20 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                   </Text>
                 </View>
                 
-                <View style={styles.subtaskList}>
+                <View style={[styles.subtaskList, { gap: 10 }]}>
                   {subtasks?.map((sub) => (
-                    <TouchableOpacity 
-                       key={sub._id} 
-                       style={[styles.subtaskItem, { backgroundColor: colors.surface, borderColor: colors.border + '40' }, isArabic && { flexDirection: 'row-reverse' }]}
-                       onPress={() => navigateToSubtask(sub._id)}
-                    >
-                      <Ionicons name={sub.status === 'done' ? "checkmark-circle" : "ellipse-outline"} size={20} color={sub.status === 'done' ? colors.success : colors.textMuted} />
-
-                      <Text style={[styles.subtaskText, { color: sub.status === 'done' ? colors.textMuted : colors.text }, isArabic && { textAlign: 'right' }]} numberOfLines={1}>
-
-                        {sub.text}
-                      </Text>
-                      <Ionicons name={isArabic ? "chevron-back" : "chevron-forward"} size={16} color={colors.textMuted} />
-
-                    </TouchableOpacity>
+                    <SubtaskRow
+                      key={sub._id}
+                      sub={sub}
+                      parentTimerDuration={todo?.timerDuration}
+                      onStartSubtask={handleStartSubtask}
+                      onPauseSubtask={handlePauseSubtask}
+                      onToggleComplete={handleToggleSubComplete}
+                      onDelete={handleDeleteSub}
+                      onSetTimer={handleSetSubTimer}
+                      onUpdateText={handleUpdateSubText}
+                      onUpdateStatus={(id, status) => updateStatus({ id, status })}
+                    />
                   ))}
 
                   <View style={[{ backgroundColor: colors.surface, borderRadius: 20, borderWidth: 1, borderColor: projectColor + '30', overflow: 'hidden' }]}>

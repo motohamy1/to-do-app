@@ -31,6 +31,9 @@ import ActionModal from '@/components/ActionModal';
 import TimerModal from '@/components/TimerModal';
 import ProjectPickerModal from '@/components/ProjectPickerModal';
 import { createHomeStyles } from '@/assets/styles/home.styles';
+import { useScreenGuide } from '@/hooks/useScreenGuide';
+import ScreenGuide from '@/components/ScreenGuide';
+import type { GuideTip } from '@/components/ScreenGuide';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -920,7 +923,20 @@ type Layer = 'categories' | 'categoryDetail' | 'subCategoryProjects' | 'detail';
 const Projects: React.FC = () => {
   const { colors } = useTheme();
   const { userId } = useAuth();
+  const { language } = useAuth();
+  const { isArabic } = useTranslation(language);
   const styles = createProjectsStyles(colors);
+  const { showGuide, dismissGuide } = useScreenGuide('projects');
+
+  const projectsTips: GuideTip[] = isArabic ? [
+    { icon: 'folder-outline', title: 'أنشئ فئة', description: 'اضغط "+ إضافة فئة" لتنظيم مشاريعك في مجموعات.', accentColor: '#7C5CFF' },
+    { icon: 'rocket-outline', title: 'أضف مشروع', description: 'ادخل أي فئة واضغط "+ مشروع" لإضافة مشروع جديد.', accentColor: '#00E096' },
+    { icon: 'layers-outline', title: 'فئات فرعية', description: 'أضف فئات فرعية لتنظيم أعمق داخل كل فئة.', accentColor: '#FFAB00' },
+  ] : [
+    { icon: 'folder-outline', title: 'Create a Category', description: 'Tap "+ Add Category" to organize your projects into groups.', accentColor: '#7C5CFF' },
+    { icon: 'rocket-outline', title: 'Add a Project', description: 'Enter any category and tap "+ Add" to create a new project.', accentColor: '#00E096' },
+    { icon: 'layers-outline', title: 'Sub-Categories', description: 'Add sub-categories for deeper organization inside each category.', accentColor: '#FFAB00' },
+  ];
 
   const [layer, setLayer] = useState<Layer>('categories');
   const [selectedCatId, setSelectedCatId] = useState<Id<'projectCategories'> | null>(null);
@@ -1054,6 +1070,8 @@ const Projects: React.FC = () => {
         isArabic={false} // Use state if needed, but categories usually en
         options={actionConfig?.options || []}
       />
+
+      <ScreenGuide visible={showGuide} tips={projectsTips} onDismiss={dismissGuide} isArabic={isArabic} />
     </View>
   );
 };

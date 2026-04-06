@@ -11,14 +11,18 @@ import { scheduleTimerNotification, cancelNotification } from '@/utils/notificat
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/utils/i18n';
 import TaskDetailModal from './TaskDetailModal';
+import { InlineTimerPicker } from './InlineTimerPicker';
+import { SubtaskRow } from './SubtaskRow';
 
 
 interface TodoCardProps {
   todo: {
     _id: Id<"todos">;
+    _creationTime?: number;
     text: string;
     status: string;
     timerDuration?: number;
+    timerDirection?: string;
     timerStartTime?: number;
     timeLeftAtPause?: number;
     dueDate?: number;
@@ -40,117 +44,7 @@ interface TodoCardProps {
   isTimelineMode?: boolean;
 }
 
-// ─── Inline Timer Picker ─────────────────────────────────────────────────────
-const InlineTimerPicker = ({
-  initialMs,
-  onSave,
-  onCancel,
-  maxMs,
-  colors,
-  t,
-  isArabic
-}: {
-  initialMs?: number;
-  onSave: (ms: number) => void;
-  onCancel: () => void;
-  maxMs?: number;
-  colors: any;
-  t: any;
-  isArabic: boolean;
-}) => {
-  const { isDarkMode } = useTheme();
-  const init = initialMs || 0;
-  const [hours, setHours] = useState(String(Math.floor(init / 3600000)));
-  const [minutes, setMinutes] = useState(String(Math.floor((init % 3600000) / 60000)));
-
-  const handleSave = () => {
-    const h = parseInt(hours) || 0;
-    const m = parseInt(minutes) || 0;
-    const ms = (h * 3600 + m * 60) * 1000;
-    if (ms <= 0) {
-      Alert.alert(t.invalidTimer, t.setTimerGreater);
-      return;
-    }
-    if (maxMs !== undefined && maxMs > 0 && ms > maxMs) {
-      const availH = Math.floor(maxMs / 3600000);
-      const availM = Math.floor((maxMs % 3600000) / 60000);
-      Alert.alert(t.timerTooLong, `${t.timerExceed} ${availH > 0 ? availH + (isArabic ? 'س ' : 'h ') : ''}${availM}${isArabic ? 'د' : 'm'} (${t.budgetAvailable}).`);
-      return;
-    }
-    onSave(ms);
-  };
-
-  return (
-    <View style={[{ marginTop: 4, padding: 12, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.primary + '30', gap: 12 }, isArabic && { direction: 'rtl' }]}>
-      {maxMs !== undefined && maxMs > 0 && (
-        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 4 }, isArabic && { flexDirection: 'row-reverse' }]}>
-          <Ionicons name="information-circle-outline" size={14} color={colors.warning} />
-          <Text style={[{ color: colors.warning, fontSize: 11, fontWeight: '700' }, isArabic && { textAlign: 'right' }]}>
-            {t.budget}: {Math.floor(maxMs / 3600000) > 0 ? Math.floor(maxMs / 3600000) + (isArabic ? 'س ' : 'h ') : ''}{Math.floor((maxMs % 3600000) / 60000)}{isArabic ? 'د' : 'm'} {t.available}
-          </Text>
-        </View>
-      )}
-      {/* Duration row */}
-      <View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
-        {/* Hours */}
-        <View style={{ alignItems: 'center', gap: 4 }}>
-          <View style={{ backgroundColor: colors.surfaceText + '08', borderWidth: 1.5, borderColor: colors.surfaceText + '20', borderRadius: 10, width: 64, height: 52, justifyContent: 'center', alignItems: 'center' }}>
-            <TextInput
-              style={{ color: colors.surfaceText, fontSize: 22, fontWeight: '800', textAlign: 'center', width: '100%', padding: 0 }}
-              keyboardType="numeric"
-              value={hours}
-              onChangeText={setHours}
-              maxLength={2}
-              selectTextOnFocus
-              placeholder="0"
-              placeholderTextColor={colors.surfaceText + '40'}
-              underlineColorAndroid="transparent"
-            />
-          </View>
-          <Text style={{ color: colors.surfaceText + '60', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>{t.hours}</Text>
-        </View>
-
-        <Text style={{ color: colors.surfaceText, fontWeight: '800', fontSize: 24, marginBottom: 18 }}>:</Text>
-
-        {/* Minutes */}
-        <View style={{ alignItems: 'center', gap: 4 }}>
-          <View style={{ backgroundColor: colors.surfaceText + '08', borderWidth: 1.5, borderColor: colors.surfaceText + '20', borderRadius: 10, width: 64, height: 52, justifyContent: 'center', alignItems: 'center' }}>
-            <TextInput
-              style={{ color: colors.surfaceText, fontSize: 22, fontWeight: '800', textAlign: 'center', width: '100%', padding: 0 }}
-              keyboardType="numeric"
-              value={minutes}
-              onChangeText={setMinutes}
-              maxLength={2}
-              selectTextOnFocus
-              placeholder="0"
-              placeholderTextColor={colors.surfaceText + '40'}
-              underlineColorAndroid="transparent"
-            />
-          </View>
-          <Text style={{ color: colors.surfaceText + '60', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>{t.minutes}</Text>
-        </View>
-      </View>
-
-      {/* Action buttons */}
-      <View style={[{ flexDirection: 'row', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
-        <TouchableOpacity
-          onPress={handleSave}
-          style={[{ flex: 1, backgroundColor: colors.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }, isArabic && { flexDirection: 'row-reverse' }]}
-        >
-          <Text style={{ color: isDarkMode ? '#000' : '#FFF', fontWeight: '800', fontSize: 14 }}>✓ {t.setTimer}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={onCancel}
-          style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}
-        >
-          <Text style={{ color: colors.textMuted, fontWeight: '700', fontSize: 14 }}>{t.cancel}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
-
-// ─── Helper: format ms to HH:MM:SS or MM:SS ────────────────────────────────
+// ─── Formatting Helpers ──────────────────────────────────────────────────
 const formatTime = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000);
   const hours = Math.floor(totalSeconds / 3600);
@@ -160,7 +54,6 @@ const formatTime = (ms: number) => {
   return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 };
 
-// ─── Helper: format ms to compact "1h 30m" ──────────────────────────────────
 const formatDuration = (ms: number) => {
   const h = Math.floor(ms / 3600000);
   const m = Math.floor((ms % 3600000) / 60000);
@@ -170,253 +63,8 @@ const formatDuration = (ms: number) => {
 };
 
 // ─── Subtask Row Component ───────────────────────────────────────────────────
-const SubtaskRow = ({
-  sub,
-  parentTimerDuration,
-  colors,
-  isDarkMode,
-  homeStyles,
-  onStartSubtask,
-  onPauseSubtask,
-  onToggleComplete,
-  onDelete,
-  onSetTimer,
-  onUpdateText,
-  onUpdateStatus,
-}: {
-  sub: any;
-  parentTimerDuration?: number;
-  colors: any;
-  isDarkMode: boolean;
-  homeStyles: any;
-  onStartSubtask: (id: Id<"todos">) => void;
-  onPauseSubtask: (id: Id<"todos">) => void;
-  onToggleComplete: (id: Id<"todos">, currentStatus: string) => void;
-  onDelete: (id: Id<"todos">) => void;
-  onSetTimer: (id: Id<"todos">, ms: number) => void;
-  onUpdateText: (id: Id<"todos">, text: string) => void;
-  onUpdateStatus: (id: Id<"todos">, status: string) => void;
-}) => {
-  const { language } = useAuth();
-  const { t, isArabic } = useTranslation(language);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(sub.text);
-  const [showTimerPicker, setShowTimerPicker] = useState(false);
-  const [subTimeLeft, setSubTimeLeft] = useState(sub.timerDuration || 0);
+// --- Component removed and moved to SubtaskRow.tsx ---
 
-  // Compute remaining budget for this subtask's timer picker
-  const subtasks = useOfflineQuery<any[]>('todos.getSubtasks', api.todos.getSubtasks, sub.parentId ? { parentId: sub.parentId } : "skip");
-  const remainingBudget = useMemo(() => {
-    if (!parentTimerDuration || !subtasks) return undefined;
-    const otherSubsDuration = subtasks
-      .filter((s: any) => s._id !== sub._id)
-      .reduce((sum: number, s: any) => sum + (s.timerDuration || 0), 0);
-    return Math.max(0, parentTimerDuration - otherSubsDuration);
-  }, [parentTimerDuration, subtasks, sub._id]);
-
-  // Live countdown for running subtasks
-  useEffect(() => {
-    if (sub.status === 'in_progress' && sub.timerStartTime && sub.timerDuration) {
-      const calc = () => {
-        const elapsed = Date.now() - sub.timerStartTime!;
-        const remaining = Math.max(0, sub.timerDuration! - elapsed);
-        setSubTimeLeft(remaining);
-        if (remaining === 0 && sub.status === 'in_progress') {
-          onUpdateStatus(sub._id, 'done');
-        }
-      };
-      calc();
-      const interval = setInterval(calc, 1000);
-      return () => clearInterval(interval);
-    } else if (sub.status === 'paused' && sub.timeLeftAtPause !== undefined) {
-      setSubTimeLeft(sub.timeLeftAtPause);
-    } else if (sub.status === 'done') {
-      setSubTimeLeft(0);
-    } else {
-      setSubTimeLeft(sub.timerDuration || 0);
-    }
-  }, [sub.status, sub.timerStartTime, sub.timerDuration, sub.timeLeftAtPause]);
-
-  const handleSaveEdit = () => {
-    if (editText.trim() && editText !== sub.text) onUpdateText(sub._id, editText.trim());
-    setIsEditing(false);
-    setShowTimerPicker(false);
-  };
-
-  const isDone = sub.status === 'done';
-  const isRunning = sub.status === 'in_progress';
-  const isPaused = sub.status === 'paused';
-  const hasTimer = !!sub.timerDuration;
-
-  if (isEditing) {
-    return (
-      <View style={[{ backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden', padding: 10, gap: 8 }, isArabic && { direction: 'rtl' }]}>
-        <Text style={[{ fontSize: 10, fontWeight: '800', color: colors.surfaceText, letterSpacing: 0.5 }, isArabic && { textAlign: 'right' }]}>{t.editingSubtask}</Text>
-
-        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
-          <TouchableOpacity onPress={() => onToggleComplete(sub._id, sub.status)}>
-            <Ionicons
-              name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
-              size={22}
-              color={isDone ? colors.success : colors.textMuted}
-            />
-          </TouchableOpacity>
-          <TextInput
-            style={[{ flex: 1, color: colors.surfaceText, fontSize: 14, backgroundColor: colors.bg, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: colors.primary, fontWeight: '600' }, isArabic && { textAlign: 'right' }]}
-            value={editText}
-            onChangeText={setEditText}
-            autoFocus
-            onSubmitEditing={handleSaveEdit}
-          />
-        </View>
-
-        {/* Timer toggle */}
-        <TouchableOpacity
-          style={[homeStyles.actionBtn, {
-            backgroundColor: hasTimer ? colors.surfaceText + '10' : 'transparent',
-            borderColor: colors.surfaceText + '30',
-            borderWidth: 1,
-            alignSelf: isArabic ? 'flex-end' : 'flex-start',
-            flexDirection: isArabic ? 'row-reverse' : 'row'
-          }]}
-          onPress={() => setShowTimerPicker(!showTimerPicker)}
-        >
-          <Ionicons name="timer-outline" size={16} color={colors.surfaceText} />
-          <Text style={[homeStyles.actionBtnText, { color: colors.surfaceText }]}>
-            {hasTimer ? formatDuration(sub.timerDuration!) : t.setTimer}
-          </Text>
-          <Ionicons name={showTimerPicker ? 'chevron-up' : 'chevron-down'} size={13} color={colors.surfaceText} />
-        </TouchableOpacity>
-
-        {showTimerPicker && (
-          <InlineTimerPicker
-            initialMs={sub.timerDuration}
-            maxMs={remainingBudget}
-            colors={colors}
-            t={t}
-            isArabic={isArabic}
-            onSave={(ms) => {
-              onSetTimer(sub._id, ms);
-              setShowTimerPicker(false);
-            }}
-            onCancel={() => setShowTimerPicker(false)}
-          />
-        )}
-
-        <View style={[{ flexDirection: 'row', gap: 8 }, isArabic && { flexDirection: 'row-reverse' }]}>
-          <TouchableOpacity
-            style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
-            onPress={handleSaveEdit}
-          >
-            <Text style={{ color: isDarkMode ? '#000' : '#FFF', fontWeight: '800', fontSize: 13 }}>{t.save}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={{ flex: 1, backgroundColor: colors.border, paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
-            onPress={() => { setIsEditing(false); setShowTimerPicker(false); }}
-          >
-            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 13 }}>{t.cancel}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
-  // ── COLLAPSED ROW ──
-  return (
-    <View style={[{ backgroundColor: colors.surface, borderRadius: 10, overflow: 'hidden' }, isArabic && { direction: 'rtl' }]}>
-      <View style={[{ flexDirection: 'row', alignItems: 'center', padding: 10 }, isArabic && { flexDirection: 'row-reverse' }]}>
-        {/* Checkbox */}
-        <TouchableOpacity onPress={() => onToggleComplete(sub._id, sub.status)}>
-          <Ionicons
-            name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
-            size={22}
-            color={isDone ? colors.success : colors.textMuted}
-            style={isArabic ? { marginLeft: 10 } : { marginRight: 10 }}
-          />
-        </TouchableOpacity>
-
-        {/* Task text - tap to edit */}
-        <TouchableOpacity
-          style={{ flex: 1 }}
-          onPress={() => { setIsEditing(true); setEditText(sub.text); }}
-        >
-          <Text
-            style={[{
-              color: isDone ? colors.surfaceText + '60' : colors.surfaceText,
-              textDecorationLine: isDone ? 'line-through' : 'none',
-              fontSize: 14,
-              fontWeight: '600',
-            }, isArabic && { textAlign: 'right' }]}
-            numberOfLines={2}
-          >
-            {sub.text}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Timer controls */}
-        {hasTimer && !isDone && (
-          <TouchableOpacity
-            onPress={() => isRunning ? onPauseSubtask(sub._id) : onStartSubtask(sub._id)}
-            style={[{
-              flexDirection: isArabic ? 'row-reverse' : 'row',
-              alignItems: 'center',
-              gap: 8,
-              backgroundColor: isRunning ? colors.warning + '15' : isPaused ? colors.surfaceText + '10' : colors.surfaceText + '08',
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 12,
-              marginLeft: isArabic ? 0 : 8,
-              marginRight: isArabic ? 8 : 0,
-              borderWidth: 1,
-              borderColor: isRunning ? colors.warning + '30' : colors.surfaceText + '20',
-            }]}
-          >
-            <CircularProgress
-              size={24}
-              strokeWidth={2}
-              progress={sub.timerDuration ? ((sub.timerDuration - subTimeLeft) / sub.timerDuration) * 100 : 0}
-              color={isRunning ? colors.warning : colors.surfaceText}
-              unfilledColor={colors.surfaceText + '10'}
-            >
-              <Ionicons
-                name={isRunning ? 'pause' : 'play'}
-                size={10}
-                color={isRunning ? colors.warning : colors.surfaceText}
-              />
-            </CircularProgress>
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: '800',
-                fontVariant: ['tabular-nums'],
-                color: isRunning ? colors.warning : colors.surfaceText,
-              }}
-            >
-              {isRunning || isPaused ? formatTime(subTimeLeft) : formatDuration(sub.timerDuration!)}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Done badge for timed subtasks */}
-        {hasTimer && isDone && (
-          <View style={[{
-            flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 4,
-            backgroundColor: colors.success + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginLeft: isArabic ? 0 : 8, marginRight: isArabic ? 8 : 0
-          }]}>
-            <Ionicons name="checkmark" size={12} color={colors.success} />
-            <Text style={{ fontSize: 11, color: colors.success, fontWeight: '800' }}>{t.done}</Text>
-          </View>
-        )}
-
-        {/* Delete */}
-        <TouchableOpacity style={[{ paddingLeft: isArabic ? 0 : 12, paddingRight: isArabic ? 12 : 0 }]} onPress={() => onDelete(sub._id)}>
-          <Ionicons name="trash-outline" size={18} color={colors.danger} />
-        </TouchableOpacity>
-      </View>
-
-    </View>
-  );
-};
 
 // ─── Main Card ────────────────────────────────────────────────────────────────
 const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLinkProject, homeStyles, depth = 0, isTimelineMode = false }) => {
@@ -448,6 +96,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const [isAddingSub, setIsAddingSub] = useState(false);
   const [newSubText, setNewSubText] = useState("");
   const [newSubDuration, setNewSubDuration] = useState<number | undefined>(undefined);
+  const [newSubDirection, setNewSubDirection] = useState<string>('down');
   const [showNewSubTimerPicker, setShowNewSubTimerPicker] = useState(false);
 
   const [lastNotifId, setLastNotifId] = useState<string | null>(null);
@@ -499,27 +148,36 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
       }
     }
 
-    if (todo.status === 'in_progress' && todo.timerDuration && todo.timerStartTime) {
-      const calculateTimeInfo = () => {
-        const elapsed = Date.now() - todo.timerStartTime!;
-        const remaining = Math.max(0, todo.timerDuration! - elapsed);
-        setTimeLeft(remaining);
-        if (remaining === 0 && todo.status === 'in_progress') {
-          updateStatus({ id: todo._id, status: 'done' });
-        }
-      };
-      calculateTimeInfo();
-      interval = setInterval(calculateTimeInfo, 1000);
+    if (todo.status === 'in_progress' && todo.timerStartTime) {
+      if (todo.timerDirection === 'up') {
+        const calculateTimeInfo = () => {
+          const elapsed = Date.now() - todo.timerStartTime!;
+          setTimeLeft(elapsed);
+        };
+        calculateTimeInfo();
+        interval = setInterval(calculateTimeInfo, 1000);
+      } else if (todo.timerDuration) {
+        const calculateTimeInfo = () => {
+          const elapsed = Date.now() - todo.timerStartTime!;
+          const remaining = Math.max(0, todo.timerDuration! - elapsed);
+          setTimeLeft(remaining);
+          if (remaining === 0 && todo.status === 'in_progress') {
+            updateStatus({ id: todo._id, status: 'done' });
+          }
+        };
+        calculateTimeInfo();
+        interval = setInterval(calculateTimeInfo, 1000);
+      }
     } else if (todo.status === 'paused') {
       setTimeLeft(todo.timeLeftAtPause || 0);
     } else if (todo.status === 'done' || todo.status === 'not_done') {
-      setTimeLeft(0);
+      setTimeLeft(todo.timerDirection === 'up' && todo.timeLeftAtPause ? todo.timeLeftAtPause : 0);
     } else {
-      setTimeLeft(todo.timerDuration || 0);
+      setTimeLeft(todo.timerDirection === 'up' ? 0 : (todo.timerDuration || 0));
     }
 
     return () => { if (interval) clearInterval(interval); };
-  }, [todo.status, todo.timerDuration, todo.timerStartTime, todo.timeLeftAtPause, subtasks]);
+  }, [todo.status, todo.timerDuration, todo.timerStartTime, todo.timeLeftAtPause, todo.timerDirection, subtasks]);
 
   // Overdue logic: automatically mark as not_done if deadline passed
   useEffect(() => {
@@ -560,8 +218,8 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     deleteTodo({ id: subId });
   }, [deleteTodo]);
 
-  const handleSetSubTimer = useCallback((subId: Id<"todos">, ms: number) => {
-    setTimer({ id: subId, duration: ms });
+  const handleSetSubTimer = useCallback((subId: Id<"todos">, ms: number, direction: string) => {
+    setTimer({ id: subId, duration: ms, timerDirection: direction });
   }, [setTimer]);
 
   const handleUpdateSubText = useCallback((subId: Id<"todos">, text: string) => {
@@ -606,10 +264,12 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
         text: newSubText.trim(),
         parentId: todo._id,
         projectId: todo.projectId,
-        ...(newSubDuration && { timerDuration: newSubDuration })
+        ...(newSubDuration && { timerDuration: newSubDuration }),
+        ...(newSubDirection === 'up' && { timerDirection: 'up' })
       });
-      setNewSubText('');
+      setNewSubText("");
       setNewSubDuration(undefined);
+      setNewSubDirection('down');
       setShowNewSubTimerPicker(false);
       setIsAddingSub(false);
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -713,11 +373,12 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                   {showTimerPicker && (
                     <InlineTimerPicker
                       initialMs={todo.timerDuration}
+                      initialDirection={todo.timerDirection}
                       colors={colors}
                       t={t}
                       isArabic={isArabic}
-                      onSave={(ms) => {
-                        setTimer({ id: todo._id, duration: ms });
+                      onSave={(ms, direction) => {
+                        setTimer({ id: todo._id, duration: ms, timerDirection: direction });
                         setShowTimerPicker(false);
                       }}
                       onCancel={() => setShowTimerPicker(false)}
@@ -733,7 +394,13 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                 </View>
               ) : (
                 <View>
-                  <Text style={[homeStyles.cardTitle, { marginBottom: 10, color: colors.surfaceText }, isArabic && { textAlign: 'right' }]} numberOfLines={2}>{todo.text}</Text>
+                  <Text 
+                    style={[homeStyles.cardTitle, { marginBottom: 10, color: colors.surfaceText }, isArabic && { textAlign: 'right' }]} 
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                  >
+                    {todo.text}
+                  </Text>
                 </View>
               )}
 
@@ -937,9 +604,6 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                       key={sub._id}
                       sub={sub}
                       parentTimerDuration={todo.timerDuration}
-                      colors={colors}
-                      isDarkMode={isDarkMode}
-                      homeStyles={homeStyles}
                       onStartSubtask={handleStartSubtask}
                       onPauseSubtask={handlePauseSubtask}
                       onToggleComplete={handleToggleSubComplete}
@@ -983,12 +647,14 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                     <View style={{ marginTop: 8 }}>
                       <InlineTimerPicker
                         initialMs={newSubDuration}
+                        initialDirection={newSubDirection}
                         maxMs={newSubBudget}
                         colors={colors}
                         t={t}
                         isArabic={isArabic}
-                        onSave={(ms) => {
+                        onSave={(ms, direction) => {
                           setNewSubDuration(ms);
+                          setNewSubDirection(direction);
                           setShowNewSubTimerPicker(false);
                         }}
                         onCancel={() => setShowNewSubTimerPicker(false)}
@@ -1005,11 +671,30 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
   if (isTimelineMode) {
     const isPlaying = todo.status === 'in_progress';
+    const isDone = todo.status === 'done';
+    
+    // Calculate creation and end times
+    const formatTimeShort = (ms: number) => {
+      const d = new Date(ms);
+      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    };
+    
+    const startTimeStr = todo._creationTime ? formatTimeShort(todo._creationTime) : "";
+    
+    let endTimeStr = "";
+    if (isDone) {
+      // If we don't have an exact completion time, estimate it
+      endTimeStr = formatTimeShort(Date.now()); 
+    } else if (isPlaying && todo.timerDuration && todo.timerStartTime) {
+      endTimeStr = formatTimeShort(todo.timerStartTime + todo.timerDuration);
+    }
     
     return (
       <View style={[homeStyles.cardContainer, { marginLeft: depth * 16 }]}>
-        <View style={[homeStyles.timelineColumn, { justifyContent: 'flex-start', paddingTop: 24 }]}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPlaying ? colors.surfaceText : colors.surfaceText + '20', transform: [{ translateX: -3 }] }} />
+        <View style={[homeStyles.timelineColumn, { justifyContent: 'space-between', paddingVertical: 12, alignItems: 'center' }]}>
+          <Text style={[homeStyles.timelineTimeTop, { color: colors.text }]}>{startTimeStr}</Text>
+          <View style={{ flex: 1, width: 2, backgroundColor: isPlaying ? colors.primary : colors.border, marginVertical: 8 }} />
+          {endTimeStr ? <Text style={[homeStyles.timelineTimeBottom, { color: colors.textMuted }]}>{endTimeStr}</Text> : null}
         </View>
         {coreCard}
         <TaskDetailModal 

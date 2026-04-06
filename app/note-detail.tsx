@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   View,
   Text, 
@@ -23,6 +23,7 @@ import useTheme from '@/hooks/useTheme';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/utils/i18n';
 import { createNotesStyles } from '@/assets/styles/notes.styles';
+import { scheduleReminderNotification } from '@/utils/notifications';
 
 const NoteHeader = React.memo(({ 
   title, 
@@ -58,13 +59,13 @@ export default function NoteDetailScreen() {
   const { colors, isDarkMode } = useTheme();
   const { userId, language } = useAuth();
   const { t, isArabic } = useTranslation(language);
-  const styles = createNotesStyles(colors, isArabic);
+  const styles = useMemo(() => createNotesStyles(colors, isArabic), [colors, isArabic]);
   const insets = useSafeAreaInsets();
 
   // Note State
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState<number>(0);
-  const [showToolbar, setShowToolbar] = useState(true);
+  const [isScheduleVisible, setScheduleVisible] = useState(isReminder === 'true');
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
 
   interface Block {
@@ -72,10 +73,17 @@ export default function NoteDetailScreen() {
     type: 'text' | 'todo' | 'h1' | 'h2' | 'h3' | 'bullet';
     content: string;
     checked?: boolean;
+    color?: string;
   }
   const [blocks, setBlocks] = useState<Block[]>([{ id: 'first', type: 'text', content: '' }]);
   const blockRefs = useRef<{ [key: string]: TextInput | null }>({});
-  const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const scrollViewRef = useRef<FlatList | null>(null);
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+  };
 
   // Typography State
   const [activeFontSize, setActiveFontSize] = useState(18);
@@ -131,15 +139,6 @@ export default function NoteDetailScreen() {
     }).join('\n');
   };
 
-  // Link Modal State
-  const [showLinkModal, setShowLinkModal] = useState(false);
-  const [linkText, setLinkText] = useState('');
-  const [linkUrl, setLinkUrl] = useState('');
-
-  // Reminder Modal State
-  const [showReminderModal, setShowReminderModal] = useState(isReminder === 'true');
-  const [reminderTitle, setReminderTitle] = useState('');
-  
   // Custom Calendar State
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
@@ -151,6 +150,7 @@ export default function NoteDetailScreen() {
   // Queries & Mutations
   const existingNote = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip')?.find((t: any) => t._id === id);
   const addNote = useOfflineMutation(api.todos.addTodo, "todos:addTodo");
+  const updateNote = useOfflineMutation(api.todos.updateTodo, "todos:updateTodo");
   const deleteNoteMutation = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
   
   useEffect(() => {
@@ -163,6 +163,7 @@ export default function NoteDetailScreen() {
         setSelectedDate(d);
         setCurrentMonth(d);
         setSelectedTime(d);
+        setScheduleVisible(true);
       }
     }
   }, [existingNote]);
@@ -181,11 +182,30 @@ export default function NoteDetailScreen() {
             userId,
             text: title.trim() || 'Untitled',
             description: bodyStr.trim(),
-            dueDate: dueDate || undefined,
-            date: dueDate || Date.now(),
+            dueDate: isScheduleVisible ? (dueDate || Date.now()) : undefined,
+            date: isScheduleVisible ? (dueDate || Date.now()) : Date.now(),
             status: 'not_started',
-            type: isReminder === 'true' ? 'reminder' : 'note',
+            type: isScheduleVisible ? 'reminder' : 'note',
           });
+        } else {
+          await updateNote({
+            id: id as any,
+            text: title.trim() || 'Untitled',
+            description: bodyStr.trim(),
+            dueDate: isScheduleVisible ? (dueDate || Date.now()) : 0,
+            type: isScheduleVisible ? 'reminder' : 'note',
+          });
+        }
+        // Schedule sound notification for reminders with future due dates
+        if (isScheduleVisible) {
+          const reminderDate = dueDate || Date.now();
+          if (reminderDate > Date.now()) {
+            await scheduleReminderNotification(
+              title.trim() || 'Untitled',
+              reminderDate,
+              language
+            );
+          }
         }
       } catch (err) {
         console.warn('Failed to save note', err);
@@ -205,15 +225,6 @@ export default function NoteDetailScreen() {
     router.back();
   };
 
-  const handleCreateReminder = async () => {
-    const finalDate = new Date(selectedDate);
-    finalDate.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
-    const dueDateMs = finalDate.getTime();
-    setDueDate(dueDateMs);
-    if (reminderTitle.trim()) setTitle(reminderTitle);
-    setShowReminderModal(false);
-  };
-
   const formattedNoteDate = new Date(dueDate || Date.now()).toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
@@ -221,9 +232,42 @@ export default function NoteDetailScreen() {
   });
 
   // Block Manipulation Handlers
-  const updateBlockContent = useCallback((blockId: string, content: string) => {
-    setBlocks(prev => prev.map(b => b.id === blockId ? { ...b, content } : b));
-  }, []);
+  const handleBlockTextChange = useCallback((blockId: string, newContent: string, currentContent: string) => {
+    const prevLength = currentContent.length;
+    const newLength = newContent.length;
+    
+    if (newLength > prevLength) {
+      const addedChar = newContent.slice(prevLength);
+      if (addedChar === '\n') {
+        setBlocks(prev => {
+          const block = prev.find(b => b.id === blockId);
+          const textBeforeNewline = currentContent;
+          if (block) {
+            const idx = prev.findIndex(b => b.id === blockId);
+            const newBlock: Block = { id: Math.random().toString(), type: 'text', content: '', color: activeFontColor };
+            const newBlocks = [...prev];
+            newBlocks[idx] = { ...block, content: textBeforeNewline };
+            newBlocks.splice(idx + 1, 0, newBlock);
+            setTimeout(() => {
+              blockRefs.current[newBlock.id]?.focus();
+              scrollToBottom();
+            }, 50);
+            return newBlocks;
+          }
+          return prev.map(b => b.id === blockId ? { ...b, content: newContent } : b);
+        });
+        return;
+      }
+    }
+    setBlocks(prev => prev.map(b => b.id === blockId ? { ...b, content: newContent } : b));
+  }, [activeFontColor]);
+
+  const changeActiveColor = useCallback((color: string) => {
+    setActiveFontColor(color);
+    if (activeBlockId) {
+      setBlocks(prev => prev.map(b => b.id === activeBlockId ? { ...b, color } : b));
+    }
+  }, [activeBlockId]);
 
   const toggleTodo = useCallback((blockId: string) => {
     setBlocks(prev => prev.map(b => b.id === blockId ? { ...b, checked: !b.checked } : b));
@@ -232,13 +276,16 @@ export default function NoteDetailScreen() {
   const addNewBlock = useCallback((afterBlockId: string, type: Block['type'] = 'text') => {
     setBlocks(prev => {
       const idx = prev.findIndex(b => b.id === afterBlockId);
-      const newBlock: Block = { id: Math.random().toString(), type, content: '' };
+      const newBlock: Block = { id: Math.random().toString(), type, content: '', color: activeFontColor };
       const newBlocks = [...prev];
       newBlocks.splice(idx + 1, 0, newBlock);
-      setTimeout(() => blockRefs.current[newBlock.id]?.focus(), 100);
+      setTimeout(() => {
+        blockRefs.current[newBlock.id]?.focus();
+        scrollToBottom();
+      }, 100);
       return newBlocks;
     });
-  }, []);
+  }, [scrollToBottom, activeFontColor]);
 
   const deleteBlock = useCallback((blockId: string) => {
     setBlocks(prev => {
@@ -249,11 +296,6 @@ export default function NoteDetailScreen() {
       if (prevBlock) setTimeout(() => blockRefs.current[prevBlock.id]?.focus(), 100);
       return newBlocks;
     });
-  }, [blocks]);
-
-  const changeBlockType = useCallback((blockId: string, type: Block['type']) => {
-    setBlocks(prev => prev.map(b => b.id === blockId ? { ...b, type } : b));
-    setTimeout(() => blockRefs.current[blockId]?.focus(), 100);
   }, []);
 
   const toggleInteractiveCheckbox = useCallback(() => {
@@ -290,30 +332,38 @@ export default function NoteDetailScreen() {
   }, [activeBlockId]);
 
   const handleKeyPress = useCallback((e: any, blockId: string) => {
-    if (e.nativeEvent.key === 'Enter') {
-      const block = blocks.find(b => b.id === blockId);
-      // User requested Enter always adds a regular new line (text) from checkbox/bullets
-      if (block?.type !== 'text') {
-        addNewBlock(blockId, 'text');
-      }
-    } else if (e.nativeEvent.key === 'Backspace') {
+    if (e.nativeEvent.key === 'Backspace') {
       const block = blocks.find(b => b.id === blockId);
       if (block?.content === '') {
         deleteBlock(blockId);
       }
     }
-  }, [blocks, addNewBlock, deleteBlock]);
+  }, [blocks, deleteBlock]);
 
   const renderHeader = useCallback(() => (
-    <NoteHeader 
-      title={title}
-      setTitle={setTitle}
-      formattedNoteDate={formattedNoteDate}
-      isArabic={isArabic}
-      colors={colors}
-      styles={styles}
-    />
-  ), [title, formattedNoteDate, isArabic, colors, styles]);
+    <TouchableOpacity 
+      activeOpacity={1} 
+      onPress={() => {
+        Keyboard.dismiss();
+        if (blocks.length > 0) {
+          const firstBlock = blocks[0];
+          setActiveBlockId(firstBlock.id);
+          setTimeout(() => {
+            blockRefs.current[firstBlock.id]?.focus();
+          }, 100);
+        }
+      }}
+    >
+      <NoteHeader 
+        title={title}
+        setTitle={setTitle}
+        formattedNoteDate={formattedNoteDate}
+        isArabic={isArabic}
+        colors={colors}
+        styles={styles}
+      />
+    </TouchableOpacity>
+  ), [title, formattedNoteDate, isArabic, colors, styles, blocks]);
 
   const renderBlock = useCallback(({ item }: { item: Block }) => (
     <View style={[
@@ -347,7 +397,7 @@ export default function NoteDetailScreen() {
             fontSize: item.type === 'h1' ? 32 : item.type === 'h2' ? 26 : item.type === 'h3' ? 22 : activeFontSize,
             fontWeight: (item.type === 'h1' || item.type === 'h2' || item.type === 'h3') ? '800' : activeFontWeight,
             fontFamily: activeFontFamily === 'System' ? undefined : activeFontFamily,
-            color: activeFontColor,
+            color: item.color || activeFontColor,
             fontStyle: activeFontStyle,
             lineHeight: (item.type === 'h1' ? 32 : item.type === 'h2' ? 26 : item.type === 'h3' ? 22 : activeFontSize) * 1.5,
             textDecorationLine: (item.type === 'todo' && item.checked) ? 'line-through' : 'none',
@@ -358,7 +408,7 @@ export default function NoteDetailScreen() {
         placeholder={item.type.startsWith('h') ? `HEADING ${item.type.charAt(1)}` : "Type away..."}
         placeholderTextColor={colors.textMuted + '60'}
         value={item.content}
-        onChangeText={txt => updateBlockContent(item.id, txt)}
+        onChangeText={txt => handleBlockTextChange(item.id, txt, item.content)}
         onFocus={() => setActiveBlockId(item.id)}
         onKeyPress={e => handleKeyPress(e, item.id)}
         onSubmitEditing={() => {
@@ -370,7 +420,7 @@ export default function NoteDetailScreen() {
         blurOnSubmit={false}
       />
     </View>
-  ), [activeFontSize, activeFontWeight, activeFontFamily, activeFontColor, activeFontStyle, isArabic, colors.textMuted, styles.checklistContainer, styles.checkbox, styles.checkboxChecked, styles.bodyInput, toggleTodo, updateBlockContent, handleKeyPress, addNewBlock]);
+  ), [activeFontSize, activeFontWeight, activeFontFamily, activeFontColor, activeFontStyle, isArabic, colors.textMuted, styles.checklistContainer, styles.checkbox, styles.checkboxChecked, styles.bodyInput, toggleTodo, handleBlockTextChange, handleKeyPress, addNewBlock]);
 
   // Calendar Helpers
   const daysInMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate();
@@ -401,24 +451,11 @@ export default function NoteDetailScreen() {
     return cells;
   };
 
-  // Menus act as overlays now instead of direct cycling.
-
-  const handleInsertLink = () => {
-    if (linkText.trim() && linkUrl.trim()) {
-      const url = linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`;
-      if (activeBlockId) updateBlockContent(activeBlockId, (blocks.find(b => b.id === activeBlockId)?.content || '') + `[${linkText}](${url})`);
-      setLinkText('');
-      setLinkUrl('');
-      setShowLinkModal(false);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.detailSafeArea} edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={[styles.detailHeader, isArabic && { flexDirection: 'row-reverse' }]}>
           <TouchableOpacity style={styles.detailHeaderBtn} onPress={handleSaveNote}>
@@ -427,13 +464,17 @@ export default function NoteDetailScreen() {
           
           <View style={styles.detailHeaderRight}>
             <TouchableOpacity 
-              style={styles.detailHeaderBtn} 
-              onPress={() => {
-                  setReminderTitle(title);
-                  setShowReminderModal(true);
-              }}
+              style={[styles.detailHeaderBtn, isScheduleVisible && { backgroundColor: colors.warning + '20' }]} 
+              onPress={() => setScheduleVisible(!isScheduleVisible)}
             >
-              <Ionicons name="alarm-outline" size={24} color={dueDate ? colors.primary : colors.text} />
+               <Ionicons 
+                 name={isScheduleVisible ? "alarm" : "alarm-outline"} 
+                 size={22} 
+                 color={isScheduleVisible ? colors.warning : colors.text} 
+               />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.detailHeaderBtn} onPress={handleSaveNote}>
+               <Ionicons name="checkmark" size={24} color={colors.success} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.detailHeaderBtn} onPress={() => {
                if (id) handleDeleteNote();
@@ -444,220 +485,163 @@ export default function NoteDetailScreen() {
           </View>
         </View>
 
-        <FlatList
-          data={blocks}
-          keyExtractor={item => item.id}
-          ListHeaderComponent={renderHeader}
-          renderItem={renderBlock}
-          contentContainerStyle={{ paddingBottom: 250 }}
+        <ScrollView 
+          ref={scrollViewRef as any}
           style={{ flex: 1 }}
-        />
-
-        {showToolbar && (
-          <View style={[
-            styles.toolbarWrapper, 
-            { 
-              position: 'absolute', 
-              bottom: Platform.OS === 'ios' ? 10 : 20, 
-              left: 20, 
-              right: 20,
-              elevation: 5,
-              zIndex: 1000
-            }
-          ]}>
-            <View style={styles.toolbarHeader}>
-               <TouchableOpacity style={styles.toolbarDismiss} onPress={() => setShowToolbar(false)}>
-                  <Ionicons name="close" size={20} color="#AAA" />
-               </TouchableOpacity>
-            </View>
-            
-            <View style={[styles.toolbarRow, isArabic && { flexDirection: 'row-reverse' }]}>
-              <TouchableOpacity style={styles.toolbarFontSelector} onPress={() => setActiveMenu('fontFamily')}>
-                <Text style={styles.toolbarFontText}>
-                  {activeFontFamily === 'System' || activeFontFamily === 'sans-serif' ? 'Sans Serif' : activeFontFamily}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {renderHeader()}
+          
+          {isScheduleVisible && (
+            <View style={{ paddingHorizontal: 24, marginBottom: 24 }}>
+              <View style={styles.inlineReminderHeader}>
+                <Text style={[styles.inlineReminderTitle, isArabic && { textAlign: 'right' }]}>
+                  {isArabic ? 'موعد التذكير' : 'Reminder Schedule'}
                 </Text>
-                <Ionicons name="chevron-down" size={14} color="#FFF" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarFontSelector} onPress={() => setActiveMenu('fontSize')}>
-                <Text style={styles.toolbarFontText}>{activeFontSize}pt</Text>
-                <Ionicons name="chevron-down" size={14} color="#FFF" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveMenu('color')}>
-                <Ionicons name="color-palette" size={24} color={activeFontColor} />
-              </TouchableOpacity>
-            </View>
+                
+                <View style={styles.calendarCard}>
+                  <View style={[styles.calendarHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <TouchableOpacity onPress={prevMonth}>
+                      <Ionicons name="chevron-back" size={20} color={colors.text} />
+                    </TouchableOpacity>
+                    <Text style={styles.calendarTitle}>
+                      {currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })}
+                    </Text>
+                    <TouchableOpacity onPress={nextMonth}>
+                      <Ionicons name="chevron-forward" size={20} color={colors.text} />
+                    </TouchableOpacity>
+                  </View>
 
-            <View style={[styles.toolbarIconRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[styles.weekDaysRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                    {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((d) => (
+                      <Text key={d} style={styles.weekDayText}>{d}</Text>
+                    ))}
+                  </View>
+
+                  <View style={[styles.daysGrid, isArabic && { flexDirection: 'row-reverse' }]}>
+                    {renderCalendarDays()}
+                  </View>
+                </View>
+
+                <View style={[styles.timePresetsRow, isArabic && { flexDirection: 'row-reverse' }, { alignItems: 'center', marginTop: 16 }]}>
+                  {Platform.OS === 'ios' ? (
+                    <DateTimePicker
+                      value={selectedTime}
+                      mode="time"
+                      display="spinner"
+                      style={{ flex: 1, height: 100 }}
+                      onChange={(e, d) => {
+                        if (d) {
+                          setSelectedTime(d);
+                          const finalDate = new Date(selectedDate);
+                          finalDate.setHours(d.getHours(), d.getMinutes(), 0, 0);
+                          setDueDate(finalDate.getTime());
+                        }
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <TouchableOpacity 
+                        style={[styles.timePresetBtn, { backgroundColor: colors.bg, flexDirection: 'row', alignItems: 'center', height: 50, borderRadius: 12 }]}
+                        onPress={() => setShowTimePicker(true)}
+                      >
+                        <Ionicons name="time-outline" size={20} color={colors.text} style={{ marginRight: 8 }} />
+                        <Text style={[styles.timePresetMain, { color: colors.text, fontSize: 18 }]}>
+                          {selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </Text>
+                      </TouchableOpacity>
+                      {showTimePicker && (
+                        <DateTimePicker
+                          value={selectedTime}
+                          mode="time"
+                          display="default"
+                          is24Hour={true}
+                          onChange={(e, d) => {
+                             setShowTimePicker(false);
+                             if (d) {
+                               setSelectedTime(d);
+                               const finalDate = new Date(selectedDate);
+                               finalDate.setHours(d.getHours(), d.getMinutes(), 0, 0);
+                               setDueDate(finalDate.getTime());
+                             }
+                          }}
+                        />
+                      )}
+                    </>
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
+
+          {blocks.map((item) => (
+            <React.Fragment key={item.id}>
+              {renderBlock({ item })}
+            </React.Fragment>
+          ))}
+
+          <TouchableOpacity 
+            style={{ height: 100, padding: 24 }}
+            onPress={() => {
+              Keyboard.dismiss();
+              if (blocks.length > 0) {
+                const lastBlock = blocks[blocks.length - 1];
+                setActiveBlockId(lastBlock.id);
+                setTimeout(() => {
+                  blockRefs.current[lastBlock.id]?.focus();
+                }, 100);
+              }
+            }}
+            activeOpacity={1}
+          >
+            <Text style={{ color: colors.textMuted, opacity: 0.5 }}>
+              {isArabic ? 'اضغط للإضافة...' : 'Tap to add more...'}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        <View style={[
+          styles.toolbarWrapper, 
+          { 
+            backgroundColor: '#1A1A1A',
+            paddingVertical: 12,
+            paddingHorizontal: 20,
+            borderTopWidth: 1,
+            borderColor: 'rgba(255,255,255,0.1)',
+          }
+        ]}>
+          <View style={[
+            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+            isArabic && { flexDirection: 'row-reverse' }
+          ]}>
+            <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
               <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveHeading}>
-                <Ionicons name="text-outline" size={20} color="#FFF" />
+                <Ionicons name="text-outline" size={22} color="#FFF" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveCheckbox}>
-                <Ionicons name="checkbox-outline" size={20} color="#FFF" />
+                <Ionicons name="checkbox-outline" size={22} color="#FFF" />
               </TouchableOpacity>
               <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveBullet}>
-                <Ionicons name="list-outline" size={20} color="#FFF" />
+                <Ionicons name="list-outline" size={22} color="#FFF" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarIconBtn} onPress={() => {}}>
-                <Ionicons name="chevron-forward" size={20} color="#FFF" />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+              <TouchableOpacity onPress={() => setActiveMenu('fontSize')} style={{ paddingHorizontal: 4 }}>
+                 <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{activeFontSize}pt</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarIconBtn} onPress={() => {}}>
-                <Ionicons name="remove-outline" size={20} color="#FFF" />
+              <TouchableOpacity onPress={() => setActiveMenu('color')}>
+                <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: activeFontColor, borderWidth: 2, borderColor: '#FFF' }} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarIconBtn} onPress={() => setShowLinkModal(true)}>
-                <Ionicons name="link-outline" size={20} color="#FFF" />
+              <TouchableOpacity onPress={() => setActiveMenu('fontFamily')}>
+                <Ionicons name="language-outline" size={22} color="#FFF" />
               </TouchableOpacity>
             </View>
           </View>
-        )}
+        </View>
       </KeyboardAvoidingView>
-
-      {/* Reminder Modal */}
-      <Modal
-        visible={showReminderModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowReminderModal(false)}
-      >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalContent}>
-            <View style={[styles.modalHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setShowReminderModal(false)}>
-                <Ionicons name="chevron-back" size={24} color={colors.text} />
-              </TouchableOpacity>
-              <Text style={styles.modalTitle}>Add Reminder</Text>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={[styles.sectionLabel, isArabic && { textAlign: 'right' }]}>What do you want to be reminded?</Text>
-              <TextInput
-                style={[styles.reminderTitleInput, isArabic && { textAlign: 'right' }]}
-                placeholder="Enter your title..."
-                placeholderTextColor={colors.textMuted}
-                value={reminderTitle}
-                onChangeText={setReminderTitle}
-              />
-
-              <Text style={[styles.sectionLabel, isArabic && { textAlign: 'right' }]}>Select Date</Text>
-              <View style={styles.calendarCard}>
-                <View style={[styles.calendarHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-                  <TouchableOpacity onPress={prevMonth}>
-                    <Ionicons name="chevron-back" size={20} color={colors.text} />
-                  </TouchableOpacity>
-                  <Text style={styles.calendarTitle}>
-                    {currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })}
-                  </Text>
-                  <TouchableOpacity onPress={nextMonth}>
-                    <Ionicons name="chevron-forward" size={20} color={colors.text} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={[styles.weekDaysRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                  {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((d) => (
-                    <Text key={d} style={styles.weekDayText}>{d}</Text>
-                  ))}
-                </View>
-
-                <View style={[styles.daysGrid, isArabic && { flexDirection: 'row-reverse' }]}>
-                  {renderCalendarDays()}
-                </View>
-              </View>
-
-              <Text style={[styles.sectionLabel, isArabic && { textAlign: 'right' }]}>Select Exact Time</Text>
-              
-              <View style={[styles.timePresetsRow, isArabic && { flexDirection: 'row-reverse' }, { alignItems: 'center' }]}>
-                {Platform.OS === 'ios' ? (
-                  <DateTimePicker
-                    value={selectedTime}
-                    mode="time"
-                    display="spinner"
-                    style={{ flex: 1, height: 120 }}
-                    onChange={(e, d) => d && setSelectedTime(d)}
-                  />
-                ) : (
-                  <>
-                    <TouchableOpacity 
-                      style={[styles.timePresetBtn, { backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', height: 60 }]}
-                      onPress={() => setShowTimePicker(true)}
-                    >
-                      <Ionicons name="time-outline" size={24} color={colors.text} style={{ marginRight: 8 }} />
-                      <Text style={[styles.timePresetMain, { color: colors.text, fontSize: 24 }]}>
-                        {selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </Text>
-                    </TouchableOpacity>
-                    {showTimePicker && (
-                      <DateTimePicker
-                        value={selectedTime}
-                        mode="time"
-                        display="default"
-                        is24Hour={true}
-                        onChange={(e, d) => {
-                           setShowTimePicker(false);
-                           if (d) setSelectedTime(d);
-                        }}
-                      />
-                    )}
-                  </>
-                )}
-              </View>
-
-              <TouchableOpacity style={styles.createReminderBtn} onPress={handleCreateReminder}>
-                <Text style={styles.createReminderText}>Create Reminder</Text>
-              </TouchableOpacity>
-              
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Link Input Modal */}
-      <Modal
-        visible={showLinkModal}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowLinkModal(false)}
-      >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { height: 'auto', marginBottom: Platform.OS === 'ios' ? 100 : 50, paddingBottom: 24 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Insert Link</Text>
-              <TouchableOpacity onPress={() => setShowLinkModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-            
-            <Text style={styles.sectionLabel}>Display Text</Text>
-            <TextInput
-              style={styles.reminderTitleInput}
-              placeholder="e.g., My Portfolio"
-              placeholderTextColor={colors.textMuted}
-              value={linkText}
-              onChangeText={setLinkText}
-              autoFocus
-            />
-
-            <Text style={styles.sectionLabel}>URL</Text>
-            <TextInput
-              style={styles.reminderTitleInput}
-              placeholder="e.g., example.com"
-              placeholderTextColor={colors.textMuted}
-              value={linkUrl}
-              onChangeText={setLinkUrl}
-              autoCapitalize="none"
-              keyboardType="url"
-            />
-
-            <TouchableOpacity 
-              style={[styles.createReminderBtn, { marginTop: 24 }]} 
-              onPress={handleInsertLink}
-            >
-              <Text style={styles.createReminderText}>Add Link</Text>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
 
       {/* Action Menu Bottom Sheet */}
       <Modal
@@ -697,31 +681,19 @@ export default function NoteDetailScreen() {
                 </TouchableOpacity>
               ))}
 
-              {activeMenu === 'fontShape' && [
-                { label: 'Normal', weight: 'normal', style: 'normal' },
-                { label: 'Thin', weight: '200', style: 'normal' },
-                { label: 'Semi-Bold', weight: '600', style: 'normal' },
-                { label: 'Bold', weight: 'bold', style: 'normal' },
-                { label: 'Italic', weight: 'normal', style: 'italic' }
-              ].map(opt => (
-                <TouchableOpacity key={opt.label} onPress={() => { setActiveFontWeight(opt.weight as any); setActiveFontStyle(opt.style as any); setActiveMenu('none'); }} style={{ padding: 16, borderBottomWidth: 1, borderColor: colors.border }}>
-                  <Text style={{ color: colors.text, fontSize: 18, fontWeight: opt.weight as any, fontStyle: opt.style as any }}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
-
               {activeMenu === 'color' && (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, padding: 16, justifyContent: 'space-around' }}>
                   {[colors.text, colors.primary, colors.danger, colors.success, '#FFAB00', '#A020F0', '#00BCD4'].map(c => (
                     <TouchableOpacity 
                       key={c} 
-                      onPress={() => { setActiveFontColor(c); setActiveMenu('none'); }} 
+                      onPress={() => { changeActiveColor(c); setActiveMenu('none'); }} 
                       style={{ 
                         width: 56, 
                         height: 56, 
                         borderRadius: 28, 
                         backgroundColor: c, 
                         borderWidth: 3, 
-                        borderColor: activeFontColor === c ? colors.text : 'transparent',
+                        borderColor: activeFontColor === c ? '#FFF' : 'transparent',
                         shadowColor: "#000",
                         shadowOpacity: 0.2,
                         shadowRadius: 4,
@@ -735,7 +707,6 @@ export default function NoteDetailScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
-
     </SafeAreaView>
   );
 }

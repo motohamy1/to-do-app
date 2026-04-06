@@ -8,9 +8,12 @@ import { useTranslation } from '@/utils/i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Platform, Share, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Platform, Share, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActionModal, { ActionOption } from '@/components/ActionModal';
+import { useScreenGuide } from '@/hooks/useScreenGuide';
+import ScreenGuide from '@/components/ScreenGuide';
+import type { GuideTip } from '@/components/ScreenGuide';
 
 // Helper to get random pastel colors for cards
 const getRandomColor = (index: number, isDarkMode: boolean) => {
@@ -27,6 +30,17 @@ export default function NotesScreen() {
   const { t, isArabic } = useTranslation(language);
   const styles = createNotesStyles(colors, isArabic);
   const insets = useSafeAreaInsets();
+  const { showGuide, dismissGuide } = useScreenGuide('notes');
+
+  const notesTips: GuideTip[] = isArabic ? [
+    { icon: 'document-text-outline', title: 'ملاحظة سريعة', description: 'اضغط "ملاحظة سريعة" لإنشاء ملاحظة غنية بالتنسيق والألوان.', accentColor: '#5CB2FF' },
+    { icon: 'notifications-outline', title: 'تذكير جديد', description: 'اضغط "تذكير جديد" لإنشاء تذكير بتاريخ ووقت محدد.', accentColor: '#FF5C77' },
+    { icon: 'hand-left-outline', title: 'اضغط مطولاً', description: 'اضغط مطولاً على بطاقة لتعديلها أو مشاركتها أو حذفها.', accentColor: '#FFAB00' },
+  ] : [
+    { icon: 'document-text-outline', title: 'Quick Note', description: 'Tap "Quick Note" to create a rich note with formatting and colors.', accentColor: '#5CB2FF' },
+    { icon: 'notifications-outline', title: 'New Reminder', description: 'Tap "New Reminder" to create a reminder with a specific date and time.', accentColor: '#FF5C77' },
+    { icon: 'hand-left-outline', title: 'Long Press', description: 'Long press any card to edit, share, or delete it.', accentColor: '#FFAB00' },
+  ];
 
   const todos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip');
   const deleteTodo = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
@@ -46,14 +60,7 @@ export default function NotesScreen() {
   const reminders = todos.filter(t => t.type === 'reminder' || (!t.type && t.dueDate && t.dueDate > 0 && !t.categoryId && !t.priority && !t.timerDuration));
   const notes = todos.filter(t => t.type === 'note' || (!t.type && (!t.dueDate || t.dueDate === 0) && !t.categoryId && !t.priority && !t.timerDuration && !t.isCompleted));
 
-  const chunkArray = (arr: any[], size: number) => {
-    return Array.from({ length: Math.ceil(arr.length / size) }, (v, i) =>
-      arr.slice(i * size, i * size + size)
-    );
-  };
 
-  const remindersChunks = chunkArray(reminders, 2);
-  const notesChunks = chunkArray(notes, 2);
 
   const renderCard = (item: any, globalIndex: number) => {
     if (item.isAdd) {
@@ -62,7 +69,7 @@ export default function NotesScreen() {
         <TouchableOpacity
           key={item._id}
           style={[
-            styles.card,
+            styles.gridCard,
             {
               backgroundColor: colors.surface,
               borderWidth: 0,
@@ -91,12 +98,12 @@ export default function NotesScreen() {
           }}>
             <Ionicons name={isRem ? 'alarm' : 'add'} size={32} color={colors.primary} />
           </View>
-          <Text style={{
+          <Text style={[{
             color: colors.text,
             fontSize: 16,
             fontWeight: '700',
-            fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif'
-          }}>
+            fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif-medium'
+          }, isArabic && { textAlign: 'right' }]}>
             {isRem ? 'New Reminder' : 'Quick Note'}
           </Text>
         </TouchableOpacity>
@@ -108,7 +115,7 @@ export default function NotesScreen() {
     return (
       <TouchableOpacity
         key={item._id}
-        style={[styles.card, { backgroundColor: bgColor }]}
+        style={[styles.gridCard, { backgroundColor: bgColor }]}
         activeOpacity={0.7}
         onPress={() => router.push({ pathname: '/note-detail', params: { id: item._id } })}
         onLongPress={() => {
@@ -131,17 +138,7 @@ export default function NotesScreen() {
     );
   };
 
-  const renderReminderColumn = ({ item }: { item: any[] }) => (
-    <View style={{ gap: 12, marginRight: 0 }}>
-      {item.map(n => renderCard(n, reminders.indexOf(n)))}
-    </View>
-  );
 
-  const renderNoteColumn = ({ item }: { item: any[] }) => (
-    <View style={{ gap: 12, marginRight: 0 }}>
-      {item.map(n => renderCard(n, notes.indexOf(n)))}
-    </View>
-  );
 
   return (
     <SafeAreaView style={[styles.safeArea, { overflow: 'hidden' }]} edges={['left', 'right', 'bottom']}>
@@ -149,28 +146,30 @@ export default function NotesScreen() {
         <Text style={[styles.headerTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif', fontSize: 32 }]}>Notes & Reminders</Text>
       </View>
 
-      <View style={{ flex: 1, paddingBottom: 20 }}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={styles.sectionContainer}>
           <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
             <Text style={[styles.sectionTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif' }]}>Reminders</Text>
             <Text style={{ color: colors.textMuted, fontSize: 16 }}>{reminders.length}</Text>
           </View>
 
-          <FlatList
-            ListHeaderComponent={() => (
-              <View style={{ height: '100%', justifyContent: 'center', paddingRight: 4 }}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingRight: 24 }}
+          >
+            <View style={[{ flexDirection: 'row', alignItems: 'center' }, isArabic && { flexDirection: 'row-reverse' }]}>
+              {/* Quick Add Reminder - Lone Column, Centered Vertically */}
+              <View style={[styles.loneColumnCentered, { marginRight: 12, marginLeft: isArabic ? 12 : 24 }]}>
                 {renderCard({ _id: 'add_new_rem', isAdd: true }, -1)}
               </View>
-            )}
-            data={remindersChunks}
-            keyExtractor={(_, index) => `remChunk_${index}`}
-            renderItem={renderReminderColumn}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[styles.listContent, isArabic && { flexDirection: 'row-reverse' }]}
-            snapToInterval={(Dimensions.get('window').width * 0.45) + 16}
-            decelerationRate="fast"
-          />
+              
+              {/* Reminder items - 2 Row Grid */}
+              <View style={[styles.horizontalGridContainer, { paddingHorizontal: 0 }, isArabic && { flexDirection: 'column-reverse' }]}>
+                {reminders.map((item, index) => renderCard(item, index))}
+              </View>
+            </View>
+          </ScrollView>
         </View>
 
         <View style={styles.sectionContainer}>
@@ -179,23 +178,25 @@ export default function NotesScreen() {
             <Text style={{ color: colors.textMuted, fontSize: 16 }}>{notes.length}</Text>
           </View>
 
-          <FlatList
-            ListHeaderComponent={() => (
-              <View style={{ height: '100%', justifyContent: 'center', paddingRight: 4 }}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingRight: 24 }}
+          >
+            <View style={[{ flexDirection: 'row', alignItems: 'center' }, isArabic && { flexDirection: 'row-reverse' }]}>
+              {/* Quick Add Note - Lone Column, Centered Vertically */}
+              <View style={[styles.loneColumnCentered, { marginRight: 12, marginLeft: isArabic ? 12 : 24 }]}>
                 {renderCard({ _id: 'add_new_note', isAdd: true }, -1)}
               </View>
-            )}
-            data={notesChunks}
-            keyExtractor={(_, index) => `noteChunk_${index}`}
-            renderItem={renderNoteColumn}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={[styles.listContent, isArabic && { flexDirection: 'row-reverse' }]}
-            snapToInterval={(Dimensions.get('window').width * 0.45) + 16}
-            decelerationRate="fast"
-          />
+
+              {/* Note items - 2 Row Grid */}
+              <View style={[styles.horizontalGridContainer, { paddingHorizontal: 0 }, isArabic && { flexDirection: 'column-reverse' }]}>
+                {notes.map((item, index) => renderCard(item, index))}
+              </View>
+            </View>
+          </ScrollView>
         </View>
-      </View>
+      </ScrollView>
 
       <ActionModal 
         visible={isActionModalVisible}
@@ -225,6 +226,8 @@ export default function NotesScreen() {
           }
         ]}
       />
+
+      <ScreenGuide visible={showGuide} tips={notesTips} onDismiss={dismissGuide} isArabic={isArabic} />
     </SafeAreaView>
   );
 }

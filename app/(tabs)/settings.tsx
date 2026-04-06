@@ -12,6 +12,9 @@ import { useOfflineMutation } from '@/hooks/useOfflineMutation';
 import { useRouter } from 'expo-router';
 import { useTranslation } from '@/utils/i18n';
 import * as ImagePicker from 'expo-image-picker';
+import { useScreenGuide } from '@/hooks/useScreenGuide';
+import ScreenGuide from '@/components/ScreenGuide';
+import type { GuideTip } from '@/components/ScreenGuide';
 
 const Settings = () => {
   const { colors, isDarkMode, toggleDarkMode } = useTheme();
@@ -19,6 +22,17 @@ const Settings = () => {
   const { t, isArabic } = useTranslation(language);
   const styles = createSettingsStyles(colors, isArabic);
   const router = useRouter();
+  const { showGuide, dismissGuide } = useScreenGuide('settings');
+
+  const settingsTips: GuideTip[] = isArabic ? [
+    { icon: 'person-circle-outline', title: 'ملفك الشخصي', description: 'اضغط على صورتك لتغييرها، أو اضغط على أيقونة القلم لتعديل اسمك.', accentColor: '#7C5CFF' },
+    { icon: 'moon-outline', title: 'الوضع الداكن', description: 'فعّل الوضع الداكن لراحة عينيك في الإضاءة المنخفضة.', accentColor: '#D4F82D' },
+    { icon: 'language-outline', title: 'تغيير اللغة', description: 'بدّل بين العربية والإنجليزية من إعدادات التفضيلات.', accentColor: '#4ECDC4' },
+  ] : [
+    { icon: 'person-circle-outline', title: 'Your Profile', description: 'Tap your photo to change it, or tap the edit icon to update your name.', accentColor: '#7C5CFF' },
+    { icon: 'moon-outline', title: 'Dark Mode', description: 'Toggle dark mode for a comfortable experience in low light.', accentColor: '#D4F82D' },
+    { icon: 'language-outline', title: 'Switch Language', description: 'Switch between Arabic and English from the Preferences section.', accentColor: '#4ECDC4' },
+  ];
   
   const userSettings = useOfflineQuery<any>('auth.getUserSettings', api.auth.getUserSettings, userId ? { userId } : "skip");
   const updateSettings = useOfflineMutation(api.auth.updateSettings, "auth:updateSettings");
@@ -336,6 +350,8 @@ const Settings = () => {
           <Text style={styles.versionText}>VERSION 1.0.4 (BETA)</Text>
         </ScrollView>
       </SafeAreaView>
+
+      <ScreenGuide visible={showGuide} tips={settingsTips} onDismiss={dismissGuide} isArabic={isArabic} />
     </View>
   );
 };

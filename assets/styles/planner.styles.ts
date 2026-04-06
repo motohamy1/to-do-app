@@ -1,5 +1,5 @@
 import { ColorScheme } from "@/hooks/useTheme";
-import { StyleSheet, Dimensions } from "react-native";
+import { StyleSheet, Dimensions, Platform } from "react-native";
 
 const { width } = Dimensions.get('window');
 const gapSize = 12;
@@ -7,6 +7,8 @@ const paddingHorizontal = 20;
 const totalPadding = paddingHorizontal * 2;
 // Subtracting border width (approx 3-4px total) and a small buffer to ensure 3 columns
 const cardWidth = (width - totalPadding - (gapSize * 2) - 6) / 3;
+const gridCardWidth = (width - 48 - gapSize) / 2; // 2 columns with padding 24*2 + one gap
+
 
 export const createPlannerStyles = (colors: ColorScheme, isArabic: boolean = false) => {
   return StyleSheet.create({
@@ -229,6 +231,34 @@ export const createPlannerStyles = (colors: ColorScheme, isArabic: boolean = fal
     addDayTaskContainer: {
         paddingHorizontal: 24,
         marginTop: 20,
+    },
+    gridContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: 24,
+      gap: gapSize,
+    },
+    gridTaskItem: {
+      width: gridCardWidth,
+      height: 145,
+      borderRadius: 20,
+      padding: 16,
+      borderWidth: 1,
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+    },
+    gridTaskItemText: {
+      fontSize: 16,
+      fontWeight: '600',
+      writingDirection: 'auto',
+      fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif-medium',
+    },
+    horizontalGridContainer: {
+      flexDirection: 'column',
+      flexWrap: 'wrap',
+      paddingHorizontal: 24,
+      height: 310, // 145 * 2 + 20 gap
+      gap: 12,
     }
   });
 };

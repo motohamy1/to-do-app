@@ -3,6 +3,8 @@ import { ColorScheme } from "@/hooks/useTheme";
 
 const { width } = Dimensions.get('window');
 const cardWidth = width * 0.45;
+const gridCardWidth = (width - 48 - 12) / 2; // (Screen - horizontal padding*2 - gap) / 2
+
 
 export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false) => {
   return StyleSheet.create({
@@ -28,8 +30,7 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
       color: colors.text,
     },
     sectionContainer: {
-      height: '48%',
-      marginVertical: '1%',
+      marginBottom: 32,
     },
     sectionHeader: {
       flexDirection: 'row',
@@ -64,6 +65,12 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
       fontWeight: '700',
       color: '#000000',
       marginBottom: 8,
+      fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif-medium',
+      writingDirection: 'auto',
+    },
+    loneColumnCentered: {
+      justifyContent: 'center',
+      height: 290, // Match horizontalGridContainer height
     },
     cardDesc: {
       fontSize: 14,
@@ -392,6 +399,45 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
     checklistTextDone: {
       textDecorationLine: 'line-through',
       color: colors.textMuted,
+    },
+    gridContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: 24,
+      gap: 12,
+    },
+    gridCard: {
+      width: gridCardWidth,
+      height: 145,
+      borderRadius: 32,
+      padding: 16,
+      justifyContent: 'space-between',
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 10,
+      elevation: 4,
+    },
+    horizontalGridContainer: {
+      flexDirection: 'column',
+      flexWrap: 'wrap',
+      paddingHorizontal: 24,
+      height: 310, // 145 * 2 + 20 gap
+      gap: 12,
+    },
+    inlineReminderHeader: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: 20,
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    inlineReminderTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: 16,
     }
   });
 };

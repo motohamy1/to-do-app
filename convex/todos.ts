@@ -20,7 +20,7 @@ export const getSubtasks = query({
     return await ctx.db
       .query("todos")
       .withIndex("by_parent", (q) => q.eq("parentId", args.parentId))
-      .order('desc')
+      .order('asc')
       .collect();
   },
 });
@@ -60,6 +60,7 @@ export const addTodo = mutation({
     userId: v.id("users"),
     text: v.string(),
     timerDuration: v.optional(v.number()),
+    timerDirection: v.optional(v.string()),
     status: v.optional(v.string()),
     timerStartTime: v.optional(v.number()),
     dueDate: v.optional(v.number()),
@@ -79,6 +80,7 @@ export const addTodo = mutation({
       text: args.text,
       status: args.status || "not_started",
       ...(args.timerDuration && { timerDuration: args.timerDuration }),
+      ...(args.timerDirection && { timerDirection: args.timerDirection }),
       ...(args.timerStartTime && { timerStartTime: args.timerStartTime }),
       ...(args.dueDate && { dueDate: args.dueDate }),
       ...(args.projectId && { projectId: args.projectId }),
@@ -135,6 +137,7 @@ export const setTimer = mutation({
   args: { 
     id: v.id("todos"), 
     duration: v.optional(v.number()),
+    timerDirection: v.optional(v.string()),
     dueDate: v.optional(v.number()), 
     date: v.optional(v.number()) 
   },
@@ -163,6 +166,7 @@ export const setTimer = mutation({
 
     await ctx.db.patch(args.id, { 
       ...(args.duration !== undefined && { timerDuration: args.duration }),
+      ...(args.timerDirection !== undefined && { timerDirection: args.timerDirection }),
       ...(args.dueDate !== undefined && { dueDate: args.dueDate }),
       ...(args.date !== undefined && { date: args.date })
     });
@@ -317,8 +321,19 @@ export const updateTodo = mutation({
     location: v.optional(v.string()),
     meetingLink: v.optional(v.string()),
     priority: v.optional(v.string()),
+    timerDirection: v.optional(v.string()),
     categoryId: v.optional(v.id("projectCategories")),
     type: v.optional(v.string()),
+    dueDate: v.optional(v.number()),
+    date: v.optional(v.number()),
+    userId: v.optional(v.id("users")),
+    isCompleted: v.optional(v.boolean()),
+    status: v.optional(v.string()),
+    timerDuration: v.optional(v.number()),
+    timerStartTime: v.optional(v.number()),
+    timeLeftAtPause: v.optional(v.number()),
+    projectId: v.optional(v.string()),
+    parentId: v.optional(v.id("todos")),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;

@@ -18,6 +18,9 @@ import ProjectPickerModal from "@/components/ProjectPickerModal";
 import ActionModal from "@/components/ActionModal";
 import CircularProgress from "@/components/CircularProgress";
 import { useAuth } from "@/hooks/useAuth";
+import { useScreenGuide } from "@/hooks/useScreenGuide";
+import ScreenGuide from "@/components/ScreenGuide";
+import type { GuideTip } from "@/components/ScreenGuide";
 
 import { useTranslation } from "@/utils/i18n";
 
@@ -29,6 +32,8 @@ const index = () => {
     const router = useRouter();
     const setTimerMutation = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
     const linkProject = useOfflineMutation(api.todos.linkProject, "todos:linkProject");
+    const updateTodo = useOfflineMutation(api.todos.updateTodo, "todos:updateTodo");
+    const updateStatus = useOfflineMutation(api.todos.updateStatus, "todos:updateStatus");
     const { colors, isDarkMode } = useTheme();
 
     const [isTimerModalVisible, setTimerModalVisible] = useState(false);
@@ -39,8 +44,23 @@ const index = () => {
     const [isActionModalVisible, setActionModalVisible] = useState(false);
     const [selectedTodoForAction, setSelectedTodoForAction] = useState<any>(null);
 
+    const [isGlobalActionModalVisible, setGlobalActionModalVisible] = useState(false);
+    const [showOverdue, setShowOverdue] = useState(false);
+    const [sortActive, setSortActive] = useState('');
+
     const scrollViewRef = useRef<ScrollView>(null);
     const homeStyles = createHomeStyles(colors, isArabic);
+    const { showGuide, dismissGuide } = useScreenGuide('home');
+
+    const homeTips: GuideTip[] = isArabic ? [
+      { icon: 'add-circle-outline', title: 'أضف مهمة', description: 'اكتب مهمتك في الحقل بالأسفل واضغط إرسال لإضافتها.', accentColor: '#D4F82D' },
+      { icon: 'timer-outline', title: 'مؤقت ذكي', description: 'اضغط على أيقونة الساعة لتحديد مدة المهمة وموعدها.', accentColor: '#00E096' },
+      { icon: 'hand-left-outline', title: 'اضغط مطولاً', description: 'اضغط مطولاً على أي مهمة لحذفها أو مشاركتها أو ربطها بمشروع.', accentColor: '#5CB2FF' },
+    ] : [
+      { icon: 'add-circle-outline', title: 'Add a Task', description: 'Type your task in the input field below and hit send to add it.', accentColor: '#D4F82D' },
+      { icon: 'timer-outline', title: 'Smart Timer', description: 'Tap the clock icon on any task to set a duration and due date.', accentColor: '#00E096' },
+      { icon: 'hand-left-outline', title: 'Long Press', description: 'Long press any task to delete, share, or link it to a project.', accentColor: '#5CB2FF' },
+    ];
 
     const scrollToBottom = () => {
       setTimeout(() => {
@@ -55,7 +75,32 @@ const index = () => {
       status: t.status || ((t as any).isCompleted ? 'done' : 'not_started')
     })) || [];
 
-    const todayTodos = normalizedTodos; 
+    const { todayTodos, overdueTodos } = useMemo(() => {
+      const todayStart = new Date().setHours(0, 0, 0, 0);
+      const tomorrowStart = todayStart + 86400000;
+      
+      const today: any[] = [];
+      const overdue: any[] = [];
+
+      normalizedTodos.forEach(t => {
+        if (t.status === 'done' && t.date !== undefined && (t.date < todayStart || t.date >= tomorrowStart)) return;
+        
+        if (t.date !== undefined && t.date < todayStart && t.status !== 'done') {
+          overdue.push(t);
+        } else if (!t.date || (t.date >= todayStart && t.date < tomorrowStart)) {
+          today.push(t);
+        }
+      });
+      
+      if (sortActive === 'priority') {
+        const pScores: any = { 'Urgent': 3, 'High': 2, 'Medium': 1, 'Low': 0, undefined: -1 };
+        today.sort((a, b) => (pScores[b.priority] || -1) - (pScores[a.priority] || -1));
+      } else if (sortActive === 'date') {
+        today.sort((a, b) => (a.dueDate || 0) - (b.dueDate || 0));
+      }
+
+      return { todayTodos: today, overdueTodos: overdue };
+    }, [normalizedTodos, sortActive]);
     const doneTodosCount = todayTodos.filter(t => t.status === 'done').length;
     const inProgressCount = todayTodos.filter(t => t.status === 'in_progress' || t.status === 'paused').length;
     const totalCount = todayTodos.length;
@@ -89,6 +134,12 @@ const index = () => {
         if (activeFilter === 'In Progress') return todayTodos.filter(t => t.status === 'in_progress' || t.status === 'paused');
         return todayTodos;
     }, [todayTodos, activeFilter]);
+
+    const displayedOverdue = useMemo(() => {
+        if (activeFilter === 'Done') return overdueTodos.filter(t => t.status === 'done');
+        if (activeFilter === 'In Progress') return overdueTodos.filter(t => t.status === 'in_progress' || t.status === 'paused');
+        return overdueTodos;
+    }, [overdueTodos, activeFilter]);
 
     return (
         <KeyboardAvoidingView 
@@ -166,12 +217,12 @@ const index = () => {
                       {/* Tasks List */}
                       <View style={[homeStyles.sectionTitleContainer, isArabic && { flexDirection: 'row-reverse' }]}>
                           <Text style={homeStyles.sectionTitleText}>{t.tasksForToday}</Text>
-                          <TouchableOpacity>
+                          <TouchableOpacity onPress={() => setGlobalActionModalVisible(true)}>
                               <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
                           </TouchableOpacity>
                       </View>
 
-                      {displayedTodos.length === 0 && (
+                      {displayedTodos.length === 0 && displayedOverdue.length === 0 && (
                         <View style={homeStyles.emptyContainer}>
                            <Ionicons name="clipboard-outline" size={48} color={colors.border} />
                            <Text style={homeStyles.emptyText}>{t.noTasksFound}</Text>
@@ -194,9 +245,45 @@ const index = () => {
                       ))}
                       
                       {activeFilter === 'All' && (
-                          <View style={{ marginTop: 24, marginBottom: 0 }}>
+                          <View style={{ marginTop: 24, marginBottom: 24 }}>
                               <TodoInput onFocus={scrollToBottom} />
                           </View>
+                      )}
+                      
+                      {displayedOverdue.length > 0 && (
+                        <View style={{ marginBottom: 16 }}>
+                          <TouchableOpacity 
+                            style={[homeStyles.sectionTitleContainer, isArabic && { flexDirection: 'row-reverse' }, { marginBottom: 8 }]}
+                            onPress={() => setShowOverdue(!showOverdue)}
+                          >
+                            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                              <Text style={[homeStyles.sectionTitleText, { color: colors.warning }]}>{t.overdueTasks}</Text>
+                              <View style={{ backgroundColor: colors.warning + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning }}>{displayedOverdue.length}</Text>
+                              </View>
+                            </View>
+                            <Ionicons 
+                              name={showOverdue ? 'chevron-down' : (isArabic ? 'chevron-back' : 'chevron-forward')} 
+                              size={20} 
+                              color={colors.textMuted} 
+                            />
+                          </TouchableOpacity>
+                          
+                          {showOverdue && displayedOverdue.map(todo => (
+                            <TodoCard 
+                                key={todo._id} 
+                                todo={todo} 
+                                onSetTimer={handleOpenTimerModal}
+                                onLongPress={(id) => {
+                                    setSelectedTodoForAction(todo);
+                                    setActionModalVisible(true);
+                                }}
+                                onLinkProject={handleOpenProjectModal}
+                                homeStyles={homeStyles}
+                                isTimelineMode={true}
+                            />
+                          ))}
+                        </View>
                       )}
 
                    </ScrollView>
@@ -260,6 +347,41 @@ const index = () => {
               ]}
             />
 
+            <ActionModal 
+              visible={isGlobalActionModalVisible}
+              onClose={() => setGlobalActionModalVisible(false)}
+              title={isArabic ? 'خيارات القائمة' : 'List Options'}
+              isArabic={isArabic}
+              options={[
+                {
+                  label: t.sortByPriority,
+                  icon: 'star-outline',
+                  onPress: () => setSortActive('priority')
+                },
+                {
+                  label: t.sortByDueDate,
+                  icon: 'calendar-outline',
+                  onPress: () => setSortActive('date')
+                },
+                {
+                  label: t.markAllDone,
+                  icon: 'checkmark-done-outline',
+                  onPress: () => {
+                    displayedTodos.forEach(t => updateStatus({ id: t._id, status: 'done' }));
+                  }
+                },
+                {
+                  label: t.clearCompleted,
+                  icon: 'trash-outline',
+                  variant: 'destructive',
+                  onPress: () => {
+                    todayTodos.filter(t => t.status === 'done').forEach(t => deleteTodo({ id: t._id }));
+                  }
+                }
+              ]}
+            />
+
+            <ScreenGuide visible={showGuide} tips={homeTips} onDismiss={dismissGuide} isArabic={isArabic} />
         </KeyboardAvoidingView>
     );
 };

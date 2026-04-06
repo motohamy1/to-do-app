@@ -20,6 +20,7 @@ import { useOfflineMutation } from '@/hooks/useOfflineMutation';
 import { api } from '@/convex/_generated/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
+import { scheduleReminderNotification } from '@/utils/notifications';
 
 const AddReminderScreen = () => {
   const router = useRouter();
@@ -49,8 +50,15 @@ const AddReminderScreen = () => {
         userId: userId!,
         text: title.trim(),
         dueDate: dueDate,
+        date: dueDate || Date.now(),
         status: "not_started",
+        type: 'reminder',
       });
+
+      // Schedule a sound notification at due time
+      if (dueDate && dueDate > Date.now()) {
+        await scheduleReminderNotification(title.trim(), dueDate, language);
+      }
 
       if (Platform.OS !== 'web') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

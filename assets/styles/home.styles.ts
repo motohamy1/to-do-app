@@ -128,8 +128,21 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       flexDirection: 'row',
     },
     timelineColumn: {
-      width: 50,
-      alignItems: 'flex-start',
+      width: 70,
+      alignItems: 'center',
+      paddingLeft: 4,
+    },
+    timelineTimeTop: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+    timelineTimeBottom: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: colors.textMuted,
+      textAlign: 'center',
     },
     timelineTime: {
       fontSize: 14,
@@ -153,6 +166,8 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       fontWeight: "800",
       color: colors.surfaceText,
       flex: 1,
+      writingDirection: 'auto',
+      fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif-medium',
     },
     
     // Utilities

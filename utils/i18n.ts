@@ -90,6 +90,17 @@ export const translations = {
     saveFailed: "Failed to save reminder",
     deadline: "Deadline",
     remove: "Remove",
+    countUp: "Count Up",
+    countDown: "Count Down",
+    overdueTasks: "Overdue Tasks",
+    hide: "Hide",
+    show: "Show",
+    sortByPriority: "Sort by Priority",
+    sortByDueDate: "Sort by Due Date",
+    clearCompleted: "Clear Completed",
+    markAllDone: "Mark All Done",
+    reminderNotifTitle: "⏰ Reminder",
+    reminderNotifBody: "Time for: ",
   },
 
 
@@ -184,6 +195,17 @@ export const translations = {
     saveFailed: "فشل حفظ التذكير",
     deadline: "الموعد النهائي",
     remove: "إزالة",
+    countUp: "تصاعدي",
+    countDown: "تنازلي",
+    overdueTasks: "المهام المتأخرة",
+    hide: "إخفاء",
+    show: "إظهار",
+    sortByPriority: "فرز حسب الأولوية",
+    sortByDueDate: "فرز حسب تاريخ الاستحقاق",
+    clearCompleted: "مسح المنجز",
+    markAllDone: "تحديد الكل كمنجز",
+    reminderNotifTitle: "⏰ تذكير",
+    reminderNotifBody: "حان وقت: ",
   }
 
 
