@@ -59,7 +59,8 @@
             "./assets/alarm_tone.wav"
           ]
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true
