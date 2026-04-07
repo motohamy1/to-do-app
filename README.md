@@ -1,50 +1,91 @@
-# Welcome to your Expo app 👋
+# ToDoIt 👋
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A premium, localized, and feature-rich To-Do & Planner application built with **Expo**, **React Native**, and **Convex**. 
 
-## Get started
+ToDoIt is designed to provide a seamless productivity experience with focus on premium aesthetics, real-time synchronization, and powerful task management.
 
-1. Install dependencies
+---
 
-   ```bash
-   npm install
-   ```
+## ✨ Key Features
 
-2. Start the app
+- **🏆 Comprehensive Task Management**: Create tasks with detailed descriptions, priority levels, and due dates.
+- **🔳 Nested Subtasks**: Break down complex goals into smaller, manageable subtasks with their own statuses and timers.
+- **⏱️ Integrated Timers**: Track time spent on tasks and subtasks directly within the app to boost focus and productivity.
+- **🗓️ Daily Planner**: A dedicated space to organize your day, manage reminders, and stay on top of your schedule.
+- **📁 Project Organization**: Group tasks into projects for better categorical focus and tracking.
+- **🔔 Premium Notifications**: Never miss a deadline with localized alerts and custom alarm tones.
+- **🌓 Dark Mode & RTL Support**: Full support for automatic theme switching and Right-to-Left (RTL) languages like Arabic.
+- **⚡ Real-time Sync**: Powered by Convex, your data stays in sync across all your devices instantly.
 
-   ```bash
-   npx expo start
-   ```
+---
 
-In the output, you'll find options to open the app in a
+## 🛠️ Tech Stack
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- **Frontend**: [React Native](https://reactnative.dev/) & [Expo](https://expo.dev/)
+- **Routing**: [Expo Router](https://docs.expo.dev/router/introduction/) (File-based navigation)
+- **Backend/Database**: [Convex](https://www.convex.dev/) (Real-time database & serverless backend)
+- **State Management**: Convex Hooks & React State
+- **Localization**: `i18next` & `react-i18next`
+- **Styling**: Vanilla React Native Styles with custom theme hooks
+- **Persistence**: `expo-secure-store`
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+---
 
-## Get a fresh project
+## 🚀 Getting Started
 
-When you're ready, run:
+### 1. Prerequisites
+- [Node.js](https://nodejs.org/) (LTS)
+- [Expo Go](https://expo.dev/go) on your mobile device or an emulator (Android Studio / Xcode)
+
+### 2. Installation
+Clone the repository and install the dependencies:
 
 ```bash
-npm run reset-project
+git clone <repository-url>
+cd to-do-app
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 3. Setup Backend (Convex)
+The project uses Convex for its backend. Initialize your Convex project by running:
 
-## Learn more
+```bash
+npx convex dev
+```
+Follow the prompts to link the project to your Convex account. This will start a local backend development environment.
 
-To learn more about developing your project with Expo, look at the following resources:
+### 4. Start the Application
+In a separate terminal, start the Expo development server:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npx expo start -c
+```
 
-## Join the community
+---
 
-Join our community of developers creating universal apps.
+## 📱 Project Structure
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `app/`: Contains the Expo Router screen definitions and tabs.
+- `components/`: Reusable UI components (TodoCard, TaskDetailModal, ActionModal, etc.).
+- `convex/`: Backend schema and serverless functions (todos, projects, etc.).
+- `hooks/`: Custom React hooks for theming, auth, and state.
+- `assets/`: Images, icons, and custom sound files.
+- `utils/`: Helper functions, localization setup, and notification logic.
+
+---
+
+## 🌐 Localization
+
+ToDoIt is built to be accessible globally. Current supported languages:
+- **English** (en)
+- **Arabic** (ar) - with full RTL layout support.
+
+---
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
+Developed with ❤️ by [dr-tohamy](https://github.com/dr-tohamy)
