@@ -17,14 +17,18 @@ interface TaskDetailModalProps {
   visible: boolean;
   onClose: () => void;
   todoId: Id<"todos"> | null;
+  initialDate?: number;
+  projectId?: Id<"projects">;
 }
 
-const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, todoId }) => {
+const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, todoId, initialDate, projectId }) => {
   const { colors, isDarkMode } = useTheme();
   const { userId, language } = useAuth();
   const { t, isArabic } = useTranslation(language);
 
-  const currentTodoId = todoId;
+  // --- Task Nesting (Back Stack) ---
+  const [taskStack, setTaskStack] = useState<Id<"todos">[]>([]);
+  const currentTodoId = taskStack.length > 0 ? taskStack[taskStack.length - 1] : todoId;
   const todo = useOfflineQuery<any>('todos.getById', api.todos.getById, currentTodoId ? { id: currentTodoId } : "skip");
   const subtasks = useOfflineQuery<any[]>('todos.getSubtasks', api.todos.getSubtasks, currentTodoId ? { parentId: currentTodoId } : "skip");
   const project = useOfflineQuery<any>('projects.getProjectMetadata', api.projects.getProjectMetadata, todo?.projectId ? { id: todo.projectId } : "skip");
@@ -34,6 +38,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const setTimer = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
   const startTimer = useOfflineMutation(api.todos.startTimer, "todos:startTimer");
   const pauseTimer = useOfflineMutation(api.todos.pauseTimer, "todos:pauseTimer");
+  const resetTimer = useOfflineMutation(api.todos.resetTimer, "todos:resetTimer");
+  const removeTimer = useOfflineMutation(api.todos.removeTimer, "todos:removeTimer");
   const addTodo = useOfflineMutation(api.todos.addTodo, "todos:addTodo");
   const deleteTodo = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
 
@@ -88,17 +94,68 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
     }
   }, [todo?._id]);
 
+  // Reset to blank draft when modal opens with no todoId
   useEffect(() => {
-    // Left empty since we removed todoStack
+    if (visible && !todoId) {
+      setEditText("");
+      setDescription("");
+      setPriority("Medium");
+      setHours("0");
+      setMinutes("0");
+      setNewSubtaskText("");
+      setIsEditingTimer(false);
+      setInitializedForId(null);
+    }
   }, [visible, todoId]);
 
-  const handleClose = () => {
+
+  const handleClose = async () => {
+    if (todoId) {
+      saveText();
+      saveDescription();
+    } else if (editText.trim() && userId) {
+      // Create new task from draft
+      const h = parseInt(hours) || 0;
+      const m = parseInt(minutes) || 0;
+      const ms = (h * 3600 + m * 60) * 1000;
+      
+      await addTodo({
+        userId,
+        text: editText.trim(),
+        description: description.trim(),
+        priority: priority,
+        date: initialDate || Date.now(),
+        status: "not_started",
+        ...(projectId ? { projectId } : {}),
+        ...(ms > 0 ? { timerDuration: ms } : {}),
+      });
+    }
+    
+    setTaskStack([]);
     setInitializedForId(null);
+    // Explicitly reset draft state for next time
+    setEditText("");
+    setDescription("");
+    setPriority("Medium");
+    setHours("0");
+    setMinutes("0");
     onClose();
   };
 
   const handleBack = () => {
-    handleClose();
+    if (taskStack.length > 0) {
+      const newStack = [...taskStack];
+      newStack.pop();
+      setTaskStack(newStack);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    } else {
+      handleClose();
+    }
+  };
+
+  const openSubtaskDetail = (id: Id<"todos">) => {
+    setTaskStack(prev => [...prev, id]);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
   };
 
   const saveText = () => {
@@ -215,7 +272,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
             {/* Header */}
            <View style={[styles.header, { borderBottomColor: colors.border + '40' }, isArabic && { flexDirection: 'row-reverse' }]}>
             <TouchableOpacity onPress={handleBack} style={styles.headerIcon}>
-              <Ionicons name={"close"} size={26} color={colors.text} />
+              <Ionicons name={taskStack.length > 0 ? (isArabic ? "chevron-forward" : "chevron-back") : "close"} size={28} color={colors.text} />
             </TouchableOpacity>
             
             <View style={{ flex: 1, alignItems: 'center' }}>
@@ -241,7 +298,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
 
           </View>
 
-          {!todo ? (
+          {(!todo && currentTodoId) ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={projectColor} />
             </View>
@@ -271,19 +328,35 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               </View>
 
               {/* Timer Section Selection */}
-              {(!todo.timerDuration || isEditingTimer) && (
+              {(!todo || !todo.timerDuration) && !isEditingTimer && (
+                <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
+                  <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{t.timer}</Text>
+                  <TouchableOpacity 
+                    style={[styles.deadlineButton, { borderColor: projectColor + '60', backgroundColor: projectColor + '10' }, isArabic && { flexDirection: 'row-reverse' }]}
+                    onPress={() => {
+                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                        setIsEditingTimer(true);
+                    }}
+                  >
+                    <Ionicons name="timer-outline" size={20} color={projectColor} />
+                    <Text style={[styles.deadlineButtonText, { color: colors.text, fontWeight: '700' }]}>
+                      {isArabic ? 'إضافة مؤقت' : 'Add a Timer'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {isEditingTimer && (
                 <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
                   <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
                     <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{t.timer}</Text>
 
-                    {isEditingTimer && (todo?.timerDuration ?? 0) > 0 && (
-                      <TouchableOpacity onPress={() => {
-                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                        setIsEditingTimer(false);
-                      }}>
-                        <Text style={{ fontSize: 13, color: colors.danger, fontWeight: '700' }}>{t.cancel}</Text>
-                      </TouchableOpacity>
-                    )}
+                    <TouchableOpacity onPress={() => {
+                      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                      setIsEditingTimer(false);
+                    }}>
+                      <Text style={{ fontSize: 13, color: colors.danger, fontWeight: '700' }}>{t.cancel}</Text>
+                    </TouchableOpacity>
                   </View>
 
                   {/* Custom Timer Input Row */}
@@ -337,8 +410,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                   onPress={() => setShowDatePicker(true)}
                 >
                   <Ionicons name="calendar-outline" size={20} color={todo?.dueDate ? projectColor : colors.textMuted} />
-                  <Text style={[styles.deadlineButtonText, { color: todo!.dueDate ? colors.text : colors.textMuted }]}>
-                    {todo!.dueDate ? new Date(todo!.dueDate).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : (isArabic ? 'تحديد موعد نهائي' : 'Set a deadline')}
+                  <Text style={[styles.deadlineButtonText, { color: todo?.dueDate ? colors.text : colors.textMuted }]}>
+                    {todo?.dueDate ? new Date(todo.dueDate).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : (isArabic ? 'تحديد موعد نهائي' : 'Set a deadline')}
                   </Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
@@ -355,7 +428,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               </View>
 
               {/* Circular Timer Visualization */}
-              {!!todo!.timerDuration && !isEditingTimer && (
+              {todo?.timerDuration && !isEditingTimer && (
                 <View style={styles.timerContainer}>
                   <Svg width="200" height="200" viewBox="0 0 220 220">
                     <G rotation="-90" origin="110, 110">
@@ -423,7 +496,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     
                     <TouchableOpacity 
                       style={[styles.secondaryButton, { borderColor: projectColor + '40', backgroundColor: colors.surface }]}
-                      onPress={() => setTimer({ id: currentTodoId!, duration: todo!.timerDuration })}
+                      onPress={() => resetTimer({ id: currentTodoId! })}
                     >
                       <Ionicons name="refresh" size={20} color={projectColor} />
                     </TouchableOpacity>
@@ -447,7 +520,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       style={[styles.tertiaryButton, { borderColor: colors.danger + '40' }]}
                       onPress={() => {
                         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                        currentTodoId && setTimer({ id: currentTodoId, duration: 0 });
+                        if (currentTodoId) removeTimer({ id: currentTodoId });
+                        setIsEditingTimer(false);
                       }}
                     >
                       <Ionicons name="close-circle-outline" size={16} color={colors.danger} />
@@ -461,46 +535,64 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
 
 
 
-              {/* Status & Priority Selection */}
-
-              <View style={[styles.rowSection, isArabic && { flexDirection: 'row-reverse' }]}>
-                <View style={[styles.halfSection, isArabic && { alignItems: 'flex-end' }]}>
-                  <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{isArabic ? "الحالة" : "Status"}</Text>
-
-                  <TouchableOpacity 
-                    style={[styles.statusButton, { backgroundColor: todo!.status === 'done' ? colors.success + '20' : colors.surface, borderColor: todo!.status === 'done' ? colors.success : colors.border }]}
-                    onPress={() => updateStatus({ id: currentTodoId!, status: todo!.status === 'done' ? 'not_started' : 'done' })}
+              {/* Status Section */}
+              {currentTodoId && todo && (
+              <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
+                <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{isArabic ? "الحالة" : "Status"}</Text>
+                
+                <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', padding: 4, borderRadius: 12 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (todo!.timerDuration && todo!.timerDuration > 0) {
+                        startTimer({ id: currentTodoId! });
+                      } else {
+                        updateStatus({ id: currentTodoId!, status: 'in_progress' });
+                      }
+                    }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: todo!.status === 'in_progress' ? '#f85d08' : 'transparent', backgroundColor: todo!.status === 'in_progress' ? '#f85d08' : 'transparent' }}
                   >
+                    <Ionicons name="play" size={14} color={todo!.status === 'in_progress' ? '#FFF' : colors.textMuted} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: todo!.status === 'in_progress' ? '#FFF' : colors.textMuted }}>{t.inProgress}</Text>
+                  </TouchableOpacity>
 
-                    <Ionicons name={todo!.status === 'done' ? "checkmark-circle" : "ellipse-outline"} size={18} color={todo!.status === 'done' ? colors.success : colors.textMuted} />
+                  <TouchableOpacity
+                    onPress={() => updateStatus({ id: currentTodoId!, status: 'done' })}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: todo!.status === 'done' ? colors.success : 'transparent', backgroundColor: todo!.status === 'done' ? colors.success : 'transparent' }}
+                  >
+                    <Ionicons name="checkmark-circle" size={14} color={todo!.status === 'done' ? '#FFF' : colors.textMuted} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: todo!.status === 'done' ? '#FFF' : colors.textMuted }}>{t.done}</Text>
+                  </TouchableOpacity>
 
-                    <Text style={[styles.statusText, { color: todo!.status === 'done' ? (isDarkMode ? '#FFFFFF' : colors.success) : colors.text }]}>
-                      {todo!.status === 'done' ? t.done : t.notStarted}
-                    </Text>
+                  <TouchableOpacity
+                    onPress={() => updateStatus({ id: currentTodoId!, status: 'not_done' })}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: todo!.status === 'not_done' ? '#ff0000' : 'transparent', backgroundColor: todo!.status === 'not_done' ? '#ff0000' : 'transparent' }}
+                  >
+                    <Ionicons name="close-circle" size={14} color={todo!.status === 'not_done' ? '#FFF' : colors.textMuted} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: todo!.status === 'not_done' ? '#FFF' : colors.textMuted }}>{t.notDone}</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+              )}
 
-                <View style={[styles.halfSection, isArabic && { alignItems: 'flex-end' }]}>
-                  <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{isArabic ? "الأولوية" : "Priority"}</Text>
-
-                  <View style={[styles.priorityPills, isArabic && { flexDirection: 'row-reverse' }]}>
-                    {['Low', 'Medium', 'High'].map((p) => (
-                      <TouchableOpacity 
-                        key={p} 
-                        style={[
-                          styles.priorityPill, 
-                          { backgroundColor: priority === p ? (p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : colors.primary) + '20' : colors.surface },
-                          priority === p && { borderColor: p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : colors.primary }
-                        ]}
-                        onPress={() => handleUpdatePriority(p)}
-                      >
-                        <Text style={[styles.priorityText, { color: priority === p ? (isDarkMode ? '#FFFFFF' : (p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : colors.primary)) : colors.textMuted }]}>
-
-                          {p === 'Low' ? (isArabic ? 'منخفضة' : 'Low') : p === 'Medium' ? (isArabic ? 'متوسطة' : 'Med') : (isArabic ? 'عالية' : 'High')}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+              {/* Priority Section */}
+              <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
+                <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{isArabic ? "الأولوية" : "Priority"}</Text>
+                <View style={[styles.priorityPills, isArabic && { flexDirection: 'row-reverse' }]}>
+                  {['Low', 'Medium', 'High'].map((p) => (
+                    <TouchableOpacity 
+                      key={p} 
+                      style={[
+                        styles.priorityPill, 
+                        { backgroundColor: priority === p ? (p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : colors.primary) + '20' : colors.surface },
+                        priority === p && { borderColor: p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : colors.primary }
+                      ]}
+                      onPress={() => handleUpdatePriority(p)}
+                    >
+                      <Text style={[styles.priorityText, { color: priority === p ? (isDarkMode ? '#FFFFFF' : (p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : colors.primary)) : colors.textMuted }]}>
+                        {p === 'Low' ? (isArabic ? 'منخفضة' : 'Low') : p === 'Medium' ? (isArabic ? 'متوسطة' : 'Med') : (isArabic ? 'عالية' : 'High')}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
 
@@ -531,7 +623,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                 </View>
                 
                 <View style={[styles.subtaskList, { gap: 10 }]}>
-                  {subtasks?.map((sub) => (
+                    {subtasks?.map((sub) => (
                     <SubtaskRow
                       key={sub._id}
                       sub={sub}
@@ -543,6 +635,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       onSetTimer={handleSetSubTimer}
                       onUpdateText={handleUpdateSubText}
                       onUpdateStatus={(id, status) => updateStatus({ id, status })}
+                      onSelect={(id) => openSubtaskDetail(id)}
                     />
                   ))}
 
@@ -746,11 +839,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   titleInput: {
-    fontSize: 26,
+    fontSize: 32,
     fontWeight: '900',
-    letterSpacing: -0.5,
+    letterSpacing: -1,
     padding: 0,
-    minHeight: 40,
+    minHeight: 44,
   },
   rowSection: {
     flexDirection: 'row',

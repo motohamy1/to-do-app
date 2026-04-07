@@ -1,0 +1,19 @@
+Index: app.json
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>{\n  \"expo\": {\n    \"name\": \"to-do-app\",\n    \"slug\": \"do-it\",\n    \"version\": \"1.0.0\",\n    \"orientation\": \"portrait\",\n    \"icon\": \"./assets/images/icon.png\",\n    \"scheme\": \"todoapp\",\n    \"userInterfaceStyle\": \"automatic\",\n    \"ios\": {\n      \"supportsTablet\": true\n    },\n    \"android\": {\n      \"softwareKeyboardLayoutMode\": \"pan\",\n      \"adaptiveIcon\": {\n        \"backgroundColor\": \"#E6F4FE\",\n        \"foregroundImage\": \"./assets/images/android-icon-foreground.png\",\n        \"backgroundImage\": \"./assets/images/android-icon-background.png\",\n        \"monochromeImage\": \"./assets/images/android-icon-monochrome.png\"\n      },\n      \"predictiveBackGestureEnabled\": false,\n      \"package\": \"com.motohamy.todoapp\"\n    },\n    \"web\": {\n      \"output\": \"static\",\n      \"favicon\": \"./assets/images/favicon.png\"\n    },\n    \"plugins\": [\n      \"expo-router\",\n      [\n        \"expo-splash-screen\",\n        {\n          \"image\": \"./assets/images/splash-icon.png\",\n          \"imageWidth\": 200,\n          \"resizeMode\": \"contain\",\n          \"backgroundColor\": \"#ffffff\",\n          \"dark\": {\n            \"backgroundColor\": \"#000000\"\n          }\n        }\n      ],\n      \"expo-font\",\n      \"expo-image\",\n      \"expo-web-browser\",\n      \"@react-native-community/datetimepicker\",\n      \"expo-secure-store\",\n      \"expo-notifications\"\n    ],\n    \"experiments\": {\n      \"typedRoutes\": true\n    },\n    \"extra\": {\n      \"router\": {},\n      \"eas\": {\n        \"projectId\": \"d9fd5723-c157-43cc-ac0d-1827b2ad7cdb\"\n      }\n    },\n    \"owner\": \"motohamy\"\n  }\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/app.json b/app.json
+--- a/app.json	(revision 604f8c726355716e8b97e12d72e797a2938bc91f)
++++ b/app.json	(date 1775538205302)
+@@ -14,7 +14,7 @@
+       "softwareKeyboardLayoutMode": "pan",
+       "adaptiveIcon": {
+         "backgroundColor": "#E6F4FE",
+-        "foregroundImage": "./assets/images/android-icon-foreground.png",
++        "foregroundImage": "./assets/images/logo.png",
+         "backgroundImage": "./assets/images/android-icon-background.png",
+         "monochromeImage": "./assets/images/android-icon-monochrome.png"
+       },

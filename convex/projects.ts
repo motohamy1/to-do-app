@@ -13,6 +13,20 @@ export const getCategories = query({
   },
 });
 
+export const getCategory = query({
+  args: { id: v.id("projectCategories") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
+export const getSubCategory = query({
+  args: { id: v.id("projectSubCategories") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
 export const addCategory = mutation({
   args: {
     userId: v.id("users"),
@@ -27,6 +41,19 @@ export const addCategory = mutation({
       icon: args.icon,
       color: args.color,
     });
+  },
+});
+
+export const updateCategory = mutation({
+  args: {
+    id: v.id("projectCategories"),
+    name: v.optional(v.string()),
+    icon: v.optional(v.string()),
+    color: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { id, ...fields } = args;
+    await ctx.db.patch(id, fields);
   },
 });
 
@@ -93,6 +120,19 @@ export const addSubCategory = mutation({
       icon: args.icon,
       color: args.color,
     });
+  },
+});
+
+export const updateSubCategory = mutation({
+  args: {
+    id: v.id("projectSubCategories"),
+    name: v.optional(v.string()),
+    icon: v.optional(v.string()),
+    color: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { id, ...fields } = args;
+    await ctx.db.patch(id, fields);
   },
 });
 

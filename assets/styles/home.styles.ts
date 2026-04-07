@@ -74,37 +74,43 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
     
     // --- Filter Pills ---
     pillsContainer: {
-      paddingHorizontal: 24,
-      gap: 8,
+      flexDirection: 'row',
+      marginHorizontal: 24,
+      backgroundColor: colors.surface + '80', // semi-transparent surface
+      borderRadius: 16,
+      padding: 4,
+      gap: 4,
       marginBottom: 32,
     },
     pill: {
-      paddingHorizontal: 16,
+      flex: 1,
       paddingVertical: 10,
-      borderRadius: 20,
-      backgroundColor: colors.surface,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: 'transparent',
     },
     pillActive: {
       backgroundColor: colors.surface,
-      borderColor: colors.primary,
-      borderWidth: 1.5,
+      borderColor: colors.border,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 2,
     },
     pillInactive: {
       backgroundColor: 'transparent',
-      borderColor: 'transparent',
     },
     pillText: {
-      fontSize: 14,
-      fontWeight: '600',
+      fontSize: 13,
+      fontWeight: '700',
     },
     pillSubText: {
-      fontSize: 12,
-      color: colors.textMuted,
-      marginTop: 2,
+      fontSize: 10,
+      fontWeight: '600',
+      marginTop: 1,
     },
 
     // --- Timeline List ---
@@ -154,6 +160,12 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       backgroundColor: colors.surface,
       borderRadius: 20,
       padding: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    cardNotDone: {
+      borderColor: colors.danger,
+      borderWidth: 2,
     },
     cardHeader: {
       flexDirection: "row",

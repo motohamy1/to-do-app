@@ -1,0 +1,21 @@
+Index: package.json
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>{\n  \"name\": \"to-do-app\",\n  \"main\": \"expo-router/entry\",\n  \"version\": \"1.0.0\",\n  \"scripts\": {\n    \"start\": \"expo start\",\n    \"reset-project\": \"node ./scripts/reset-project.js\",\n    \"android\": \"expo start --android\",\n    \"ios\": \"expo start --ios\",\n    \"web\": \"expo start --web\",\n    \"lint\": \"expo lint\"\n  },\n  \"dependencies\": {\n    \"@expo/vector-icons\": \"^15.0.3\",\n    \"@react-native-async-storage/async-storage\": \"2.2.0\",\n    \"@react-native-community/datetimepicker\": \"8.6.0\",\n    \"@react-native-community/netinfo\": \"11.5.2\",\n    \"@react-navigation/bottom-tabs\": \"^7.4.0\",\n    \"@react-navigation/elements\": \"^2.6.3\",\n    \"@react-navigation/native\": \"^7.1.8\",\n    \"@types/bcryptjs\": \"^2.4.6\",\n    \"bcryptjs\": \"^3.0.3\",\n    \"convex\": \"^1.32.0\",\n    \"expo\": \"^55.0.5\",\n    \"expo-constants\": \"~55.0.7\",\n    \"expo-dev-client\": \"~55.0.19\",\n    \"expo-font\": \"~55.0.4\",\n    \"expo-haptics\": \"~55.0.8\",\n    \"expo-image\": \"~55.0.6\",\n    \"expo-image-picker\": \"~55.0.14\",\n    \"expo-linear-gradient\": \"~55.0.8\",\n    \"expo-linking\": \"~55.0.7\",\n    \"expo-localization\": \"^55.0.8\",\n    \"expo-notifications\": \"~55.0.14\",\n    \"expo-router\": \"~55.0.5\",\n    \"expo-secure-store\": \"~55.0.8\",\n    \"expo-splash-screen\": \"~55.0.10\",\n    \"expo-status-bar\": \"~55.0.4\",\n    \"expo-symbols\": \"~55.0.5\",\n    \"expo-system-ui\": \"~55.0.9\",\n    \"expo-web-browser\": \"~55.0.9\",\n    \"fast-text-encoding\": \"^1.0.6\",\n    \"react\": \"19.2.0\",\n    \"react-dom\": \"19.2.0\",\n    \"react-native\": \"0.83.2\",\n    \"react-native-gesture-handler\": \"~2.30.0\",\n    \"react-native-get-random-values\": \"~1.11.0\",\n    \"react-native-reanimated\": \"4.2.1\",\n    \"react-native-safe-area-context\": \"~5.6.0\",\n    \"react-native-screens\": \"~4.23.0\",\n    \"react-native-svg\": \"15.15.3\",\n    \"react-native-web\": \"~0.21.0\",\n    \"react-native-worklets\": \"^0.7.2\"\n  },\n  \"devDependencies\": {\n    \"@types/react\": \"~19.2.10\",\n    \"eslint\": \"^9.25.0\",\n    \"eslint-config-expo\": \"~55.0.0\",\n    \"typescript\": \"~5.9.2\"\n  },\n  \"private\": true\n}\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/package.json b/package.json
+--- a/package.json	(revision ce4e500d4392a0d5cf86c52352edf461dc150332)
++++ b/package.json	(date 1775514300846)
+@@ -5,8 +5,8 @@
+   "scripts": {
+     "start": "expo start",
+     "reset-project": "node ./scripts/reset-project.js",
+-    "android": "expo start --android",
+-    "ios": "expo start --ios",
++    "android": "expo run:android",
++    "ios": "expo run:ios",
+     "web": "expo start --web",
+     "lint": "expo lint"
+   },

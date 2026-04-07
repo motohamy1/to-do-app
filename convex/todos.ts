@@ -173,6 +173,30 @@ export const setTimer = mutation({
   },
 });
 
+export const resetTimer = mutation({
+  args: { id: v.id("todos") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      timerStartTime: undefined,
+      timeLeftAtPause: undefined,
+      status: "not_started"
+    });
+  }
+});
+
+export const removeTimer = mutation({
+  args: { id: v.id("todos") },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, {
+      timerDuration: undefined,
+      timerDirection: undefined,
+      timerStartTime: undefined,
+      timeLeftAtPause: undefined,
+      status: "not_started"
+    });
+  }
+});
+
 export const startTimer = mutation({
   args: { id: v.id("todos") },
   handler: async (ctx, args) => {

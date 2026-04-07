@@ -18,6 +18,11 @@ function getNotificationsAPI(): typeof NotificationsType | null {
 
 const Notifications = getNotificationsAPI();
 
+// Custom alarm sound name (without extension)
+// Android: looks in android/app/src/main/res/raw/alarm_tone.wav
+// iOS: looks for alarm_tone.wav in the app bundle
+const ALARM_SOUND = Platform.OS === 'android' ? 'alarm_tone' : 'alarm_tone.wav';
+
 if (Notifications) {
   try {
     Notifications.setNotificationHandler({
@@ -27,6 +32,7 @@ if (Notifications) {
         shouldSetBadge: true,
         shouldShowBanner: true,
         shouldShowList: true,
+        priority: Notifications.AndroidNotificationPriority?.MAX,
       } as any),
     });
   } catch (error) {
@@ -42,30 +48,57 @@ export async function requestPermissionsAsync() {
 
   try {
     if (Platform.OS === 'android') {
+      // IMPORTANT: Delete existing channels first so they get recreated 
+      // with the new alarm sound. Android caches channel settings permanently.
+      const channelIds = ['tasks', 'subtasks', 'reminders', 'daily'];
+      for (const id of channelIds) {
+        try {
+          await Notifications.deleteNotificationChannelAsync(id);
+        } catch (_) {
+          // Channel may not exist yet, that's fine
+        }
+      }
+
+      // Task timer completion channel — ALARM-LEVEL urgency
       await Notifications.setNotificationChannelAsync('tasks', {
         name: 'Task Timers',
         importance: Notifications.AndroidImportance.MAX,
-        sound: 'default',
+        sound: ALARM_SOUND,
         enableVibrate: true,
-        vibrationPattern: [0, 500, 200, 500],
+        vibrationPattern: [0, 500, 200, 500, 200, 500],
         lightColor: '#FF231F7C',
-      });
+        enableLights: true,
+        bypassDnd: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      } as any);
+
+      // Subtask timer completion channel — HIGH urgency
       await Notifications.setNotificationChannelAsync('subtasks', {
         name: 'Subtask Timers',
-        importance: Notifications.AndroidImportance.HIGH,
-        sound: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        sound: ALARM_SOUND,
         enableVibrate: true,
-        vibrationPattern: [0, 250, 150, 250],
+        vibrationPattern: [0, 400, 150, 400, 150, 400],
         lightColor: '#D4F82D',
-      });
+        enableLights: true,
+        bypassDnd: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      } as any);
+
+      // Reminders channel — ALARM-LEVEL urgency
       await Notifications.setNotificationChannelAsync('reminders', {
         name: 'Reminders',
         importance: Notifications.AndroidImportance.MAX,
-        sound: 'default',
+        sound: ALARM_SOUND,
         enableVibrate: true,
-        vibrationPattern: [0, 500, 200, 500],
+        vibrationPattern: [0, 500, 200, 500, 200, 500],
         lightColor: '#FF5C77',
-      });
+        enableLights: true,
+        bypassDnd: true,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      } as any);
+
+      // Daily summaries — normal importance with default sound
       await Notifications.setNotificationChannelAsync('daily', {
         name: 'Daily Summaries',
         importance: Notifications.AndroidImportance.HIGH,
@@ -73,6 +106,7 @@ export async function requestPermissionsAsync() {
         enableVibrate: true,
         vibrationPattern: [0, 250, 150, 250],
         lightColor: '#4A90D9',
+        enableLights: true,
       });
     }
 
@@ -103,8 +137,11 @@ export async function scheduleTimerNotification(title: string, durationMs: numbe
       content: {
         title: isSubtask ? t.notifSubtaskTitle : t.notifTaskTitle,
         body: (isSubtask ? t.notifSubtaskBody : t.notifTaskBody) + `"${title}"`,
-        sound: 'default',
-        priority: 'max',
+        sound: ALARM_SOUND,
+        priority: Notifications.AndroidNotificationPriority?.MAX,
+        sticky: false,
+        autoDismiss: false,
+        vibrate: [0, 500, 200, 500, 200, 500],
       } as any,
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -152,8 +189,11 @@ export async function scheduleReminderNotification(
       content: {
         title: t.reminderNotifTitle || '⏰ Reminder',
         body: (t.reminderNotifBody || 'Time for: ') + `"${title}"`,
-        sound: 'default',
-        priority: 'max',
+        sound: ALARM_SOUND,
+        priority: Notifications.AndroidNotificationPriority?.MAX,
+        sticky: false,
+        autoDismiss: false,
+        vibrate: [0, 500, 200, 500, 200, 500],
       } as any,
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,

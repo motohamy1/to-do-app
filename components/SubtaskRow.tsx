@@ -28,6 +28,17 @@ const formatDuration = (ms: number) => {
   return `${m}m`;
 };
 
+// Luminance helper
+const getLuminance = (hex: string) => {
+  if (!hex || hex.length < 6) return 0;
+  const c = hex.substring(hex.startsWith('#') ? 1 : 0);
+  const rgb = parseInt(c, 16);
+  const r = (rgb >> 16) & 0xff;
+  const g = (rgb >>  8) & 0xff;
+  const b = (rgb >>  0) & 0xff;
+  return 0.299 * r + 0.587 * g + 0.114 * b;
+};
+
 interface SubtaskRowProps {
   sub: any;
   parentTimerDuration?: number;
@@ -38,6 +49,7 @@ interface SubtaskRowProps {
   onSetTimer: (id: Id<"todos">, ms: number, direction: string) => void;
   onUpdateText: (id: Id<"todos">, text: string) => void;
   onUpdateStatus: (id: Id<"todos">, status: string) => void;
+  onSelect?: (id: Id<"todos">) => void;
 }
 
 const localStyles = {
@@ -65,6 +77,7 @@ export const SubtaskRow = ({
   onSetTimer,
   onUpdateText,
   onUpdateStatus,
+  onSelect,
 }: SubtaskRowProps) => {
   const { language } = useAuth();
   const { t, isArabic } = useTranslation(language);
@@ -86,27 +99,26 @@ export const SubtaskRow = ({
 
   // Live countdown for running subtasks
   useEffect(() => {
+    let interval: NodeJS.Timeout;
     if (sub.status === 'in_progress' && sub.timerStartTime) {
       if (sub.timerDirection === 'up') {
         const calc = () => {
           const elapsed = Date.now() - sub.timerStartTime!;
-          setSubTimeLeft(elapsed);
+          setSubTimeLeft((prev: number) => prev !== elapsed ? elapsed : prev);
         };
         calc();
-        const interval = setInterval(calc, 1000);
-        return () => clearInterval(interval);
+        interval = setInterval(calc, 1000);
       } else if (sub.timerDuration) {
         const calc = () => {
           const elapsed = Date.now() - sub.timerStartTime!;
           const remaining = Math.max(0, sub.timerDuration! - elapsed);
-          setSubTimeLeft(remaining);
+          setSubTimeLeft((prev: number) => prev !== remaining ? remaining : prev);
           if (remaining === 0 && sub.status === 'in_progress') {
             onUpdateStatus(sub._id, 'done');
           }
         };
         calc();
-        const interval = setInterval(calc, 1000);
-        return () => clearInterval(interval);
+        interval = setInterval(calc, 1000);
       }
     } else if (sub.status === 'paused' && sub.timeLeftAtPause !== undefined) {
       setSubTimeLeft(sub.timeLeftAtPause);
@@ -115,7 +127,8 @@ export const SubtaskRow = ({
     } else {
       setSubTimeLeft(sub.timerDirection === 'up' ? 0 : (sub.timerDuration || 0));
     }
-  }, [sub.status, sub.timerStartTime, sub.timerDuration, sub.timeLeftAtPause, sub.timerDirection]);
+    return () => { if (interval) clearInterval(interval); };
+  }, [sub.status, sub.timerStartTime, sub.timerDuration, sub.timeLeftAtPause, sub.timerDirection, sub._id, onUpdateStatus]);
 
   const handleSaveEdit = () => {
     if (editText.trim() && editText !== sub.text) onUpdateText(sub._id, editText.trim());
@@ -128,21 +141,31 @@ export const SubtaskRow = ({
   const isPaused = sub.status === 'paused';
   const hasTimer = !!sub.timerDuration;
 
+  const cardBg = sub.status === 'in_progress' ? colors.taskInProgressBg 
+               : sub.status === 'paused' ? colors.taskPausedBg 
+               : sub.status === 'done' ? colors.taskDoneBg 
+               : sub.status === 'not_done' ? colors.taskNotDoneBg 
+               : colors.taskNotStartedBg;
+
+  const isBrightBg = getLuminance(cardBg) > 170;
+  const contentColor = isBrightBg ? '#0D0F1A' : colors.surfaceText;
+  const contentMutedColor = isBrightBg ? '#00000080' : colors.surfaceText + '80';
+
   if (isEditing) {
     return (
-      <View style={[{ backgroundColor: colors.surface, borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, borderColor: colors.border + '40', marginBottom: 8 }, isArabic && { direction: 'rtl' }]}>
-        <Text style={[{ fontSize: 10, fontWeight: '800', color: colors.surfaceText, letterSpacing: 0.5, textTransform: 'uppercase' }, isArabic && { textAlign: 'right' }]}>{t.editingSubtask}</Text>
+      <View style={[{ backgroundColor: cardBg, borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, borderColor: isBrightBg ? '#00000020' : colors.border + '40', marginBottom: 8 }, isArabic && { direction: 'rtl' }]}>
+        <Text style={[{ fontSize: 10, fontWeight: '800', color: contentColor, letterSpacing: 0.5, textTransform: 'uppercase' }, isArabic && { textAlign: 'right' }]}>{t.editingSubtask}</Text>
 
         <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, isArabic && { flexDirection: 'row-reverse' }]}>
           <TouchableOpacity onPress={() => onToggleComplete(sub._id, sub.status)}>
             <Ionicons
               name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
               size={24}
-              color={isDone ? colors.success : colors.textMuted}
+              color={isDone ? colors.success : contentMutedColor}
             />
           </TouchableOpacity>
           <TextInput
-            style={[{ flex: 1, color: colors.surfaceText, fontSize: 16, backgroundColor: colors.bg, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: colors.primary, fontWeight: '600' }, isArabic && { textAlign: 'right' }]}
+            style={[{ flex: 1, color: contentColor, fontSize: 16, backgroundColor: isBrightBg ? '#00000008' : colors.bg, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: isBrightBg ? '#00000040' : colors.primary, fontWeight: '600' }, isArabic && { textAlign: 'right' }]}
             value={editText}
             onChangeText={setEditText}
             autoFocus
@@ -150,22 +173,21 @@ export const SubtaskRow = ({
           />
         </View>
 
-        {/* Timer toggle */}
         <TouchableOpacity
           style={[localStyles.actionBtn, {
-            backgroundColor: hasTimer ? colors.surfaceText + '10' : 'transparent',
-            borderColor: colors.surfaceText + '30',
+            backgroundColor: hasTimer ? (isBrightBg ? '#00000010' : colors.surfaceText + '10') : 'transparent',
+            borderColor: isBrightBg ? '#00000030' : colors.surfaceText + '30',
             borderWidth: 1,
             alignSelf: isArabic ? 'flex-end' : 'flex-start',
             flexDirection: isArabic ? 'row-reverse' : 'row'
           }]}
           onPress={() => setShowTimerPicker(!showTimerPicker)}
         >
-          <Ionicons name="timer-outline" size={16} color={colors.surfaceText} />
-          <Text style={[localStyles.actionBtnText, { color: colors.surfaceText }]}>
+          <Ionicons name="timer-outline" size={16} color={contentColor} />
+          <Text style={[localStyles.actionBtnText, { color: contentColor }]}>
             {hasTimer ? formatDuration(sub.timerDuration!) : t.setTimer}
           </Text>
-          <Ionicons name={showTimerPicker ? 'chevron-up' : 'chevron-down'} size={13} color={colors.surfaceText} />
+          <Ionicons name={showTimerPicker ? 'chevron-up' : 'chevron-down'} size={13} color={contentColor} />
         </TouchableOpacity>
 
         {showTimerPicker && (
@@ -186,16 +208,16 @@ export const SubtaskRow = ({
 
         <View style={[{ flexDirection: 'row', gap: 10 }, isArabic && { flexDirection: 'row-reverse' }]}>
            <TouchableOpacity
-            style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+            style={{ flex: 1, backgroundColor: sub.status === 'in_progress' ? '#f85d08' : colors.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
             onPress={handleSaveEdit}
           >
-            <Text style={{ color: isDarkMode ? '#000' : '#FFF', fontWeight: '800', fontSize: 14 }}>{t.save}</Text>
+            <Text style={{ color: (sub.status === 'in_progress' || colors.primary === '#f85d08') ? '#FFF' : (isDarkMode ? '#000' : '#FFF'), fontWeight: '800', fontSize: 14 }}>{t.save}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={{ flex: 1, backgroundColor: colors.border, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+            style={{ flex: 1, backgroundColor: isBrightBg ? '#00000015' : colors.border, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
             onPress={() => { setIsEditing(false); setShowTimerPicker(false); }}
           >
-            <Text style={{ color: colors.text, fontWeight: '700', fontSize: 14 }}>{t.cancel}</Text>
+            <Text style={{ color: contentColor, fontWeight: '700', fontSize: 14 }}>{t.cancel}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -203,24 +225,24 @@ export const SubtaskRow = ({
   }
 
   return (
-    <View style={[{ backgroundColor: colors.surface, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.border + '20' }, isArabic && { direction: 'rtl' }]}>
+    <View style={[{ backgroundColor: cardBg, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: isBrightBg ? '#00000010' : colors.border + '20' }, isArabic && { direction: 'rtl' }]}>
       <View style={[{ flexDirection: 'row', alignItems: 'center', padding: 12 }, isArabic && { flexDirection: 'row-reverse' }]}>
         <TouchableOpacity onPress={() => onToggleComplete(sub._id, sub.status)}>
           <Ionicons
             name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
             size={24}
-            color={isDone ? colors.success : colors.textMuted}
+            color={isDone ? colors.success : contentMutedColor}
             style={isArabic ? { marginLeft: 12 } : { marginRight: 12 }}
           />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={{ flex: 1 }}
-          onPress={() => { setIsEditing(true); setEditText(sub.text); }}
+          onPress={() => onSelect ? onSelect(sub._id) : (setIsEditing(true), setEditText(sub.text))}
         >
           <Text
             style={[{
-              color: isDone ? colors.surfaceText + '60' : colors.surfaceText,
+              color: isDone ? contentMutedColor : contentColor,
               textDecorationLine: isDone ? 'line-through' : 'none',
               fontSize: 15,
               fontWeight: '600',
@@ -238,27 +260,27 @@ export const SubtaskRow = ({
               flexDirection: isArabic ? 'row-reverse' : 'row',
               alignItems: 'center',
               gap: 8,
-              backgroundColor: isRunning ? colors.warning + '15' : isPaused ? colors.surfaceText + '10' : colors.surfaceText + '08',
+              backgroundColor: isRunning ? (isBrightBg ? '#f85d08' : colors.warning + '15') : isPaused ? (isBrightBg ? '#00000010' : colors.surfaceText + '10') : (isBrightBg ? '#00000008' : colors.surfaceText + '08'),
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderRadius: 12,
               marginLeft: isArabic ? 0 : 8,
               marginRight: isArabic ? 8 : 0,
               borderWidth: 1,
-              borderColor: isRunning ? colors.warning + '30' : colors.surfaceText + '20',
+              borderColor: isRunning ? (isBrightBg ? '#f85d08' : colors.warning + '30') : (isBrightBg ? '#00000020' : colors.surfaceText + '20'),
             }]}
           >
             <CircularProgress
               size={24}
               strokeWidth={2}
               progress={sub.timerDuration ? ((sub.timerDuration - subTimeLeft) / sub.timerDuration) * 100 : 0}
-              color={isRunning ? colors.warning : colors.surfaceText}
-              unfilledColor={colors.surfaceText + '10'}
+              color={isRunning ? (isBrightBg ? '#FFF' : colors.warning) : contentColor}
+              unfilledColor={isBrightBg ? 'rgba(0,0,0,0.05)' : colors.surfaceText + '10'}
             >
               <Ionicons
                 name={isRunning ? 'pause' : 'play'}
                 size={10}
-                color={isRunning ? colors.warning : colors.surfaceText}
+                color={isRunning ? (isBrightBg ? '#FFF' : colors.warning) : contentColor}
               />
             </CircularProgress>
             <Text
@@ -266,7 +288,7 @@ export const SubtaskRow = ({
                 fontSize: 12,
                 fontWeight: '800',
                 fontVariant: ['tabular-nums'],
-                color: isRunning ? colors.warning : colors.surfaceText,
+                color: isRunning ? (isBrightBg ? '#FFF' : colors.warning) : contentColor,
               }}
             >
               {isRunning || isPaused ? formatTime(subTimeLeft) : formatDuration(sub.timerDuration!)}
@@ -285,8 +307,8 @@ export const SubtaskRow = ({
         )}
 
         <View style={[{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginLeft: isArabic ? 0 : 8, marginRight: isArabic ? 8 : 0 }]}>
-           <TouchableOpacity onPress={() => { setIsEditing(true); setEditText(sub.text); }}>
-            <Ionicons name="create-outline" size={20} color={colors.primary} />
+           <TouchableOpacity onPress={() => (setIsEditing(true), setEditText(sub.text))}>
+            <Ionicons name="create-outline" size={20} color={isBrightBg ? '#000000' : colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => onDelete(sub._id)}>
             <Ionicons name="trash-outline" size={20} color={colors.danger} />

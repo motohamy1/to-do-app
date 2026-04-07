@@ -132,11 +132,11 @@ const darkColors: ColorScheme = {
   successBg: "#10261E",
   warningBg: "#2B2100",
   dangerBg: "#2B1014",
-  taskInProgressBg: "#1C1C21",
-  taskNotStartedBg: "#1C1C21",
+  taskInProgressBg: "#ffe100ff", // Bright Orange
+  taskNotStartedBg: "#2C2C35", // Dark Gray (matched to border)
   taskDoneBg: "#10261E",
   taskPausedBg: "#1C1C21",
-  taskNotDoneBg: "#2B1014",
+  taskNotDoneBg: "#ff0000", // Pure Red
   shadow: "#000000",
   gradients: {
     background: ["#0F0F12", "#0F0F12"],

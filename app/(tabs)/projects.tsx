@@ -23,6 +23,7 @@ import { useTranslation } from '@/utils/i18n';
 import { createProjectsStyles } from '@/assets/styles/projects.styles';
 import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import { useOfflineMutation } from '@/hooks/useOfflineMutation';
+import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id, Doc } from '@/convex/_generated/dataModel';
 import TodoInput from '@/components/TodoInput';
@@ -58,6 +59,9 @@ const ACCENT_COLORS = [
   '#7C5CFF', '#FF6B6B', '#4ECDC4', '#FFD93D',
   '#6BCB77', '#FF9500', '#47A3FF', '#FF2D55',
   '#AF52DE', '#00C58E', '#FF6D00', '#007AFF',
+  '#E91E63', '#9C27B0', '#673AB7', '#3F51B5',
+  '#2196F3', '#03A9F4', '#00BCD4', '#009688',
+  '#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B',
 ];
 
 const RESOURCE_TYPES: { key: string; label: string; icon: string; color: string }[] = [
@@ -97,55 +101,44 @@ function getTaskStatusColor(status: string | undefined, colors: any) {
 
 // ─── Modals ───────────────────────────────────────────────────────────────────
 
-const AddSubCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
+const AddSubCategoryModal = ({ visible, onClose, colors, styles, onAdd, initialData }: {
   visible: boolean; onClose: () => void; colors: any; styles: any;
   onAdd: (name: string, icon: string, color: string) => void;
+  initialData?: { name: string; icon: string; color: string; id: Id<'projectSubCategories'> };
 }) => {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState(SUB_CATEGORY_ICONS[0]);
   const [color, setColor] = useState(ACCENT_COLORS[2]);
-  const [showCustom, setShowCustom] = useState(false);
-  const [customHex, setCustomHex] = useState(ACCENT_COLORS[2]);
-  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); setShowCustom(false); onClose(); };
+
+  useEffect(() => {
+    if (initialData) {
+      setName(initialData.name);
+      setIcon(initialData.icon);
+      setColor(initialData.color);
+    } else {
+      setName('');
+      setIcon(SUB_CATEGORY_ICONS[0]);
+      setColor(ACCENT_COLORS[2]);
+    }
+  }, [initialData, visible]);
+
+  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
       <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>New Sub-Category</Text>
+            <Text style={styles.modalTitle}>{initialData ? 'Edit Sub-Category' : 'New Sub-Category'}</Text>
             <Text style={styles.modalLabel}>Name</Text>
             <TextInput style={styles.modalInput} placeholder="e.g. Frontend, Cardiology, Sci-Fi..." placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus />
             <Text style={styles.modalLabel}>Color</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPicker}>
               {ACCENT_COLORS.map(c => (
-                <TouchableOpacity key={c} style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} onPress={() => { setColor(c); setShowCustom(false); }} />
+                <TouchableOpacity key={c} style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} onPress={() => setColor(c)} />
               ))}
-              <TouchableOpacity 
-                style={[styles.colorSwatch, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }, showCustom && styles.colorSwatchSelected]} 
-                onPress={() => setShowCustom(true)}
-              >
-                <Ionicons name="color-palette-outline" size={20} color={colors.text} />
-              </TouchableOpacity>
             </ScrollView>
-
-            {showCustom && (
-              <View style={{ marginBottom: 16 }}>
-                <Text style={styles.modalLabel}>Custom Hex Color</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={customHex}
-                  onChangeText={(val) => {
-                    setCustomHex(val);
-                    if (val.length === 7 && val.startsWith('#')) setColor(val);
-                  }}
-                  placeholder="#000000"
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-            )}
-
-            <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleAdd}><Text style={styles.modalPrimaryBtnText}>Create Sub-Category</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleAdd}><Text style={styles.modalPrimaryBtnText}>{initialData ? 'Save Changes' : 'Create Sub-Category'}</Text></TouchableOpacity>
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>
         </ScrollView>
@@ -154,23 +147,35 @@ const AddSubCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
   );
 };
 
-const AddCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
+const AddCategoryModal = ({ visible, onClose, colors, styles, onAdd, initialData }: {
   visible: boolean; onClose: () => void; colors: any; styles: any;
   onAdd: (name: string, icon: string, color: string) => void;
+  initialData?: { name: string; icon: string; color: string; id: Id<'projectCategories'> };
 }) => {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState(CATEGORY_ICONS[0]);
   const [color, setColor] = useState(ACCENT_COLORS[0]);
-  const [showCustom, setShowCustom] = useState(false);
-  const [customHex, setCustomHex] = useState(ACCENT_COLORS[0]);
-  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); setShowCustom(false); onClose(); };
+
+  useEffect(() => {
+    if (initialData) {
+      setName(initialData.name);
+      setIcon(initialData.icon);
+      setColor(initialData.color);
+    } else {
+      setName('');
+      setIcon(CATEGORY_ICONS[0]);
+      setColor(ACCENT_COLORS[0]);
+    }
+  }, [initialData, visible]);
+
+  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), icon, color); setName(''); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
       <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>New Category</Text>
+            <Text style={styles.modalTitle}>{initialData ? 'Edit Category' : 'New Category'}</Text>
             <Text style={styles.modalLabel}>Name</Text>
             <TextInput style={styles.modalInput} placeholder="e.g. Programming, Medicine…" placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus />
             <Text style={styles.modalLabel}>Icon</Text>
@@ -184,33 +189,10 @@ const AddCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
             <Text style={styles.modalLabel}>Color</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPicker}>
               {ACCENT_COLORS.map(c => (
-                <TouchableOpacity key={c} style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} onPress={() => { setColor(c); setShowCustom(false); }} />
+                <TouchableOpacity key={c} style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} onPress={() => setColor(c)} />
               ))}
-              <TouchableOpacity 
-                style={[styles.colorSwatch, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }, showCustom && styles.colorSwatchSelected]} 
-                onPress={() => setShowCustom(true)}
-              >
-                <Ionicons name="color-palette-outline" size={20} color={colors.text} />
-              </TouchableOpacity>
             </ScrollView>
-
-            {showCustom && (
-              <View style={{ marginBottom: 16 }}>
-                <Text style={styles.modalLabel}>Custom Hex Color</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={customHex}
-                  onChangeText={(val) => {
-                    setCustomHex(val);
-                    if (val.length === 7 && val.startsWith('#')) setColor(val);
-                  }}
-                  placeholder="#000000"
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-            )}
-
-            <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleAdd}><Text style={styles.modalPrimaryBtnText}>Create Category</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleAdd}><Text style={styles.modalPrimaryBtnText}>{initialData ? 'Save Changes' : 'Create Category'}</Text></TouchableOpacity>
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>
         </ScrollView>
@@ -219,24 +201,38 @@ const AddCategoryModal = ({ visible, onClose, colors, styles, onAdd }: {
   );
 };
 
-const AddProjectModal = ({ visible, onClose, colors, styles, onAdd }: {
+const AddProjectModal = ({ visible, onClose, colors, styles, onAdd, initialData }: {
   visible: boolean; onClose: () => void; colors: any; styles: any;
   onAdd: (name: string, desc: string, icon: string, color: string) => void;
+  initialData?: { name: string; description?: string; icon: string; color: string; id: Id<'projects'> };
 }) => {
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
   const [icon, setIcon] = useState(PROJECT_ICONS[0]);
   const [color, setColor] = useState(ACCENT_COLORS[1]);
-  const [showCustom, setShowCustom] = useState(false);
-  const [customHex, setCustomHex] = useState(ACCENT_COLORS[1]);
-  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), desc.trim(), icon, color); setName(''); setDesc(''); setShowCustom(false); onClose(); };
+
+  useEffect(() => {
+    if (initialData) {
+      setName(initialData.name);
+      setDesc(initialData.description || '');
+      setIcon(initialData.icon);
+      setColor(initialData.color);
+    } else {
+      setName('');
+      setDesc('');
+      setIcon(PROJECT_ICONS[0]);
+      setColor(ACCENT_COLORS[1]);
+    }
+  }, [initialData, visible]);
+
+  const handleAdd = () => { if (!name.trim()) return; onAdd(name.trim(), desc.trim(), icon, color); setName(''); setDesc(''); onClose(); };
   return (
     <Modal visible={visible} transparent animationType="slide">
       <KeyboardAvoidingView style={styles.modalOverlay} behavior="padding">
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: 'flex-end', flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>New Project</Text>
+            <Text style={styles.modalTitle}>{initialData ? 'Edit Project' : 'New Project'}</Text>
             <Text style={styles.modalLabel}>Project Name</Text>
             <TextInput style={styles.modalInput} placeholder="e.g. Todo App, Research Paper…" placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus />
             <Text style={styles.modalLabel}>Short Description (optional)</Text>
@@ -244,33 +240,10 @@ const AddProjectModal = ({ visible, onClose, colors, styles, onAdd }: {
             <Text style={styles.modalLabel}>Color</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPicker}>
               {ACCENT_COLORS.map(c => (
-                <TouchableOpacity key={c} style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} onPress={() => { setColor(c); setShowCustom(false); }} />
+                <TouchableOpacity key={c} style={[styles.colorSwatch, { backgroundColor: c }, color === c && styles.colorSwatchSelected]} onPress={() => setColor(c)} />
               ))}
-              <TouchableOpacity 
-                style={[styles.colorSwatch, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', alignItems: 'center' }, showCustom && styles.colorSwatchSelected]} 
-                onPress={() => setShowCustom(true)}
-              >
-                <Ionicons name="color-palette-outline" size={20} color={colors.text} />
-              </TouchableOpacity>
             </ScrollView>
-
-            {showCustom && (
-              <View style={{ marginBottom: 16 }}>
-                <Text style={styles.modalLabel}>Custom Hex Color</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  value={customHex}
-                  onChangeText={(val) => {
-                    setCustomHex(val);
-                    if (val.length === 7 && val.startsWith('#')) setColor(val);
-                  }}
-                  placeholder="#000000"
-                  placeholderTextColor={colors.textMuted}
-                />
-              </View>
-            )}
-
-            <TouchableOpacity style={[styles.modalPrimaryBtn, { backgroundColor: color }]} onPress={handleAdd}><Text style={styles.modalPrimaryBtnText}>Create Project</Text></TouchableOpacity>
+            <TouchableOpacity style={[styles.modalPrimaryBtn, { backgroundColor: color }]} onPress={handleAdd}><Text style={styles.modalPrimaryBtnText}>{initialData ? 'Save Changes' : 'Create Project'}</Text></TouchableOpacity>
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>
         </ScrollView>
@@ -317,15 +290,16 @@ const AddResourceModal = ({ visible, onClose, colors, styles, onAdd }: {
 
 // ─── Layer 1: Categories View (Full Width) ───────────────────────────────────
 
-const CategoriesView = ({ styles, colors, onSelectCategory, onAddCategory, onOpenAction, userId }: {
+const CategoriesView = ({ styles, colors, onSelectCategory, onAddCategory, onEditCategory, onOpenAction, userId }: {
   styles: any; colors: any;
   onSelectCategory: (id: Id<'projectCategories'>, name: string, color: string) => void;
   onAddCategory: () => void;
+  onEditCategory: (cat: any) => void;
   onOpenAction: (config: any) => void;
   userId: Id<'users'> | null;
 }) => {
   const categories = useOfflineQuery<any[]>('projects.getCategories', api.projects.getCategories, userId ? { userId } : 'skip');
-  const deleteCategory = useOfflineMutation(api.projects.deleteCategory, "projects:deleteCategory");
+  const deleteCategory = useMutation(api.projects.deleteCategory);
   if (!categories) return <View style={styles.emptyContainer}><Ionicons name="hourglass-outline" size={40} color={colors.border} /></View>;
   return (
     <ScrollView contentContainerStyle={styles.categoriesGrid} showsVerticalScrollIndicator={false}>
@@ -352,6 +326,11 @@ const CategoriesView = ({ styles, colors, onSelectCategory, onAddCategory, onOpe
             onPress={() => onOpenAction({
               title: cat.name,
               options: [
+                {
+                  label: 'Edit Category',
+                  icon: 'create-outline',
+                  onPress: () => onEditCategory(cat)
+                },
                 {
                   label: 'Share Category',
                   icon: 'share-social-outline',
@@ -383,16 +362,20 @@ const CategoriesView = ({ styles, colors, onSelectCategory, onAddCategory, onOpe
 
 // ─── Layer 2: Category Detail View (Sub-categories & Direct Projects) ────────
 
-const CategoryDetailView = ({
-  styles, colors, categoryId, categoryName,
-  onSelectSubCategory, onSelectProject, onAddSubCategory, onAddProject, onDeleteCategory, onOpenAction, userId
-}: {
-  styles: any; colors: any;
-  categoryId: Id<'projectCategories'>; categoryName: string;
+const CategoryDetailView = ({ 
+  styles, colors, categoryId, categoryName, userId, onSelectSubCategory, onSelectProject, onAddSubCategory, onAddProject, onEditCategory, onEditSubCategory, onEditProject, onDeleteCategory, onOpenAction 
+}: { 
+  styles: any; 
+  colors: any; 
+  categoryId: Id<'projectCategories'>; 
+  categoryName: string; 
   onSelectSubCategory: (id: Id<'projectSubCategories'>, name: string) => void;
   onSelectProject: (id: Id<'projects'>) => void;
   onAddSubCategory: () => void;
   onAddProject: () => void;
+  onEditCategory: (cat: any) => void;
+  onEditSubCategory: (sub: any) => void;
+  onEditProject: (proj: any) => void;
   onDeleteCategory: (id: Id<'projectCategories'>) => void;
   onOpenAction: (config: any) => void;
   userId: Id<'users'> | null;
@@ -420,6 +403,11 @@ const CategoryDetailView = ({
            onPress={() => onOpenAction({
              title: categoryName,
              options: [
+               {
+                 label: 'Edit Category',
+                 icon: 'create-outline',
+                 onPress: () => onEditCategory({ _id: categoryId, name: categoryName })
+               },
                {
                  label: 'Share Category',
                  icon: 'share-social-outline',
@@ -451,7 +439,17 @@ const CategoryDetailView = ({
         )}
 
         {subCategories.map(sub => (
-          <TouchableOpacity key={sub._id} style={styles.subCategoryCard} onPress={() => onSelectSubCategory(sub._id, sub.name)}>
+          <TouchableOpacity 
+            key={sub._id} style={styles.subCategoryCard} 
+            onPress={() => onSelectSubCategory(sub._id, sub.name)}
+            onLongPress={() => onOpenAction({
+              title: sub.name,
+              options: [
+                { label: 'Edit Sub-Category', icon: 'create-outline', onPress: () => onEditSubCategory(sub) },
+                { label: 'Delete Sub-Category', icon: 'trash-outline', variant: 'destructive', onPress: () => {} } // Need delete sub mutation here or pass it
+              ]
+            })}
+          >
             <View style={[styles.subCategoryIconWrap, { backgroundColor: colors.primary + '15' }]}><Ionicons name="layers-outline" size={18} color={colors.primary} /></View>
             <Text style={styles.subCategoryName}>{sub.name}</Text>
           </TouchableOpacity>
@@ -475,7 +473,17 @@ const CategoryDetailView = ({
           {directProjects.map(project => {
             const { pct } = getProgress(project._id);
             return (
-              <TouchableOpacity key={project._id} style={[styles.projectGridCard, { shadowColor: project.color }]} onPress={() => onSelectProject(project._id)}>
+              <TouchableOpacity 
+                key={project._id} style={[styles.projectGridCard, { shadowColor: project.color }]} 
+                onPress={() => onSelectProject(project._id)}
+                onLongPress={() => onOpenAction({
+                  title: project.name,
+                  options: [
+                    { label: 'Edit Project', icon: 'create-outline', onPress: () => onEditProject(project) },
+                    { label: 'Delete Project', icon: 'trash-outline', variant: 'destructive', onPress: () => {} }
+                  ]
+                })}
+              >
                 <View style={[styles.projectGridIcon, { backgroundColor: project.color + '20' }]}><Ionicons name={project.icon as any} size={24} color={project.color} /></View>
                 <Text style={styles.projectGridName} numberOfLines={1}>{project.name}</Text>
                 <View style={styles.projectGridFooter}>
@@ -503,18 +511,21 @@ const CategoryDetailView = ({
 
 const SubCategoryProjectsView = ({
   styles, colors, subCategoryId, subCategoryName,
-  onSelectProject, onAddProject, onDeleteSubCategory, onOpenAction, userId
+  onSelectProject, onAddProject, onEditSubCategory, onEditProject, onDeleteSubCategory, onOpenAction, userId
 }: {
   styles: any; colors: any;
   subCategoryId: Id<'projectSubCategories'>; subCategoryName: string;
   onSelectProject: (id: Id<'projects'>) => void;
   onAddProject: () => void;
+  onEditSubCategory: (sub: any) => void;
+  onEditProject: (proj: any) => void;
   onDeleteSubCategory: (id: Id<'projectSubCategories'>) => void;
   onOpenAction: (config: any) => void;
   userId: Id<'users'> | null;
 }) => {
   const projects = useOfflineQuery<any[]>('projects.getProjectsBySubCategory', api.projects.getProjectsBySubCategory, { subCategoryId });
   const allTodos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip');
+  const sub = useOfflineQuery<any>('projects.getSubCategory', api.projects.getSubCategory, { id: subCategoryId });
 
   const getProgress = (projectId: string) => {
     if (!allTodos) return { pct: 0 };
@@ -535,6 +546,11 @@ const SubCategoryProjectsView = ({
              title: subCategoryName,
              options: [
                {
+                 label: 'Edit Sub-Category',
+                 icon: 'create-outline',
+                 onPress: () => sub && onEditSubCategory(sub)
+               },
+               {
                  label: 'Share Sub-Category',
                  icon: 'share-social-outline',
                  onPress: () => Share.share({ message: `Sub-Category: ${subCategoryName}` })
@@ -554,7 +570,27 @@ const SubCategoryProjectsView = ({
       {projects.map(project => {
         const { pct } = getProgress(project._id);
         return (
-          <TouchableOpacity key={project._id} style={[styles.projectGridCard, { shadowColor: project.color }]} onPress={() => onSelectProject(project._id)}>
+          <TouchableOpacity 
+            key={project._id} 
+            style={[styles.projectGridCard, { shadowColor: project.color }]} 
+            onPress={() => onSelectProject(project._id)}
+            onLongPress={() => onOpenAction({
+              title: project.name,
+              options: [
+                {
+                  label: 'Edit Project',
+                  icon: 'create-outline',
+                  onPress: () => onEditProject(project)
+                },
+                {
+                   label: 'Delete Project',
+                   icon: 'trash-outline',
+                   variant: 'destructive',
+                   onPress: () => {} // Need deleteProject mutation here or pass it
+                }
+              ]
+            })}
+          >
             <View style={[styles.projectGridIcon, { backgroundColor: project.color + '20' }]}><Ionicons name={project.icon as any} size={24} color={project.color} /></View>
             <Text style={styles.projectGridName} numberOfLines={2}>{project.name}</Text>
             <View style={styles.projectGridFooter}>
@@ -573,30 +609,31 @@ const SubCategoryProjectsView = ({
 
 // ─── Layer 4: Project Detail View ───────────────────────────────────────────
 
-const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId }: { styles: any; colors: any; projectId: Id<'projects'>, onDeleteProject: (id: Id<'projects'>) => void, userId: Id<'users'> | null }) => {
+const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId, onEditProject }: { styles: any; colors: any; projectId: Id<'projects'>, onDeleteProject: (id: Id<'projects'>) => void, userId: Id<'users'> | null, onEditProject: (proj: any) => void }) => {
   const { language } = useAuth();
-  const { t, isArabic } = useTranslation(language);
+  const { isArabic } = useTranslation(language);
   const project = useOfflineQuery<any>('projects.getProject', api.projects.getProject, { id: projectId });
   const resources = useOfflineQuery<any[]>('projects.getProjectResources', api.projects.getProjectResources, { projectId });
   const checklists = useOfflineQuery<any[]>('projects.getChecklists', api.projects.getChecklists, { projectId });
   const linkedTodos = useOfflineQuery<any[]>('projects.getTodosByProject', api.projects.getTodosByProject, project ? { projectId: project._id } : 'skip');
   
-  const addResource = useOfflineMutation(api.projects.addResource, "projects:addResource");
-  const deleteResource = useOfflineMutation(api.projects.deleteResource, "projects:deleteResource");
-  const updateTodoStatus = useOfflineMutation(api.todos.updateStatus, "todos:updateStatus");
-  const updateProject = useOfflineMutation(api.projects.updateProject, "projects:updateProject");
-  const addCheckItem = useOfflineMutation(api.projects.addChecklistItem, "projects:addChecklistItem");
-  const toggleCheckItem = useOfflineMutation(api.projects.toggleChecklistItem, "projects:toggleChecklistItem");
-  const deleteCheckItem = useOfflineMutation(api.projects.deleteChecklistItem, "projects:deleteChecklistItem");
-  const setTimerMutation = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
-  const linkProjectMutation = useOfflineMutation(api.todos.linkProject, "todos:linkProject");
-  const deleteTodoMutation = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
+  const addResource = useMutation(api.projects.addResource);
+  const deleteResource = useMutation(api.projects.deleteResource);
+  const updateTodoStatus = useMutation(api.todos.updateStatus);
+  const updateProject = useMutation(api.projects.updateProject);
+  const addCheckItem = useMutation(api.projects.addChecklistItem);
+  const toggleCheckItem = useMutation(api.projects.toggleChecklistItem);
+  const deleteCheckItem = useMutation(api.projects.deleteChecklistItem);
+  const deleteTodoMutation = useMutation(api.todos.deleteTodo);
+  const setTimerMutation = useMutation(api.todos.setTimer);
+  const linkTodoProjectMutation = useMutation(api.todos.linkProject);
 
   const [tasksOpen, setTasksOpen] = useState(true);
   const [checklistOpen, setChecklistOpen] = useState(true);
   const [showAddResource, setShowAddResource] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
   const [descText, setDescText] = useState('');
+  
   const [newCheckItem, setNewCheckItem] = useState('');
   const [isAddingCheck, setIsAddingCheck] = useState(false);
   
@@ -664,8 +701,13 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId 
                   type: 'project',
                   options: [
                     {
-                      label: isArabic ? 'تعديل الوصف' : 'Edit Description',
+                      label: isArabic ? 'تعديل المشروع' : 'Edit Project',
                       icon: 'create-outline',
+                      onPress: () => onEditProject(project)
+                    },
+                    {
+                      label: isArabic ? 'تعديل الوصف' : 'Edit Description',
+                      icon: 'document-text-outline',
                       onPress: () => setEditingDesc(true)
                     },
                     {
@@ -902,7 +944,7 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId 
       <ProjectPickerModal
         visible={isProjectModalVisible}
         onClose={() => { setProjectModalVisible(false); setSelectedTodoId(null); }}
-        onSelect={(id) => { if (selectedTodoId) linkProjectMutation({ id: selectedTodoId, projectId: id }); }}
+        onSelect={(id) => { if (selectedTodoId) linkTodoProjectMutation({ id: selectedTodoId, projectId: id }); }}
       />
 
       <ActionModal 
@@ -948,16 +990,22 @@ const Projects: React.FC = () => {
   const [isActionModalVisible, setActionModalVisible] = useState(false);
   const [actionConfig, setActionConfig] = useState<{ title: string, options: any[] } | null>(null);
 
-  const [showAddCat, setShowAddCat] = useState(false);
-  const [showAddSub, setShowAddSub] = useState(false);
-  const [showAddProj, setShowAddProj] = useState(false);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [isAddingSubCategory, setIsAddingSubCategory] = useState(false);
+  const [isAddingProject, setIsAddingProject] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<{ id: Id<'projectCategories'>, name: string, icon: string, color: string } | null>(null);
+  const [editingSubCategory, setEditingSubCategory] = useState<{ id: Id<'projectSubCategories'>, name: string, icon: string, color: string } | null>(null);
+  const [editingProject, setEditingProject] = useState<{ id: Id<'projects'>, name: string, description?: string, icon: string, color: string } | null>(null);
 
-  const addCat = useOfflineMutation(api.projects.addCategory, "projects:addCategory");
-  const addSub = useOfflineMutation(api.projects.addSubCategory, "projects:addSubCategory");
-  const addProj = useOfflineMutation(api.projects.addProject, "projects:addProject");
-  const deleteCatMutation = useOfflineMutation(api.projects.deleteCategory, "projects:deleteCategory");
-  const deleteSubCatMutation = useOfflineMutation(api.projects.deleteSubCategory, "projects:deleteSubCategory");
-  const deleteProjMutation = useOfflineMutation(api.projects.deleteProject, "projects:deleteProject");
+  const addCategory = useMutation(api.projects.addCategory);
+  const updateCategory = useMutation(api.projects.updateCategory);
+  const deleteCategory = useMutation(api.projects.deleteCategory);
+  const addSubCategory = useMutation(api.projects.addSubCategory);
+  const updateSubCategory = useMutation(api.projects.updateSubCategory);
+  const deleteSubCategory = useMutation(api.projects.deleteSubCategory);
+  const addProject = useMutation(api.projects.addProject);
+  const updateProject = useMutation(api.projects.updateProject);
+  const deleteProject = useMutation(api.projects.deleteProject);
 
   const handleBack = () => {
     if (layer === 'detail') {
@@ -991,6 +1039,31 @@ const Projects: React.FC = () => {
     return 'Project Details';
   };
 
+  const handleAddCategory = (name: string, icon: string, color: string) => {
+    if (!userId) return;
+    if (editingCategory) updateCategory({ id: editingCategory.id, name, icon, color });
+    else addCategory({ userId, name, icon, color });
+    setIsAddingCategory(false);
+    setEditingCategory(null);
+  };
+
+  const handleAddSubCategory = (name: string, icon: string, color: string) => {
+    if (!userId || !selectedCatId) return;
+    if (editingSubCategory) updateSubCategory({ id: editingSubCategory.id, name, icon, color });
+    else addSubCategory({ userId, categoryId: selectedCatId, name, icon, color });
+    setIsAddingSubCategory(false);
+    setEditingSubCategory(null);
+  };
+
+  const handleAddProject = (name: string, description: string, icon: string, color: string) => {
+    if (!userId) return;
+    if (editingProject) updateProject({ id: editingProject.id, name, description, icon, color });
+    else if (selectedSubId) addProject({ userId, subCategoryId: selectedSubId, name, description, icon, color });
+    else if (selectedCatId) addProject({ userId, categoryId: selectedCatId, name, description, icon, color });
+    setIsAddingProject(false);
+    setEditingProject(null);
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.bg} />
@@ -1001,22 +1074,33 @@ const Projects: React.FC = () => {
             <Text style={styles.headerSubtitle}>{layer === 'categories' ? 'Manage your workspaces' : 'Exploring paths'}</Text>
           </View>
           <View style={styles.headerActions}>
-            {layer === 'categories' && <TouchableOpacity style={styles.headerBtn} onPress={() => setShowAddCat(true)}><Ionicons name="add" size={24} color={colors.primary} /></TouchableOpacity>}
+            {layer === 'categories' && <TouchableOpacity style={styles.headerBtn} onPress={() => setIsAddingCategory(true)}><Ionicons name="add" size={24} color={colors.primary} /></TouchableOpacity>}
           </View>
         </View>
 
 
-        {layer === 'categories' && <CategoriesView styles={styles} colors={colors} userId={userId} onAddCategory={() => setShowAddCat(true)} onSelectCategory={(id, name) => { setSelectedCatId(id); setSelectedCatName(name); setLayer('categoryDetail'); }} onOpenAction={(config) => { setActionConfig(config); setActionModalVisible(true); }} />}
+        {layer === 'categories' && (
+          <CategoriesView 
+            styles={styles} colors={colors} userId={userId} 
+            onAddCategory={() => setIsAddingCategory(true)} 
+            onEditCategory={(cat) => { setEditingCategory({ id: cat._id, name: cat.name, icon: cat.icon, color: cat.color }); setIsAddingCategory(true); }}
+            onSelectCategory={(id, name) => { setSelectedCatId(id); setSelectedCatName(name); setLayer('categoryDetail'); }} 
+            onOpenAction={(config) => { setActionConfig(config); setActionModalVisible(true); }} 
+          />
+        )}
         
         {layer === 'categoryDetail' && selectedCatId && (
           <CategoryDetailView 
             styles={styles} colors={colors} categoryId={selectedCatId} categoryName={selectedCatName} userId={userId}
             onSelectSubCategory={(id, name) => { setSelectedSubId(id); setSelectedSubName(name); setLayer('subCategoryProjects'); }}
             onSelectProject={(id) => { setSelectedProjId(id); setSelectedSubId(null); setLayer('detail'); }}
-            onAddSubCategory={() => setShowAddSub(true)}
-            onAddProject={() => setShowAddProj(true)}
+            onAddSubCategory={() => setIsAddingSubCategory(true)}
+            onAddProject={() => setIsAddingProject(true)}
+            onEditCategory={(cat) => { setEditingCategory({ id: cat._id, name: cat.name, icon: cat.icon, color: cat.color }); setIsAddingCategory(true); }}
+            onEditSubCategory={(sub) => { setEditingSubCategory({ id: sub._id, name: sub.name, icon: sub.icon, color: sub.color }); setIsAddingSubCategory(true); }}
+            onEditProject={(proj) => { setEditingProject({ id: proj._id, name: proj.name, description: proj.description, icon: proj.icon, color: proj.color }); setIsAddingProject(true); }}
             onDeleteCategory={(id) => {
-              deleteCatMutation({ id });
+              deleteCategory({ id });
               setLayer('categories');
               setSelectedCatId(null);
             }}
@@ -1028,8 +1112,11 @@ const Projects: React.FC = () => {
           <SubCategoryProjectsView 
             styles={styles} colors={colors} subCategoryId={selectedSubId} subCategoryName={selectedSubName} userId={userId}
             onSelectProject={(id) => { setSelectedProjId(id); setLayer('detail'); }}
-            onAddProject={() => setShowAddProj(true)}
+            onAddProject={() => setIsAddingProject(true)}
+            onEditSubCategory={(sub) => { setEditingSubCategory({ id: sub._id, name: sub.name, icon: sub.icon, color: sub.color }); setIsAddingSubCategory(true); }}
+            onEditProject={(proj) => { setEditingProject({ id: proj._id, name: proj.name, description: proj.description, icon: proj.icon, color: proj.color }); setIsAddingProject(true); }}
             onDeleteSubCategory={(id) => {
+               deleteSubCategory({ id });
                setLayer('categoryDetail');
                setSelectedSubId(null);
             }}
@@ -1040,8 +1127,9 @@ const Projects: React.FC = () => {
         {layer === 'detail' && selectedProjId && (
           <ProjectDetailView 
             styles={styles} colors={colors} projectId={selectedProjId} userId={userId}
+            onEditProject={(proj) => { setEditingProject({ id: proj._id, name: proj.name, description: proj.description, icon: proj.icon, color: proj.color }); setIsAddingProject(true); }}
             onDeleteProject={(id) => {
-               deleteProjMutation({ id });
+               deleteProject({ id });
                setLayer(selectedSubId ? 'subCategoryProjects' : 'categoryDetail');
                setSelectedProjId(null);
             }}
@@ -1050,16 +1138,29 @@ const Projects: React.FC = () => {
 
       </SafeAreaView>
 
-      <AddCategoryModal visible={showAddCat} onClose={() => setShowAddCat(false)} colors={colors} styles={styles} onAdd={(name, icon, color) => userId && addCat({ userId, name, icon, color })} />
-      {selectedCatId && <AddSubCategoryModal visible={showAddSub} onClose={() => setShowAddSub(false)} colors={colors} styles={styles} onAdd={(name, icon, color) => userId && addSub({ userId, categoryId: selectedCatId, name, icon, color })} />}
+      <AddCategoryModal 
+        visible={isAddingCategory} 
+        onClose={() => { setIsAddingCategory(false); setEditingCategory(null); }} 
+        colors={colors} styles={styles} 
+        onAdd={handleAddCategory} 
+        initialData={editingCategory || undefined}
+      />
+      {selectedCatId && (
+        <AddSubCategoryModal 
+          visible={isAddingSubCategory} 
+          onClose={() => { setIsAddingSubCategory(false); setEditingSubCategory(null); }} 
+          colors={colors} styles={styles} 
+          onAdd={handleAddSubCategory} 
+          initialData={editingSubCategory || undefined}
+        />
+      )}
       {(selectedCatId || selectedSubId) && (
         <AddProjectModal 
-          visible={showAddProj} onClose={() => setShowAddProj(false)} colors={colors} styles={styles}
-          onAdd={(name, desc, icon, color) => {
-            if (!userId) return;
-            if (selectedSubId) addProj({ userId, subCategoryId: selectedSubId, name, description: desc, icon, color });
-            else if (selectedCatId) addProj({ userId, categoryId: selectedCatId, name, description: desc, icon, color });
-          }}
+          visible={isAddingProject} 
+          onClose={() => { setIsAddingProject(false); setEditingProject(null); }} 
+          colors={colors} styles={styles}
+          onAdd={handleAddProject}
+          initialData={editingProject || undefined}
         />
       )}
 
@@ -1067,7 +1168,7 @@ const Projects: React.FC = () => {
         visible={isActionModalVisible}
         onClose={() => { setActionModalVisible(false); setActionConfig(null); }}
         title={actionConfig?.title || ''}
-        isArabic={false} // Use state if needed, but categories usually en
+        isArabic={isArabic}
         options={actionConfig?.options || []}
       />
 

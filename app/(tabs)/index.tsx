@@ -5,7 +5,7 @@ import { useOfflineQuery } from "@/hooks/useOfflineQuery";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
 import React, { useState, useMemo, useRef } from 'react';
 
-import { StatusBar, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, KeyboardAvoidingView, Platform, Share } from 'react-native';
+import { StatusBar, View, Text, ScrollView, FlatList, ActivityIndicator, TouchableOpacity, KeyboardAvoidingView, Platform, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from "../../convex/_generated/api";
 import { Id } from '../../convex/_generated/dataModel';
@@ -75,14 +75,18 @@ const index = () => {
       status: t.status || ((t as any).isCompleted ? 'done' : 'not_started')
     })) || [];
 
-    const { todayTodos, overdueTodos } = useMemo(() => {
+    const { todayTodos, overdueTodos, overdueByDay } = useMemo(() => {
       const todayStart = new Date().setHours(0, 0, 0, 0);
       const tomorrowStart = todayStart + 86400000;
       
       const today: any[] = [];
       const overdue: any[] = [];
 
+      // A task is overdue when its scheduled date has passed and it's NOT completed.
+      // This includes paused, in_progress, not_started, and not_done tasks.
+      // When the user marks a task as done, it leaves the overdue section.
       normalizedTodos.forEach(t => {
+        // Skip completed tasks from other days
         if (t.status === 'done' && t.date !== undefined && (t.date < todayStart || t.date >= tomorrowStart)) return;
         
         if (t.date !== undefined && t.date < todayStart && t.status !== 'done') {
@@ -99,7 +103,21 @@ const index = () => {
         today.sort((a, b) => (a.dueDate || 0) - (b.dueDate || 0));
       }
 
-      return { todayTodos: today, overdueTodos: overdue };
+      // Sort overdue by date descending (latest first)
+      overdue.sort((a, b) => (b.date || 0) - (a.date || 0));
+
+      // Group overdue tasks by day (descending from latest to oldest)
+      const dayMap = new Map<number, any[]>();
+      overdue.forEach(t => {
+        const dayStart = new Date(t.date).setHours(0, 0, 0, 0);
+        if (!dayMap.has(dayStart)) dayMap.set(dayStart, []);
+        dayMap.get(dayStart)!.push(t);
+      });
+      const grouped = Array.from(dayMap.entries())
+        .sort(([a], [b]) => b - a) // descending: latest day first
+        .map(([dayTimestamp, tasks]) => ({ dayTimestamp, tasks }));
+
+      return { todayTodos: today, overdueTodos: overdue, overdueByDay: grouped };
     }, [normalizedTodos, sortActive]);
     const doneTodosCount = todayTodos.filter(t => t.status === 'done').length;
     const inProgressCount = todayTodos.filter(t => t.status === 'in_progress' || t.status === 'paused').length;
@@ -136,8 +154,7 @@ const index = () => {
     }, [todayTodos, activeFilter]);
 
     const displayedOverdue = useMemo(() => {
-        if (activeFilter === 'Done') return overdueTodos.filter(t => t.status === 'done');
-        if (activeFilter === 'In Progress') return overdueTodos.filter(t => t.status === 'in_progress' || t.status === 'paused');
+        if (activeFilter !== 'All') return [];
         return overdueTodos;
     }, [overdueTodos, activeFilter]);
 
@@ -182,11 +199,7 @@ const index = () => {
                       </View>
 
                       {/* Filter Pills */}
-                      <ScrollView 
-                          horizontal 
-                          showsHorizontalScrollIndicator={false}
-                          contentContainerStyle={[homeStyles.pillsContainer, isArabic && { flexDirection: 'row-reverse' }]}
-                      >
+                      <View style={[homeStyles.pillsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
                           {(['All', 'In Progress', 'Done'] as const).map(filter => {
                               const isActive = activeFilter === filter;
                               let count = 0;
@@ -212,79 +225,100 @@ const index = () => {
                                   </TouchableOpacity>
                               );
                           })}
-                      </ScrollView>
-
-                      {/* Tasks List */}
-                      <View style={[homeStyles.sectionTitleContainer, isArabic && { flexDirection: 'row-reverse' }]}>
-                          <Text style={homeStyles.sectionTitleText}>{t.tasksForToday}</Text>
-                          <TouchableOpacity onPress={() => setGlobalActionModalVisible(true)}>
-                              <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
-                          </TouchableOpacity>
                       </View>
 
-                      {displayedTodos.length === 0 && displayedOverdue.length === 0 && (
-                        <View style={homeStyles.emptyContainer}>
-                           <Ionicons name="clipboard-outline" size={48} color={colors.border} />
-                           <Text style={homeStyles.emptyText}>{t.noTasksFound}</Text>
-                        </View>
-                      )}
+                       {/* Today's Tasks List */}
+                       <View style={[homeStyles.sectionTitleContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+                           <Text style={homeStyles.sectionTitleText}>{t.tasksForToday}</Text>
+                           <TouchableOpacity onPress={() => setGlobalActionModalVisible(true)}>
+                               <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
+                           </TouchableOpacity>
+                       </View>
 
-                      {displayedTodos.map(todo => (
-                          <TodoCard 
-                              key={todo._id} 
-                              todo={todo} 
-                              onSetTimer={handleOpenTimerModal}
-                              onLongPress={(id) => {
-                                  setSelectedTodoForAction(todo);
-                                  setActionModalVisible(true);
-                              }}
-                              onLinkProject={handleOpenProjectModal}
-                              homeStyles={homeStyles}
-                              isTimelineMode={true}
-                          />
-                      ))}
-                      
-                      {activeFilter === 'All' && (
-                          <View style={{ marginTop: 24, marginBottom: 24 }}>
-                              <TodoInput onFocus={scrollToBottom} />
-                          </View>
-                      )}
-                      
-                      {displayedOverdue.length > 0 && (
-                        <View style={{ marginBottom: 16 }}>
-                          <TouchableOpacity 
-                            style={[homeStyles.sectionTitleContainer, isArabic && { flexDirection: 'row-reverse' }, { marginBottom: 8 }]}
-                            onPress={() => setShowOverdue(!showOverdue)}
-                          >
-                            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
-                              <Text style={[homeStyles.sectionTitleText, { color: colors.warning }]}>{t.overdueTasks}</Text>
-                              <View style={{ backgroundColor: colors.warning + '20', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 12 }}>
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: colors.warning }}>{displayedOverdue.length}</Text>
-                              </View>
-                            </View>
-                            <Ionicons 
-                              name={showOverdue ? 'chevron-down' : (isArabic ? 'chevron-back' : 'chevron-forward')} 
-                              size={20} 
-                              color={colors.textMuted} 
-                            />
-                          </TouchableOpacity>
-                          
-                          {showOverdue && displayedOverdue.map(todo => (
-                            <TodoCard 
-                                key={todo._id} 
-                                todo={todo} 
-                                onSetTimer={handleOpenTimerModal}
-                                onLongPress={(id) => {
-                                    setSelectedTodoForAction(todo);
-                                    setActionModalVisible(true);
-                                }}
-                                onLinkProject={handleOpenProjectModal}
-                                homeStyles={homeStyles}
-                                isTimelineMode={true}
-                            />
-                          ))}
-                        </View>
-                      )}
+                       {displayedTodos.length === 0 && (
+                         <View style={homeStyles.emptyContainer}>
+                            <Ionicons name="clipboard-outline" size={48} color={colors.border} />
+                            <Text style={homeStyles.emptyText}>{t.noTasksFound}</Text>
+                         </View>
+                       )}
+
+                       {displayedTodos.map(todo => (
+                           <TodoCard 
+                               key={todo._id} 
+                               todo={todo} 
+                               onSetTimer={handleOpenTimerModal}
+                               onLongPress={(id) => {
+                                   setSelectedTodoForAction(todo);
+                                   setActionModalVisible(true);
+                               }}
+                               onLinkProject={handleOpenProjectModal}
+                               homeStyles={homeStyles}
+                               isTimelineMode={true}
+                           />
+                       ))}
+                       
+                       {activeFilter === 'All' && (
+                           <View style={{ marginTop: 24, marginBottom: 24 }}>
+                               <TodoInput onFocus={scrollToBottom} />
+                           </View>
+                       )}
+
+                       {/* Not Done Tasks (Overdue) */}
+                       {displayedOverdue.length > 0 && (
+                         <View style={{ marginBottom: 16 }}>
+                           <TouchableOpacity 
+                             style={[homeStyles.sectionTitleContainer, isArabic && { flexDirection: 'row-reverse' }, { marginBottom: 8 }]}
+                             onPress={() => setShowOverdue(!showOverdue)}
+                           >
+                             <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                               <Text style={[homeStyles.sectionTitleText, { color: colors.danger }]}>{t.notDoneTasks}</Text>
+                               <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                                 <Text style={{ fontSize: 12, fontWeight: '800', color: colors.danger }}>{displayedOverdue.length}</Text>
+                               </View>
+                             </View>
+                             <Ionicons 
+                               name={showOverdue ? 'chevron-down' : (isArabic ? 'chevron-back' : 'chevron-forward')} 
+                               size={20} 
+                               color={colors.textMuted} 
+                             />
+                           </TouchableOpacity>
+                           
+                           {showOverdue && overdueByDay.map(({ dayTimestamp, tasks: dayTasks }) => {
+                             const filteredDayTasks = activeFilter === 'Done' ? dayTasks.filter(t => t.status === 'done')
+                               : activeFilter === 'In Progress' ? dayTasks.filter(t => t.status === 'in_progress' || t.status === 'paused')
+                               : dayTasks;
+                             if (filteredDayTasks.length === 0) return null;
+
+                             const dayLabel = new Date(dayTimestamp).toLocaleDateString(
+                               isArabic ? 'ar-SA' : 'en-US',
+                               { weekday: 'short', month: 'short', day: 'numeric' }
+                             );
+
+                             return (
+                               <View key={dayTimestamp} style={{ marginBottom: 12 }}>
+                                 <View style={[{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, marginBottom: 8, paddingHorizontal: 24 }]}>
+                                   <Ionicons name="calendar-outline" size={14} color={colors.textMuted} />
+                                   <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>{dayLabel}</Text>
+                                 </View>
+                                 {filteredDayTasks.map(todo => (
+                                     <TodoCard 
+                                         key={todo._id} 
+                                         todo={todo} 
+                                         onSetTimer={handleOpenTimerModal}
+                                         onLongPress={(id) => {
+                                             setSelectedTodoForAction(todo);
+                                             setActionModalVisible(true);
+                                         }}
+                                         onLinkProject={handleOpenProjectModal}
+                                         homeStyles={homeStyles}
+                                         isTimelineMode={true}
+                                     />
+                                 ))}
+                               </View>
+                             );
+                           })}
+                         </View>
+                       )}
 
                    </ScrollView>
                 )}
