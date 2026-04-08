@@ -531,6 +531,7 @@ export default function NoteDetailScreen() {
                       value={selectedTime}
                       mode="time"
                       display="spinner"
+                      themeVariant={isDarkMode ? 'dark' : 'light'}
                       style={{ flex: 1, height: 100 }}
                       onChange={(e, d) => {
                         if (d) {
@@ -557,6 +558,7 @@ export default function NoteDetailScreen() {
                           value={selectedTime}
                           mode="time"
                           display="default"
+                          themeVariant={isDarkMode ? 'dark' : 'light'}
                           is24Hour={true}
                           onChange={(e, d) => {
                              setShowTimePicker(false);

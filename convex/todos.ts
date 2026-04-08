@@ -92,6 +92,7 @@ export const addTodo = mutation({
       ...(args.priority !== undefined && { priority: args.priority }),
       ...(args.categoryId !== undefined && { categoryId: args.categoryId }),
       ...(args.type !== undefined && { type: args.type }),
+      ...(args.status === 'done' && { completedAt: Date.now() }),
     });
     return todoId;
   },
@@ -103,7 +104,10 @@ export const updateStatus = mutation({
     const todo = await ctx.db.get(args.id);
     if (!todo) return;
     
-    await ctx.db.patch(args.id, { status: args.status });
+    await ctx.db.patch(args.id, { 
+      status: args.status,
+      completedAt: args.status === 'done' ? Date.now() : undefined 
+    });
 
     // If a parent is marked done or not_done or paused, cascade to subtasks.
     if (args.status === "done" || args.status === "not_done" || args.status === "paused" || args.status === "not_started") {
@@ -358,10 +362,17 @@ export const updateTodo = mutation({
     timeLeftAtPause: v.optional(v.number()),
     projectId: v.optional(v.string()),
     parentId: v.optional(v.id("todos")),
+    completedAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { id, ...updates } = args;
-    await ctx.db.patch(id, updates);
+    const finalUpdates = { ...updates };
+    if (updates.status === 'done' || updates.isCompleted === true) {
+      finalUpdates.completedAt = Date.now();
+    } else if (updates.status && updates.status !== 'done') {
+      finalUpdates.completedAt = undefined;
+    }
+    await ctx.db.patch(id, finalUpdates as any);
   }
 })
 

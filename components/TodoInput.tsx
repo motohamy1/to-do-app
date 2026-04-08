@@ -329,6 +329,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
           value={new Date(selectedDate)}
           mode="date"
           display="default"
+          themeVariant={isDarkMode ? 'dark' : 'light'}
           onChange={(event, date) => {
             setShowDatePicker(Platform.OS === 'ios');
             if (date) setSelectedDate(date.getTime());

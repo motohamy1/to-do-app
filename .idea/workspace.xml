@@ -4,10 +4,7 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="b87c9e08-f42e-4f23-924d-1c872f1f61c6" name="Changes" comment="group overdue tasks by date, update filters for overdue and in-progress tasks, and enhance TodoCard styling options">
-      <change beforePath="$PROJECT_DIR$/app/(tabs)/index.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/app/(tabs)/index.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/components/TodoCard.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/components/TodoCard.tsx" afterDir="false" />
-    </list>
+    <list default="true" id="b87c9e08-f42e-4f23-924d-1c872f1f61c6" name="Changes" comment="group overdue tasks by date, update filters for overdue and in-progress tasks, and enhance TodoCard styling options" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -60,7 +57,7 @@
     "javascript.preferred.runtime.type.id": "node",
     "junie.onboarding.icon.badge.shown": "true",
     "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "/home/dr-tohamy/Dev_World/Mobile_Projects/to-do-app",
+    "last_opened_file_path": "/home/dr-tohamy/Dev_World/Mobile_Projects/mern-prep",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -99,6 +96,7 @@
       <workItem from="1775535595316" duration="290000" />
       <workItem from="1775535898309" duration="381000" />
       <workItem from="1775536295663" duration="5492000" />
+      <workItem from="1775596974942" duration="42000" />
     </task>
     <task id="LOCAL-00001" summary="update README.md with project overview, key features, tech stack, and setup instructions">
       <option name="closed" value="true" />

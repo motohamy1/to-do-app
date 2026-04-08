@@ -104,6 +104,7 @@ const TimerModal: React.FC<TimerModalProps> = ({ visible, onClose, onSave, initi
               value={(datePickerMode === 'dueDate' ? dueDate : plannerDate) || new Date()}
               mode="date"
               display="default"
+              themeVariant={isDarkMode ? 'dark' : 'light'}
               onChange={onDateChange}
               minimumDate={datePickerMode === 'dueDate' ? new Date() : undefined}
             />

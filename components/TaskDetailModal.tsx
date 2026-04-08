@@ -46,6 +46,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const [editText, setEditText] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<string>("Medium");
+  const [status, setStatus] = useState<string>("not_started");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [newSubtaskText, setNewSubtaskText] = useState("");
   const [timeLeft, setTimeLeft] = useState(0);
@@ -53,6 +54,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const [hours, setHours] = useState("0");
   const [minutes, setMinutes] = useState("0");
   const [datePickerMode, setDatePickerMode] = useState<'dueDate'>('dueDate');
+  const [dueDate, setDueDate] = useState<number | undefined>(undefined);
 
   useEffect(() => {
 
@@ -90,6 +92,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
         setHours("0");
         setMinutes("0");
       }
+      setDueDate(todo.dueDate);
+      setStatus(todo.status);
       setInitializedForId(todo._id);
     }
   }, [todo?._id]);
@@ -102,6 +106,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
       setPriority("Medium");
       setHours("0");
       setMinutes("0");
+      setDueDate(undefined);
+      setStatus("not_started");
       setNewSubtaskText("");
       setIsEditingTimer(false);
       setInitializedForId(null);
@@ -125,7 +131,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
         description: description.trim(),
         priority: priority,
         date: initialDate || Date.now(),
-        status: "not_started",
+        dueDate: dueDate,
+        status: status,
         ...(projectId ? { projectId } : {}),
         ...(ms > 0 ? { timerDuration: ms } : {}),
       });
@@ -171,8 +178,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   };
 
   const handleUpdatePriority = (p: string) => {
+    setPriority(p);
     if (currentTodoId) {
-      setPriority(p);
       updateTodo({ id: currentTodoId, priority: p });
     }
   };
@@ -246,14 +253,18 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
     const ms = (h * 3600 + m * 60) * 1000;
     if (currentTodoId) {
       setTimer({ id: currentTodoId, duration: ms });
-      setIsEditingTimer(false);
     }
+    setIsEditingTimer(false);
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate && currentTodoId) {
-      setTimer({ id: currentTodoId, dueDate: selectedDate.getTime() });
+    if (selectedDate) {
+      const time = selectedDate.getTime();
+      setDueDate(time);
+      if (currentTodoId) {
+        setTimer({ id: currentTodoId, dueDate: time });
+      }
     }
   };
 
@@ -398,29 +409,33 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
                 <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
                   <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{t.deadline || (isArabic ? 'الموعد النهائي' : 'Deadline')}</Text>
-                  {todo?.dueDate && (
-                    <TouchableOpacity onPress={() => currentTodoId && setTimer({ id: currentTodoId, dueDate: undefined })}>
+                  {dueDate && (
+                    <TouchableOpacity onPress={() => {
+                      setDueDate(undefined);
+                      if (currentTodoId) setTimer({ id: currentTodoId, dueDate: undefined });
+                    }}>
                       <Text style={{ fontSize: 13, color: colors.danger, fontWeight: '700' }}>{t.remove || (isArabic ? 'إزالة' : 'Remove')}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
                 
                 <TouchableOpacity 
-                  style={[styles.deadlineButton, { borderColor: todo?.dueDate ? projectColor : colors.border, backgroundColor: todo?.dueDate ? projectColor + '10' : 'transparent' }, isArabic && { flexDirection: 'row-reverse' }]}
+                  style={[styles.deadlineButton, { borderColor: dueDate ? projectColor : colors.border, backgroundColor: dueDate ? projectColor + '10' : 'transparent' }, isArabic && { flexDirection: 'row-reverse' }]}
                   onPress={() => setShowDatePicker(true)}
                 >
-                  <Ionicons name="calendar-outline" size={20} color={todo?.dueDate ? projectColor : colors.textMuted} />
-                  <Text style={[styles.deadlineButtonText, { color: todo?.dueDate ? colors.text : colors.textMuted }]}>
-                    {todo?.dueDate ? new Date(todo.dueDate).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : (isArabic ? 'تحديد موعد نهائي' : 'Set a deadline')}
+                  <Ionicons name="calendar-outline" size={20} color={dueDate ? projectColor : colors.textMuted} />
+                  <Text style={[styles.deadlineButtonText, { color: dueDate ? colors.text : colors.textMuted }]}>
+                    {dueDate ? new Date(dueDate).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : (isArabic ? 'تحديد موعد نهائي' : 'Set a deadline')}
                   </Text>
                   <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
 
                 {showDatePicker && (
                   <DateTimePicker
-                    value={todo?.dueDate ? new Date(todo.dueDate) : new Date()}
+                    value={dueDate ? new Date(dueDate) : new Date()}
                     mode="date"
                     display="default"
+                    themeVariant={isDarkMode ? 'dark' : 'light'}
                     onChange={onDateChange}
                     minimumDate={new Date()}
                   />
@@ -536,43 +551,50 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
 
 
               {/* Status Section */}
-              {currentTodoId && todo && (
               <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
                 <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{isArabic ? "الحالة" : "Status"}</Text>
                 
                 <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', padding: 4, borderRadius: 12 }, isArabic && { flexDirection: 'row-reverse' }]}>
                   <TouchableOpacity
                     onPress={() => {
-                      if (todo!.timerDuration && todo!.timerDuration > 0) {
-                        startTimer({ id: currentTodoId! });
-                      } else {
-                        updateStatus({ id: currentTodoId!, status: 'in_progress' });
+                      setStatus('in_progress');
+                      if (currentTodoId) {
+                        if (todo?.timerDuration && todo.timerDuration > 0) {
+                          startTimer({ id: currentTodoId });
+                        } else {
+                          updateStatus({ id: currentTodoId, status: 'in_progress' });
+                        }
                       }
                     }}
-                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: todo!.status === 'in_progress' ? '#f85d08' : 'transparent', backgroundColor: todo!.status === 'in_progress' ? '#f85d08' : 'transparent' }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: status === 'in_progress' ? '#f85d08' : 'transparent', backgroundColor: status === 'in_progress' ? '#f85d08' : 'transparent' }}
                   >
-                    <Ionicons name="play" size={14} color={todo!.status === 'in_progress' ? '#FFF' : colors.textMuted} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: todo!.status === 'in_progress' ? '#FFF' : colors.textMuted }}>{t.inProgress}</Text>
+                    <Ionicons name="play" size={14} color={status === 'in_progress' ? '#FFF' : colors.textMuted} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: status === 'in_progress' ? '#FFF' : colors.textMuted }}>{t.inProgress}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={() => updateStatus({ id: currentTodoId!, status: 'done' })}
-                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: todo!.status === 'done' ? colors.success : 'transparent', backgroundColor: todo!.status === 'done' ? colors.success : 'transparent' }}
+                    onPress={() => {
+                      setStatus('done');
+                      if (currentTodoId) updateStatus({ id: currentTodoId, status: 'done' });
+                    }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: status === 'done' ? colors.success : 'transparent', backgroundColor: status === 'done' ? colors.success : 'transparent' }}
                   >
-                    <Ionicons name="checkmark-circle" size={14} color={todo!.status === 'done' ? '#FFF' : colors.textMuted} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: todo!.status === 'done' ? '#FFF' : colors.textMuted }}>{t.done}</Text>
+                    <Ionicons name="checkmark-circle" size={14} color={status === 'done' ? '#FFF' : colors.textMuted} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: status === 'done' ? '#FFF' : colors.textMuted }}>{t.done}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    onPress={() => updateStatus({ id: currentTodoId!, status: 'not_done' })}
-                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: todo!.status === 'not_done' ? '#ff0000' : 'transparent', backgroundColor: todo!.status === 'not_done' ? '#ff0000' : 'transparent' }}
+                    onPress={() => {
+                      setStatus('not_done');
+                      if (currentTodoId) updateStatus({ id: currentTodoId, status: 'not_done' });
+                    }}
+                    style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: status === 'not_done' ? '#ff0000' : 'transparent', backgroundColor: status === 'not_done' ? '#ff0000' : 'transparent' }}
                   >
-                    <Ionicons name="close-circle" size={14} color={todo!.status === 'not_done' ? '#FFF' : colors.textMuted} />
-                    <Text style={{ fontSize: 11, fontWeight: '700', color: todo!.status === 'not_done' ? '#FFF' : colors.textMuted }}>{t.notDone}</Text>
+                    <Ionicons name="close-circle" size={14} color={status === 'not_done' ? '#FFF' : colors.textMuted} />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: status === 'not_done' ? '#FFF' : colors.textMuted }}>{t.notDone}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-              )}
 
               {/* Priority Section */}
               <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>

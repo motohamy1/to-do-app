@@ -86,13 +86,13 @@ const index = () => {
       // This includes paused, in_progress, not_started, and not_done tasks.
       // When the user marks a task as done, it leaves the overdue section.
       normalizedTodos.forEach(t => {
-        // Skip completed tasks from other days
-        if (t.status === 'done' && t.date !== undefined && (t.date < todayStart || t.date >= tomorrowStart)) return;
-        
-        if (t.date !== undefined && t.date < todayStart && t.status !== 'done') {
-          overdue.push(t);
-        } else if (!t.date || (t.date >= todayStart && t.date < tomorrowStart)) {
+        const isDoneToday = t.status === 'done' && t.completedAt !== undefined && t.completedAt >= todayStart && t.completedAt < tomorrowStart;
+        const isScheduledForToday = !t.date || (t.date >= todayStart && t.date < tomorrowStart);
+
+        if (isScheduledForToday || isDoneToday) {
           today.push(t);
+        } else if (t.date !== undefined && t.date < todayStart && t.status !== 'done') {
+          overdue.push(t);
         }
       });
       
@@ -242,7 +242,7 @@ const index = () => {
                          </View>
                        )}
 
-                       {displayedTodos.map(todo => (
+                   {displayedTodos.filter(t => t.status !== 'done').map(todo => (
                            <TodoCard 
                                key={todo._id} 
                                todo={todo} 
@@ -256,6 +256,28 @@ const index = () => {
                                isTimelineMode={true}
                            />
                        ))}
+
+                       {activeFilter === 'All' && displayedTodos.some(t => t.status === 'done') && (
+                           <View style={{ marginTop: 24 }}>
+                               <View style={homeStyles.sectionTitleContainer}>
+                                   <Text style={homeStyles.sectionTitleText}>{isArabic ? 'المهام المكتملة اليوم' : 'Completed Today'}</Text>
+                               </View>
+                               {displayedTodos.filter(t => t.status === 'done').map(todo => (
+                                   <TodoCard 
+                                       key={todo._id} 
+                                       todo={todo} 
+                                       onSetTimer={handleOpenTimerModal}
+                                       onLongPress={(id) => {
+                                           setSelectedTodoForAction(todo);
+                                           setActionModalVisible(true);
+                                       }}
+                                       onLinkProject={handleOpenProjectModal}
+                                       homeStyles={homeStyles}
+                                       isTimelineMode={true}
+                                   />
+                               ))}
+                           </View>
+                       )}
                        
                        {activeFilter === 'All' && (
                            <View style={{ marginTop: 24, marginBottom: 24 }}>
