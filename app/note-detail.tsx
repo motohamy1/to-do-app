@@ -52,6 +52,7 @@ const NoteHeader = React.memo(({
     <Text style={[styles.dateSubtitle, isArabic && { textAlign: 'right' }]}>{formattedNoteDate}</Text>
   </View>
 ));
+NoteHeader.displayName = 'NoteHeader';
 
 export default function NoteDetailScreen() {
   const router = useRouter();

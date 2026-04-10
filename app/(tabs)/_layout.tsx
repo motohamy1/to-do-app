@@ -5,7 +5,7 @@ import useTheme from '@/hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Platform } from 'react-native';
 
-const _layout = () => {
+const TabLayout = () => {
   const { colors, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const paddingBottom = Platform.OS === 'android' ? Math.max(insets.bottom, 12) : Math.max(insets.bottom, 30);
@@ -93,4 +93,4 @@ const _layout = () => {
   );
 };
 
-export default _layout;
+export default TabLayout;
