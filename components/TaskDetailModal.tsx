@@ -296,11 +296,20 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
 
             <TouchableOpacity onPress={() => {
               if (currentTodoId) {
-                const confirmDelete = () => deleteTodo({ id: currentTodoId! }).then(handleBack);
-                if (Platform.OS === 'web') confirmDelete();
-                else {
-                  // In a real mobile app we'd use Alert.alert here, but for now we'll just delete
-                  confirmDelete();
+                const performDelete = () => deleteTodo({ id: currentTodoId! }).then(handleBack);
+                if (Platform.OS === 'web') {
+                  if (window.confirm(t.confirmDeleteTask || "Are you sure you want to delete this task?")) {
+                    performDelete();
+                  }
+                } else {
+                  Alert.alert(
+                    t.confirmDeleteTitle || "Confirm Delete", 
+                    t.confirmDeleteTask || "Are you sure you want to delete this task?", 
+                    [
+                      { text: t.cancel || "Cancel", style: "cancel" },
+                      { text: t.delete || "Delete", style: "destructive", onPress: performDelete }
+                    ]
+                  );
                 }
               }
             }} style={styles.headerIcon}>

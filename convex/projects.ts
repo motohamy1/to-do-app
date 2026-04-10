@@ -250,6 +250,15 @@ async function deleteProjectRecursive(ctx: any, projectId: any) {
     .collect();
   for (const item of checklists) await ctx.db.delete(item._id);
 
+  // Unlink tasks
+  const tasks = await ctx.db
+    .query("tasks")
+    .filter((q: any) => q.eq(q.field("projectId"), projectId))
+    .collect();
+  for (const task of tasks) {
+    await ctx.db.patch(task._id, { projectId: undefined });
+  }
+
   await ctx.db.delete(projectId);
 }
 

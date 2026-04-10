@@ -75,10 +75,15 @@ export const addTodo = mutation({
     type: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    let finalStatus = args.status;
+    if (!finalStatus) {
+      finalStatus = "not_started";
+    }
+
     const todoId = await ctx.db.insert("todos", {
       userId: args.userId,
       text: args.text,
-      status: args.status || "not_started",
+      status: finalStatus as any,
       ...(args.timerDuration && { timerDuration: args.timerDuration }),
       ...(args.timerDirection && { timerDirection: args.timerDirection }),
       ...(args.timerStartTime && { timerStartTime: args.timerStartTime }),
@@ -105,7 +110,7 @@ export const updateStatus = mutation({
     if (!todo) return;
     
     await ctx.db.patch(args.id, { 
-      status: args.status,
+      status: args.status as any,
       completedAt: args.status === 'done' ? Date.now() : undefined 
     });
 
@@ -129,7 +134,7 @@ export const updateStatus = mutation({
             }
           } else {
             // For done/not_done/not_started, just align status
-            await ctx.db.patch(sub._id, { status: args.status });
+            await ctx.db.patch(sub._id, { status: args.status as any });
           }
         }
       }
@@ -377,7 +382,7 @@ export const updateTodo = mutation({
 })
 
 export const linkProject = mutation({
-  args: { id: v.id("todos"), projectId: v.string() },
+  args: { id: v.id("todos"), projectId: v.optional(v.string()) },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, { projectId: args.projectId });
   },

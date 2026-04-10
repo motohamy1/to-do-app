@@ -2,6 +2,25 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import type * as NotificationsType from 'expo-notifications';
 
+export const getTimerNotificationId = (taskId: string) => `timer_${taskId}`;
+export const getMorningNotificationId = () => `daily_morning_9am`;
+export const getEveningNotificationId = () => `daily_evening_8pm`;
+
+export interface TimerNotificationData {
+  taskId: string;
+  durationMinutes: number;
+}
+
+export const NOTIFICATION_CATEGORIES = {
+  TIMER_ACTIVE: 'TIMER_ACTIVE',
+} as const;
+
+export const TIMER_ACTIONS = {
+  PAUSE: 'pause_timer',
+  RESUME: 'resume_timer',
+  RESET: 'reset_timer',
+} as const;
+
 const isExpoGo = Constants.executionEnvironment === 'storeClient';
 
 function getNotificationsAPI(): typeof NotificationsType | null {
@@ -16,7 +35,7 @@ function getNotificationsAPI(): typeof NotificationsType | null {
   }
 }
 
-const Notifications = getNotificationsAPI();
+export const Notifications = getNotificationsAPI();
 
 // Custom alarm sound name (without extension)
 // Android: looks in android/app/src/main/res/raw/alarm_tone.wav
@@ -126,22 +145,30 @@ export async function requestPermissionsAsync() {
 
 import { translations } from './i18n';
 
-export async function scheduleTimerNotification(title: string, durationMs: number, isSubtask = false, language: string = 'en'): Promise<string> {
+export async function scheduleTimerCompletion(
+  taskId: string,
+  title: string, 
+  durationMs: number, 
+  isSubtask = false, 
+  language: string = 'en'
+): Promise<string> {
   if (!Notifications) return "";
 
   const t: any = translations[language as keyof typeof translations] || translations.en;
   
   try {
     const seconds = Math.floor(durationMs / 1000);
-    const id = await Notifications.scheduleNotificationAsync({
+    const identifier = getTimerNotificationId(taskId);
+    await Notifications.scheduleNotificationAsync({
+      identifier,
       content: {
         title: isSubtask ? t.notifSubtaskTitle : t.notifTaskTitle,
         body: (isSubtask ? t.notifSubtaskBody : t.notifTaskBody) + `"${title}"`,
         sound: ALARM_SOUND,
         priority: Notifications.AndroidNotificationPriority?.MAX,
-        sticky: false,
-        autoDismiss: false,
         vibrate: [0, 500, 200, 500, 200, 500],
+        categoryIdentifier: NOTIFICATION_CATEGORIES.TIMER_ACTIVE,
+        data: { taskId, durationMinutes: Math.round(durationMs / 60000) } as TimerNotificationData,
       } as any,
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
@@ -149,18 +176,19 @@ export async function scheduleTimerNotification(title: string, durationMs: numbe
         channelId: isSubtask ? 'subtasks' : 'tasks',
       } as any,
     });
-    return id;
+    return identifier;
   } catch (error) {
     console.warn("Error scheduling timer notification:", error);
     return "";
   }
 }
 
-export async function cancelNotification(notificationId: string) {
-  if (!Notifications || !notificationId) return;
+export async function cancelTaskNotification(taskId: string) {
+  if (!Notifications || !taskId) return;
 
   try {
-    await Notifications.cancelScheduledNotificationAsync(notificationId);
+    const identifier = getTimerNotificationId(taskId);
+    await Notifications.cancelScheduledNotificationAsync(identifier);
   } catch (error) {
     console.log("Error cancelling notification:", error);
   }
@@ -208,28 +236,35 @@ export async function scheduleReminderNotification(
   }
 }
 
-export async function scheduleDailyReminders() {
+export async function scheduleMorningReminder(todos: any[], language: string = 'en') {
   if (!Notifications) return;
 
   try {
-    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-    for (const n of scheduled) {
-      if (
-        n.content.title === "Good Morning! 🌅" ||
-        n.content.title === "Evening Summary 🌙" ||
-        n.content.title === "صباح الخير! 🌅" ||
-        n.content.title === "ملخص المساء 🌙"
-      ) {
-        await Notifications.cancelScheduledNotificationAsync(n.identifier);
-      }
+    const todayStart = new Date().setHours(0, 0, 0, 0);
+    const tomorrowStart = todayStart + 86400000;
+
+    const todayTasks = todos.filter(t => {
+      if (t.status === 'done') return false;
+      return !t.date || (t.date >= todayStart && t.date < tomorrowStart);
+    });
+    
+    const count = todayTasks.length;
+
+    if (count === 0) {
+      await Notifications.cancelScheduledNotificationAsync(getMorningNotificationId());
+      return;
     }
 
+    const body = count === 1 ? `You have 1 task scheduled for today.` : `You have ${count} tasks scheduled for today.`;
+
     await Notifications.scheduleNotificationAsync({
+      identifier: getMorningNotificationId(),
       content: {
         title: "Good Morning! 🌅",
-        body: "Check your tasks and plan your day.",
+        body,
         sound: 'default',
-      },
+        categoryIdentifier: 'daily',
+      } as any,
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: 9,
@@ -237,13 +272,40 @@ export async function scheduleDailyReminders() {
         channelId: 'daily',
       } as any,
     });
+  } catch (error) {
+    console.warn("Error scheduling morning reminder:", error);
+  }
+}
+
+export async function scheduleEveningReminder(todos: any[], language: string = 'en') {
+  if (!Notifications) return;
+
+  try {
+    const todayStart = new Date().setHours(0, 0, 0, 0);
+    const missedTasks = todos.filter(t => {
+      if (t.status === 'done') return false;
+      if (t.status === 'not_done') return true;
+      if (t.date !== undefined && t.date < todayStart) return true;
+      return false;
+    });
+    
+    const count = missedTasks.length;
+
+    if (count === 0) {
+      await Notifications.cancelScheduledNotificationAsync(getEveningNotificationId());
+      return;
+    }
+
+    const body = count === 1 ? `You missed 1 task. Let's plan for tomorrow!` : `You missed ${count} tasks. Let's plan for tomorrow!`;
 
     await Notifications.scheduleNotificationAsync({
+      identifier: getEveningNotificationId(),
       content: {
         title: "Evening Summary 🌙",
-        body: "How did you do today? Check off your completed tasks!",
+        body,
         sound: 'default',
-      },
+        categoryIdentifier: 'daily',
+      } as any,
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
         hour: 20,
@@ -252,6 +314,6 @@ export async function scheduleDailyReminders() {
       } as any,
     });
   } catch (error) {
-    console.warn("Error scheduling daily reminders:", error);
+    console.warn("Error scheduling evening reminder:", error);
   }
 }

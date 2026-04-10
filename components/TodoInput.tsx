@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { Alert, Platform, Text, TextInput, TouchableOpacity, View } from "react-native";
 import TaskDetailModal from "./TaskDetailModal";
 import TimerModal from "./TimerModal";
+import CircularProgress from "./CircularProgress";
 
 interface TodoInputProps {
   initialDate?: number;
@@ -113,7 +114,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
   };
 
   const statusOptions = [
-    { id: 'not_started', label: t.notStarted, icon: 'ellipse-outline', color: colors.surfaceText },
+    { id: 'not_started', label: t.notStarted, icon: 'ellipse-outline', color: colors.primary },
     { id: 'in_progress', label: t.inProgress, icon: 'play-circle-outline', color: colors.info },
     { id: 'done', label: t.done, icon: 'checkmark-circle-outline', color: colors.success },
   ];
@@ -165,10 +166,22 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
           <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 10 }}>
             <TouchableOpacity
               onPress={() => { setActiveTimerIndex(null); setTimerModalVisible(true); }}
-              style={timerDuration ? { backgroundColor: colors.primary + '15', padding: 4, borderRadius: 6 } : {}}
             >
-              <Ionicons name="timer-outline" size={24} color={timerDuration ? colors.primary : colors.surfaceText} />
-
+              {timerDuration ? (
+                <CircularProgress
+                  size={44}
+                  strokeWidth={3}
+                  progress={100}
+                  color={colors.primary}
+                  unfilledColor={isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: colors.primary, textAlign: 'center' }}>
+                    {Math.floor(timerDuration / 60000)}m
+                  </Text>
+                </CircularProgress>
+              ) : (
+                <Ionicons name="timer-outline" size={28} color={colors.surfaceText + '80'} />
+              )}
             </TouchableOpacity>
             <TouchableOpacity onPress={handleAddTodo}>
               <Ionicons name={isArabic ? "arrow-back-circle" : "arrow-up-circle"} size={28} color={newTodo.trim() ? colors.primary : colors.surfaceText + 'a0'} />

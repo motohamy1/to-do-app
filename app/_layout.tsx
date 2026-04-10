@@ -4,15 +4,23 @@ import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Stack } from "expo-router";
 import { ThemeProvider } from "@/hooks/useTheme";
 
-const convex = new ConvexReactClient(process.env.EXPO_PUBLIC_CONVEX_URL!, {
+const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL || "https://dummy-fallback.convex.cloud";
+const convex = new ConvexReactClient(convexUrl, {
   unsavedChangesWarning: false,
 });
 
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 import { LayoutAnimation, Platform, UIManager } from "react-native";
-import { requestPermissionsAsync, scheduleDailyReminders } from "@/utils/notifications";
+import { requestPermissionsAsync } from "@/utils/notifications";
 import { useSyncManager } from "@/hooks/useSyncManager";
+import { useNotifications } from "@/hooks/useNotifications";
+import { useTranslation } from "@/utils/i18n";
+import { NOTIFICATION_CATEGORIES, TIMER_ACTIONS, Notifications } from "@/utils/notifications";
+import { BACKGROUND_NOTIFICATION_TASK } from "@/utils/backgroundTask";
+
+// Register the background task
+Notifications?.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -20,17 +28,29 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 function RootLayoutContent() {
   useSyncManager();
-  const { isLoading } = useAuth();
+  const { hasPermission } = useNotifications();
+  const { isLoading, language } = useAuth();
+  const { t } = useTranslation(language);
 
   useEffect(() => {
-    async function setupApp() {
-      const granted = await requestPermissionsAsync();
-      if (granted) {
-        await scheduleDailyReminders();
-      }
-    }
-    setupApp();
-  }, []);
+    Notifications?.setNotificationCategoryAsync(NOTIFICATION_CATEGORIES.TIMER_ACTIVE, [
+      {
+        identifier: TIMER_ACTIONS.PAUSE,
+        buttonTitle: t.pause || 'Pause',
+      },
+      {
+        identifier: TIMER_ACTIONS.RESUME,
+        buttonTitle: t.resume || 'Resume',
+      },
+      {
+        identifier: TIMER_ACTIONS.RESET,
+        buttonTitle: t.reset || 'Reset',
+        options: {
+          isDestructive: true,
+        }
+      },
+    ]);
+  }, [language, t]);
 
   if (isLoading) return null;
 

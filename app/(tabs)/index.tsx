@@ -21,10 +21,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useScreenGuide } from "@/hooks/useScreenGuide";
 import ScreenGuide from "@/components/ScreenGuide";
 import type { GuideTip } from "@/components/ScreenGuide";
+import { useTaskTimers } from "@/hooks/useTaskTimers";
+import { useDailyReminders } from "@/hooks/useDailyReminders";
 
 import { useTranslation } from "@/utils/i18n";
 
-const index = () => {
+const Index = () => {
     const { userId, language } = useAuth();
     const { t, isArabic } = useTranslation(language);
     const todos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : "skip");
@@ -41,9 +43,6 @@ const index = () => {
     const [selectedTodoId, setSelectedTodoId] = useState<Id<"todos"> | null>(null);
     const [activeFilter, setActiveFilter] = useState<'All' | 'In Progress' | 'Done'>('All');
     
-    const [isActionModalVisible, setActionModalVisible] = useState(false);
-    const [selectedTodoForAction, setSelectedTodoForAction] = useState<any>(null);
-
     const [isGlobalActionModalVisible, setGlobalActionModalVisible] = useState(false);
     const [showOverdue, setShowOverdue] = useState(false);
     const [sortActive, setSortActive] = useState('');
@@ -51,6 +50,8 @@ const index = () => {
     const scrollViewRef = useRef<ScrollView>(null);
     const homeStyles = createHomeStyles(colors, isArabic);
     const { showGuide, dismissGuide } = useScreenGuide('home');
+    useTaskTimers(todos, updateStatus);
+    useDailyReminders(todos, language);
 
     const homeTips: GuideTip[] = isArabic ? [
       { icon: 'add-circle-outline', title: 'أضف مهمة', description: 'اكتب مهمتك في الحقل بالأسفل واضغط إرسال لإضافتها.', accentColor: '#D4F82D' },
@@ -75,7 +76,7 @@ const index = () => {
       status: t.status || ((t as any).isCompleted ? 'done' : 'not_started')
     })) || [];
 
-    const { todayTodos, overdueTodos, overdueByDay } = useMemo(() => {
+    const { todayTodos, overdueTodos, overdueByDay, groupedDoneTodos } = useMemo(() => {
       const todayStart = new Date().setHours(0, 0, 0, 0);
       const tomorrowStart = todayStart + 86400000;
       
@@ -85,16 +86,31 @@ const index = () => {
       // A task is overdue when its scheduled date has passed and it's NOT completed.
       // This includes paused, in_progress, not_started, and not_done tasks.
       // When the user marks a task as done, it leaves the overdue section.
+      const groupedDoneDayMap = new Map<number, any[]>();
+
       normalizedTodos.forEach(t => {
         const isDoneToday = t.status === 'done' && t.completedAt !== undefined && t.completedAt >= todayStart && t.completedAt < tomorrowStart;
         const isScheduledForToday = !t.date || (t.date >= todayStart && t.date < tomorrowStart);
 
-        if (isScheduledForToday || isDoneToday) {
-          today.push(t);
-        } else if (t.date !== undefined && t.date < todayStart && t.status !== 'done') {
-          overdue.push(t);
+        if (t.status === 'done') {
+          if (isDoneToday) today.push(t);
+          const completionDay = t.completedAt 
+            ? new Date(t.completedAt).setHours(0, 0, 0, 0)
+            : (t.date ? new Date(t.date).setHours(0, 0, 0, 0) : todayStart);
+          if (!groupedDoneDayMap.has(completionDay)) groupedDoneDayMap.set(completionDay, []);
+          groupedDoneDayMap.get(completionDay)!.push(t);
+        } else {
+          if (isScheduledForToday) {
+            today.push(t);
+          } else if (t.date !== undefined && t.date < todayStart) {
+            overdue.push(t);
+          }
         }
       });
+
+      const groupedDoneTodos = Array.from(groupedDoneDayMap.entries())
+        .sort(([a], [b]) => b - a)
+        .map(([dayTimestamp, tasks]) => ({ dayTimestamp, tasks }));
       
       if (sortActive === 'priority') {
         const pScores: any = { 'Urgent': 3, 'High': 2, 'Medium': 1, 'Low': 0, undefined: -1 };
@@ -117,11 +133,13 @@ const index = () => {
         .sort(([a], [b]) => b - a) // descending: latest day first
         .map(([dayTimestamp, tasks]) => ({ dayTimestamp, tasks }));
 
-      return { todayTodos: today, overdueTodos: overdue, overdueByDay: grouped };
+      return { todayTodos: today, overdueTodos: overdue, overdueByDay: grouped, groupedDoneTodos };
     }, [normalizedTodos, sortActive]);
     const doneTodosCount = todayTodos.filter(t => t.status === 'done').length;
-    const inProgressCount = todayTodos.filter(t => t.status === 'in_progress' || t.status === 'paused').length;
+    const inProgressCount = todayTodos.filter(t => t.status === 'in_progress').length;
     const totalCount = todayTodos.length;
+    
+    const totalDoneCount = groupedDoneTodos.reduce((sum, group) => sum + group.tasks.length, 0);
 
     const progressPercent = totalCount === 0 ? 0 : Math.round((doneTodosCount / totalCount) * 100);
 
@@ -141,15 +159,14 @@ const index = () => {
       setProjectModalVisible(true);
     };
 
-    const handleSelectProject = (projectId: string) => {
+    const handleSelectProject = (projectId: string | undefined) => {
       if (selectedTodoId) {
         linkProject({ id: selectedTodoId, projectId });
       }
     };
 
     const displayedTodos = useMemo(() => {
-        if (activeFilter === 'Done') return todayTodos.filter(t => t.status === 'done');
-        if (activeFilter === 'In Progress') return todayTodos.filter(t => t.status === 'in_progress' || t.status === 'paused');
+        if (activeFilter === 'In Progress') return todayTodos.filter(t => t.status === 'in_progress');
         return todayTodos;
     }, [todayTodos, activeFilter]);
 
@@ -205,7 +222,7 @@ const index = () => {
                               let count = 0;
                               if (filter === 'All') count = totalCount;
                               if (filter === 'In Progress') count = inProgressCount;
-                              if (filter === 'Done') count = doneTodosCount;
+                              if (filter === 'Done') count = totalDoneCount;
 
                               const filterLabel = filter === 'All' ? t.all : 
                                                 filter === 'In Progress' ? t.inProgress : t.done;
@@ -235,22 +252,25 @@ const index = () => {
                            </TouchableOpacity>
                        </View>
 
-                       {displayedTodos.length === 0 && (
+                       {activeFilter !== 'Done' && displayedTodos.length === 0 && (
                          <View style={homeStyles.emptyContainer}>
                             <Ionicons name="clipboard-outline" size={48} color={colors.border} />
                             <Text style={homeStyles.emptyText}>{t.noTasksFound}</Text>
                          </View>
                        )}
 
-                   {displayedTodos.filter(t => t.status !== 'done').map(todo => (
+                       {activeFilter === 'Done' && totalDoneCount === 0 && (
+                         <View style={homeStyles.emptyContainer}>
+                            <Ionicons name="checkmark-done-circle-outline" size={48} color={colors.border} />
+                            <Text style={homeStyles.emptyText}>{t.noTasksFound}</Text>
+                         </View>
+                       )}
+
+                       {activeFilter !== 'Done' && displayedTodos.filter(t => t.status !== 'done').map(todo => (
                            <TodoCard 
                                key={todo._id} 
                                todo={todo} 
                                onSetTimer={handleOpenTimerModal}
-                               onLongPress={(id) => {
-                                   setSelectedTodoForAction(todo);
-                                   setActionModalVisible(true);
-                               }}
                                onLinkProject={handleOpenProjectModal}
                                homeStyles={homeStyles}
                                isTimelineMode={true}
@@ -267,10 +287,6 @@ const index = () => {
                                        key={todo._id} 
                                        todo={todo} 
                                        onSetTimer={handleOpenTimerModal}
-                                       onLongPress={(id) => {
-                                           setSelectedTodoForAction(todo);
-                                           setActionModalVisible(true);
-                                       }}
                                        onLinkProject={handleOpenProjectModal}
                                        homeStyles={homeStyles}
                                        isTimelineMode={true}
@@ -278,6 +294,38 @@ const index = () => {
                                ))}
                            </View>
                        )}
+
+                       {activeFilter === 'Done' && groupedDoneTodos.map(({ dayTimestamp, tasks }) => {
+                         const dayLabel = new Date(dayTimestamp).toLocaleDateString(
+                           isArabic ? 'ar-SA' : 'en-US',
+                           { weekday: 'long', month: 'short', day: 'numeric' }
+                         );
+                         return (
+                           <View key={dayTimestamp} style={{ marginTop: 16 }}>
+                               <View style={homeStyles.sectionTitleContainer}>
+                                   <Text style={[homeStyles.sectionTitleText, { fontSize: 14, color: colors.textMuted }]}>{dayLabel}</Text>
+                               </View>
+                               <FlatList
+                                 horizontal
+                                 showsHorizontalScrollIndicator={false}
+                                 data={tasks}
+                                 keyExtractor={(item) => item._id}
+                                 contentContainerStyle={{ paddingHorizontal: 16, gap: 16 }}
+                                 renderItem={({ item }) => (
+                                   <View style={{ width: 300 }}>
+                                     <TodoCard 
+                                         todo={item} 
+                                         onSetTimer={handleOpenTimerModal}
+                                         onLinkProject={handleOpenProjectModal}
+                                         homeStyles={homeStyles}
+                                         isTimelineMode={false}
+                                     />
+                                   </View>
+                                 )}
+                               />
+                           </View>
+                         );
+                       })}
                        
                        {activeFilter === 'All' && (
                            <View style={{ marginTop: 24, marginBottom: 24 }}>
@@ -327,10 +375,6 @@ const index = () => {
                                          key={todo._id} 
                                          todo={todo} 
                                          onSetTimer={handleOpenTimerModal}
-                                         onLongPress={(id) => {
-                                             setSelectedTodoForAction(todo);
-                                             setActionModalVisible(true);
-                                         }}
                                          onLinkProject={handleOpenProjectModal}
                                          homeStyles={homeStyles}
                                          isTimelineMode={true}
@@ -363,44 +407,6 @@ const index = () => {
                 setSelectedTodoId(null);
               }}
               onSelect={handleSelectProject}
-            />
-
-            <ActionModal 
-              visible={isActionModalVisible}
-              onClose={() => { setActionModalVisible(false); setSelectedTodoForAction(null); }}
-              title={selectedTodoForAction?.text || (isArabic ? 'خيارات المهمة' : 'Task Options')}
-              isArabic={isArabic}
-              options={[
-                { 
-                  label: isArabic ? 'تعديل التفاصيل' : 'Edit Details', 
-                  icon: 'create-outline', 
-                  onPress: () => {
-                    // This could open the timer modal or a new detail modal
-                    // For now, let's allow editing using existing modals if applicable
-                    handleOpenTimerModal(selectedTodoForAction?._id);
-                  } 
-                },
-                {
-                  label: isArabic ? 'ربط بمشروع' : 'Link Project',
-                  icon: 'folder-outline',
-                  onPress: () => handleOpenProjectModal(selectedTodoForAction?._id)
-                },
-                { 
-                  label: isArabic ? 'مشاركة' : 'Share', 
-                  icon: 'share-social-outline', 
-                  onPress: () => Share.share({ message: `${selectedTodoForAction?.text || 'Untitled'}\n\n${selectedTodoForAction?.description || ''}` }) 
-                },
-                { 
-                  label: isArabic ? 'حذف' : 'Delete', 
-                  icon: 'trash-outline', 
-                  variant: 'destructive',
-                  onPress: () => {
-                    if (selectedTodoForAction?._id) {
-                      deleteTodo({ id: selectedTodoForAction._id });
-                    }
-                  }
-                }
-              ]}
             />
 
             <ActionModal 
@@ -442,4 +448,4 @@ const index = () => {
     );
 };
 
-export default index;
+export default Index;

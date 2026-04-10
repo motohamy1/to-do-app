@@ -60,6 +60,7 @@
           ]
         }
       ],
+      "expo-task-manager",
       "expo-localization"
     ],
     "experiments": {
@@ -68,7 +69,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "9afae469-f720-488b-98f1-994d21c7ca98"
+        "projectId": "e341c08b-c194-454e-9beb-bb58bd658384"
       }
     }
   }

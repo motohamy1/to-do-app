@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, KeyboardAvoidingView } from 'react-native';
 import useTheme from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -41,7 +41,7 @@ const TimerModal: React.FC<TimerModalProps> = ({ visible, onClose, onSave, initi
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
         <View style={[styles.modalContainer, { backgroundColor: colors.surface }]}>
           <Text style={[styles.title, { color: colors.text }]}>Timer & Deadline</Text>
           
@@ -119,7 +119,7 @@ const TimerModal: React.FC<TimerModalProps> = ({ visible, onClose, onSave, initi
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

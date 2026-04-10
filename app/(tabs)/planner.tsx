@@ -113,7 +113,7 @@ const Planner = () => {
 
   const getTasksForDay = (day: number, month: number, year: number) => {
     return todos.filter(todo => {
-      const targetDate = todo.dueDate || todo.date;
+      const targetDate = (todo.status === 'done' && todo.completedAt) ? todo.completedAt : (todo.dueDate || todo.date);
       if (!targetDate) return false;
       const todoDate = new Date(targetDate);
       return todoDate.getDate() === day && 
@@ -129,7 +129,7 @@ const Planner = () => {
 
   const getTasksForMonth = (monthIndex: number) => {
     return todos.filter(todo => {
-      const targetDate = todo.dueDate || todo.date;
+      const targetDate = (todo.status === 'done' && todo.completedAt) ? todo.completedAt : (todo.dueDate || todo.date);
       if (!targetDate) return false;
       const todoDate = new Date(targetDate);
       return todoDate.getMonth() === monthIndex && todoDate.getFullYear() === currentYear;
@@ -316,12 +316,12 @@ const Planner = () => {
             )}
 
             <View style={{ marginBottom: 40 }}>
-                {tasks.filter(t => t.type !== 'note' && t.type !== 'reminder').length > 0 && (
+                {tasks.filter(t => t.type !== 'note' && t.type !== 'reminder' && t.status !== 'done').length > 0 && (
                     <View style={{ marginBottom: 24 }}>
                         <Text style={[{ fontSize: 20, fontWeight: '800', paddingHorizontal: 24, marginBottom: 16, color: colors.text }, isArabic && { textAlign: 'right' }]}>{t.tasks}</Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                             <View style={[styles.horizontalGridContainer, isArabic && { flexDirection: 'column-reverse' }]}>
-                                {tasks.filter(t => t.type !== 'note' && t.type !== 'reminder').map((task) => {
+                                {tasks.filter(t => t.type !== 'note' && t.type !== 'reminder' && t.status !== 'done').map((task) => {
                                     const isExpanded = expandedTodoId === task._id;
                                     return (
                                         <TouchableOpacity 
@@ -357,13 +357,72 @@ const Planner = () => {
                                 })}
                             </View>
                         </ScrollView>
-                        {expandedTodoId && tasks.find(t => t._id === expandedTodoId && t.type !== 'note' && t.type !== 'reminder') && (
+                        {expandedTodoId && tasks.find(t => t._id === expandedTodoId && t.type !== 'note' && t.type !== 'reminder' && t.status !== 'done') && (
                             <View style={{ paddingHorizontal: 24, marginTop: 24 }}>
                                 <TodoCard 
                                   todo={{ ...tasks.find(t => t._id === expandedTodoId), status: tasks.find(t => t._id === expandedTodoId)?.status || 'not_started' } as any} 
                                   homeStyles={homeStyles}
                                   onSetTimer={(id) => { setSelectedTodoId(id as Id<"todos">); setTimerModalVisible(true); }} 
-                                  onLongPress={(id) => deleteTodoMutation({ id: id as Id<"todos"> })} 
+                                  onLinkProject={(id) => { setSelectedTodoId(id as Id<"todos">); setProjectModalVisible(true); }}
+                                />
+                                <TouchableOpacity 
+                                  style={{ alignSelf: 'center', marginTop: -16, backgroundColor: colors.surface, borderRadius: 20, padding: 6, borderWidth: 1, borderColor: colors.border, zIndex: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 }}
+                                  onPress={() => setExpandedTodoId(null)}
+                                >
+                                  <Ionicons name="chevron-up" size={20} color={colors.primary} />
+                                </TouchableOpacity>
+                            </View>
+                        )}
+                    </View>
+                )}
+
+                {tasks.filter(t => t.type !== 'note' && t.type !== 'reminder' && t.status === 'done').length > 0 && (
+                    <View style={{ marginBottom: 24 }}>
+                        <Text style={[{ fontSize: 20, fontWeight: '800', paddingHorizontal: 24, marginBottom: 16, color: colors.text }, isArabic && { textAlign: 'right' }]}>{isArabic ? 'المكتملة' : 'Completed'}</Text>
+                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            <View style={[styles.horizontalGridContainer, isArabic && { flexDirection: 'column-reverse' }]}>
+                                {tasks.filter(t => t.type !== 'note' && t.type !== 'reminder' && t.status === 'done').map((task) => {
+                                    const isExpanded = expandedTodoId === task._id;
+                                    return (
+                                        <TouchableOpacity 
+                                            key={task._id}
+                                            style={[styles.gridTaskItem, { backgroundColor: isExpanded ? colors.primary + '10' : colors.surface, borderColor: isExpanded ? colors.primary : colors.border }]}
+                                            onPress={() => setExpandedTodoId(isExpanded ? null : task._id)}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <TouchableOpacity 
+                                                    onPress={() => updateTodoStatus({ id: task._id, status: task.status === 'done' ? 'not_started' : 'done' })}
+                                                    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+                                                >
+                                                    <Ionicons 
+                                                        name={task.status === 'done' ? "checkmark-circle" : "ellipse-outline"} 
+                                                        size={26} 
+                                                        color={task.status === 'done' ? colors.success : colors.border} 
+                                                    />
+                                                </TouchableOpacity>
+                                            </View>
+                                            <View style={{ flex: 1, width: '100%', marginTop: 8 }}>
+                                                <Text style={[
+                                                    styles.taskItemText, 
+                                                    task.status === 'done' && { textDecorationLine: 'line-through', color: colors.textMuted, opacity: 0.6 },
+                                                    isArabic && { textAlign: 'right' },
+                                                    { fontSize: 15, fontWeight: '700' }
+                                                ]} numberOfLines={2}>
+                                                    {task.text}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </ScrollView>
+                        {expandedTodoId && tasks.find(t => t._id === expandedTodoId && t.type !== 'note' && t.type !== 'reminder' && t.status === 'done') && (
+                            <View style={{ paddingHorizontal: 24, marginTop: 24 }}>
+                                <TodoCard 
+                                  todo={{ ...tasks.find(t => t._id === expandedTodoId), status: tasks.find(t => t._id === expandedTodoId)?.status || 'not_started' } as any} 
+                                  homeStyles={homeStyles}
+                                  onSetTimer={(id) => { setSelectedTodoId(id as Id<"todos">); setTimerModalVisible(true); }} 
                                   onLinkProject={(id) => { setSelectedTodoId(id as Id<"todos">); setProjectModalVisible(true); }}
                                 />
                                 <TouchableOpacity 

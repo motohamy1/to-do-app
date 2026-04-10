@@ -95,6 +95,7 @@ function getTaskStatusColor(status: string | undefined, colors: any) {
     case 'in_progress': return colors.info;
     case 'paused':      return colors.warning;
     case 'not_done':    return colors.danger;
+    case 'not_started': return colors.primary;
     default:            return colors.textMuted;
   }
 }
@@ -363,7 +364,7 @@ const CategoriesView = ({ styles, colors, onSelectCategory, onAddCategory, onEdi
 // ─── Layer 2: Category Detail View (Sub-categories & Direct Projects) ────────
 
 const CategoryDetailView = ({ 
-  styles, colors, categoryId, categoryName, userId, onSelectSubCategory, onSelectProject, onAddSubCategory, onAddProject, onEditCategory, onEditSubCategory, onEditProject, onDeleteCategory, onOpenAction 
+  styles, colors, categoryId, categoryName, userId, onSelectSubCategory, onSelectProject, onAddSubCategory, onAddProject, onEditCategory, onEditSubCategory, onEditProject, onDeleteCategory, onDeleteSubCategory, onDeleteProject, onOpenAction 
 }: { 
   styles: any; 
   colors: any; 
@@ -377,9 +378,12 @@ const CategoryDetailView = ({
   onEditSubCategory: (sub: any) => void;
   onEditProject: (proj: any) => void;
   onDeleteCategory: (id: Id<'projectCategories'>) => void;
+  onDeleteSubCategory: (id: Id<'projectSubCategories'>) => void;
+  onDeleteProject: (id: Id<'projects'>) => void;
   onOpenAction: (config: any) => void;
   userId: Id<'users'> | null;
 }) => {
+  const { t } = useTranslation();
   const subCategories = useOfflineQuery<any[]>('projects.getSubCategories', api.projects.getSubCategories, { categoryId });
   const directProjects = useOfflineQuery<any[]>('projects.getProjectsByCategory', api.projects.getProjectsByCategory, { categoryId });
   const allTodos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip');
@@ -414,10 +418,19 @@ const CategoryDetailView = ({
                  onPress: () => Share.share({ message: `Category: ${categoryName}` })
                },
                {
-                 label: 'Delete Category',
+                 label: t.delete || 'Delete Category',
                  icon: 'trash-outline',
                  variant: 'destructive',
-                 onPress: () => onDeleteCategory(categoryId)
+                 onPress: () => {
+                   Alert.alert(
+                     t.confirmDeleteTitle || "Confirm Delete", 
+                     "Are you sure you want to delete this category and all its contents?", 
+                     [
+                       { text: t.cancel || "Cancel", style: "cancel" },
+                       { text: t.delete || "Delete", style: "destructive", onPress: () => onDeleteCategory(categoryId) }
+                     ]
+                   );
+                 }
                }
              ]
            })}
@@ -445,8 +458,22 @@ const CategoryDetailView = ({
             onLongPress={() => onOpenAction({
               title: sub.name,
               options: [
-                { label: 'Edit Sub-Category', icon: 'create-outline', onPress: () => onEditSubCategory(sub) },
-                { label: 'Delete Sub-Category', icon: 'trash-outline', variant: 'destructive', onPress: () => {} } // Need delete sub mutation here or pass it
+                { label: t.edit || 'Edit', icon: 'create-outline', onPress: () => onEditSubCategory(sub) },
+                { 
+                  label: t.delete || 'Delete', 
+                  icon: 'trash-outline', 
+                  variant: 'destructive', 
+                  onPress: () => {
+                    Alert.alert(
+                      t.confirmDeleteTitle || "Confirm Delete", 
+                      t.confirmDeleteSubCategory || "Are you sure you want to delete this sub-category and all its child projects?", 
+                      [
+                        { text: t.cancel || "Cancel", style: "cancel" },
+                        { text: t.delete || "Delete", style: "destructive", onPress: () => onDeleteSubCategory(sub._id) }
+                      ]
+                    );
+                  } 
+                }
               ]
             })}
           >
@@ -479,8 +506,23 @@ const CategoryDetailView = ({
                 onLongPress={() => onOpenAction({
                   title: project.name,
                   options: [
-                    { label: 'Edit Project', icon: 'create-outline', onPress: () => onEditProject(project) },
-                    { label: 'Delete Project', icon: 'trash-outline', variant: 'destructive', onPress: () => {} }
+                    { label: t.edit || 'Edit', icon: 'create-outline', onPress: () => onEditProject(project) },
+                    { label: t.share || 'Share', icon: 'share-social-outline', onPress: () => Share.share({ message: `Project: ${project.name}` }) },
+                    { 
+                      label: t.delete || 'Delete', 
+                      icon: 'trash-outline', 
+                      variant: 'destructive', 
+                      onPress: () => {
+                        Alert.alert(
+                          t.confirmDeleteTitle || "Confirm Delete", 
+                          t.confirmDeleteProject || "Are you sure you want to delete this project and unlink all its tasks?", 
+                          [
+                            { text: t.cancel || "Cancel", style: "cancel" },
+                            { text: t.delete || "Delete", style: "destructive", onPress: () => onDeleteProject(project._id) }
+                          ]
+                        );
+                      } 
+                    }
                   ]
                 })}
               >
@@ -511,7 +553,7 @@ const CategoryDetailView = ({
 
 const SubCategoryProjectsView = ({
   styles, colors, subCategoryId, subCategoryName,
-  onSelectProject, onAddProject, onEditSubCategory, onEditProject, onDeleteSubCategory, onOpenAction, userId
+  onSelectProject, onAddProject, onEditSubCategory, onEditProject, onDeleteSubCategory, onDeleteProject, onOpenAction, userId
 }: {
   styles: any; colors: any;
   subCategoryId: Id<'projectSubCategories'>; subCategoryName: string;
@@ -520,9 +562,11 @@ const SubCategoryProjectsView = ({
   onEditSubCategory: (sub: any) => void;
   onEditProject: (proj: any) => void;
   onDeleteSubCategory: (id: Id<'projectSubCategories'>) => void;
+  onDeleteProject: (id: Id<'projects'>) => void;
   onOpenAction: (config: any) => void;
   userId: Id<'users'> | null;
 }) => {
+  const { t } = useTranslation();
   const projects = useOfflineQuery<any[]>('projects.getProjectsBySubCategory', api.projects.getProjectsBySubCategory, { subCategoryId });
   const allTodos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip');
   const sub = useOfflineQuery<any>('projects.getSubCategory', api.projects.getSubCategory, { id: subCategoryId });
@@ -546,20 +590,29 @@ const SubCategoryProjectsView = ({
              title: subCategoryName,
              options: [
                {
-                 label: 'Edit Sub-Category',
+                 label: t.edit || 'Edit',
                  icon: 'create-outline',
                  onPress: () => sub && onEditSubCategory(sub)
                },
                {
-                 label: 'Share Sub-Category',
+                 label: t.share || 'Share',
                  icon: 'share-social-outline',
                  onPress: () => Share.share({ message: `Sub-Category: ${subCategoryName}` })
                },
                {
-                 label: 'Delete Sub-Category',
+                 label: t.delete || 'Delete',
                  icon: 'trash-outline',
                  variant: 'destructive',
-                 onPress: () => onDeleteSubCategory(subCategoryId)
+                 onPress: () => {
+                   Alert.alert(
+                     t.confirmDeleteTitle || "Confirm Delete", 
+                     t.confirmDeleteSubCategory || "Are you sure you want to delete this sub-category and all its child projects?", 
+                     [
+                       { text: t.cancel || "Cancel", style: "cancel" },
+                       { text: t.delete || "Delete", style: "destructive", onPress: () => onDeleteSubCategory(subCategoryId) }
+                     ]
+                   );
+                 }
                }
              ]
            })}
@@ -578,15 +631,29 @@ const SubCategoryProjectsView = ({
               title: project.name,
               options: [
                 {
-                  label: 'Edit Project',
+                  label: t.edit || 'Edit',
                   icon: 'create-outline',
                   onPress: () => onEditProject(project)
                 },
                 {
-                   label: 'Delete Project',
+                  label: t.share || 'Share',
+                  icon: 'share-social-outline',
+                  onPress: () => Share.share({ message: `Project: ${project.name}` })
+                },
+                {
+                   label: t.delete || 'Delete',
                    icon: 'trash-outline',
                    variant: 'destructive',
-                   onPress: () => {} // Need deleteProject mutation here or pass it
+                   onPress: () => {
+                     Alert.alert(
+                       t.confirmDeleteTitle || "Confirm Delete", 
+                       t.confirmDeleteProject || "Are you sure you want to delete this project and unlink all its tasks?", 
+                       [
+                         { text: t.cancel || "Cancel", style: "cancel" },
+                         { text: t.delete || "Delete", style: "destructive", onPress: () => onDeleteProject(project._id) }
+                       ]
+                     );
+                   }
                 }
               ]
             })}
@@ -1104,6 +1171,12 @@ const Projects: React.FC = () => {
               setLayer('categories');
               setSelectedCatId(null);
             }}
+            onDeleteSubCategory={(id) => {
+               deleteSubCategory({ id });
+            }}
+            onDeleteProject={(id) => {
+               deleteProject({ id });
+            }}
             onOpenAction={(config) => { setActionConfig(config); setActionModalVisible(true); }}
           />
         )}
@@ -1119,6 +1192,9 @@ const Projects: React.FC = () => {
                deleteSubCategory({ id });
                setLayer('categoryDetail');
                setSelectedSubId(null);
+            }}
+            onDeleteProject={(id) => {
+               deleteProject({ id });
             }}
             onOpenAction={(config) => { setActionConfig(config); setActionModalVisible(true); }}
           />

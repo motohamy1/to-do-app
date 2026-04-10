@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface ProjectPickerModalProps {
   visible: boolean;
   onClose: () => void;
-  onSelect: (projectId: string) => void;
+  onSelect: (projectId: string | undefined) => void;
 }
 
 const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({ visible, onClose, onSelect }) => {
@@ -145,7 +145,21 @@ const ProjectPickerModal: React.FC<ProjectPickerModalProps> = ({ visible, onClos
           {isLoading ? (
             <View style={{ padding: 60, alignItems: 'center' }}><ActivityIndicator color={colors.primary} size="large" /></View>
           ) : currentLevel === 'categories' ? (
-            <FlatList data={categories} keyExtractor={(item) => item._id} renderItem={renderCategoryItem} contentContainerStyle={styles.listContent} />
+            <>
+              <TouchableOpacity
+                style={[styles.item, { borderBottomColor: colors.border }]}
+                onPress={() => {
+                  onSelect(undefined);
+                  handleClose();
+                }}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: colors.border + '30' }]}>
+                  <Ionicons name="close-circle-outline" size={20} color={colors.textMuted} />
+                </View>
+                <Text style={[styles.label, { color: colors.textMuted }]}>Unlink / None</Text>
+              </TouchableOpacity>
+              <FlatList data={categories} keyExtractor={(item) => item._id} renderItem={renderCategoryItem} contentContainerStyle={styles.listContent} />
+            </>
           ) : currentLevel === 'categoryDetail' ? (
             <SectionList
               sections={[

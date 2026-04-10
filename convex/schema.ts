@@ -1,5 +1,17 @@
 import { defineSchema, defineTable } from "convex/server";
-import { v } from "convex/values";
+import { v, Infer } from "convex/values";
+import { Doc } from "./_generated/dataModel";
+
+export const taskStatusValidator = v.union(
+  v.literal("not_started"),
+  v.literal("not_done"),
+  v.literal("in_progress"),
+  v.literal("paused"),
+  v.literal("done")
+);
+
+export type TaskStatus = Infer<typeof taskStatusValidator>;
+export type Task = Doc<"todos">;
 
 export default defineSchema({
   users: defineTable({
@@ -17,7 +29,7 @@ export default defineSchema({
     userId: v.optional(v.id("users")),
     text: v.string(),
     isCompleted: v.optional(v.boolean()), 
-    status: v.optional(v.string()), 
+    status: v.optional(taskStatusValidator), 
     timerDuration: v.optional(v.number()), 
     timerDirection: v.optional(v.string()), // 'up' | 'down'
     timerStartTime: v.optional(v.number()), 
