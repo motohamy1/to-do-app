@@ -1,8 +1,7 @@
 import * as TaskManager from 'expo-task-manager';
-import * as Notifications from 'expo-notifications';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../convex/_generated/api';
-import { TIMER_ACTIONS, TimerNotificationData } from './notifications';
+import { Notifications, TIMER_ACTIONS, TimerNotificationData } from './notifications';
 import { Id } from '../convex/_generated/dataModel';
 
 export const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND_NOTIFICATION_TASK';
@@ -23,7 +22,7 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
     const actionData = notificationData.notification?.request?.content?.data as TimerNotificationData;
 
     if (!actionData?.taskId) {
-      if (notificationData.notification?.request?.identifier) {
+      if (Notifications && notificationData.notification?.request?.identifier) {
         await Notifications.dismissNotificationAsync(notificationData.notification.request.identifier);
       }
       return;
@@ -35,8 +34,8 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
       // Verify if task still exists
       const task = await convex.query(api.todos.getById, { id: taskId });
       if (!task) {
-         await Notifications.dismissNotificationAsync(notificationData.notification.request.identifier);
-         return;
+        if (Notifications) await Notifications.dismissNotificationAsync(notificationData.notification.request.identifier);
+        return;
       }
 
       if (actionIdentifier === TIMER_ACTIONS.PAUSE) {
@@ -47,7 +46,7 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
         await convex.mutation(api.todos.updateStatus, { id: taskId, status: 'not_started' });
       }
       
-      await Notifications.dismissNotificationAsync(notificationData.notification.request.identifier);
+      if (Notifications) await Notifications.dismissNotificationAsync(notificationData.notification.request.identifier);
     } catch (e) {
       console.error('Failed to handle notification action:', e);
     }

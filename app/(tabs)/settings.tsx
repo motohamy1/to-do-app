@@ -15,6 +15,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useScreenGuide } from '@/hooks/useScreenGuide';
 import ScreenGuide from '@/components/ScreenGuide';
 import type { GuideTip } from '@/components/ScreenGuide';
+import { getNotificationSound, setNotificationSound, NotificationSound } from '@/utils/soundPreferences';
+import { updateNotificationSoundPreference } from '@/utils/notifications';
 
 const Settings = () => {
   const { colors, isDarkMode, toggleDarkMode } = useTheme();
@@ -43,6 +45,24 @@ const Settings = () => {
   const [editName, setEditName] = React.useState('');
   const [editEmail, setEditEmail] = React.useState('');
   const [isUploading, setIsUploading] = React.useState(false);
+  const [isSoundModalVisible, setIsSoundModalVisible] = React.useState(false);
+  const [notificationSound, setNotificationSoundState] = React.useState<NotificationSound>('default');
+
+  React.useEffect(() => {
+    getNotificationSound().then(setNotificationSoundState);
+  }, []);
+
+  const handleSoundChange = async (sound: NotificationSound) => {
+    await setNotificationSound(sound);
+    setNotificationSoundState(sound);
+    await updateNotificationSoundPreference(sound);
+    if (userId && !isAnonymous) {
+      try {
+        await updateSettings({ userId, notificationSound: sound } as any);
+      } catch(e) {}
+    }
+    setIsSoundModalVisible(false);
+  };
 
   React.useEffect(() => {
     if (userSettings) {
@@ -156,7 +176,7 @@ const Settings = () => {
   );
 
   return (
-    <View style={[styles.container, isArabic && { direction: 'rtl' }]}>
+    <View style={[styles.container]}>
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.bg} />
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -249,6 +269,33 @@ const Settings = () => {
             </KeyboardAvoidingView>
           </Modal>
 
+          {/* Sound Selection Modal */}
+          <Modal visible={isSoundModalVisible} animationType="slide" transparent>
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>{isArabic ? 'اختر النغمة' : 'Select Sound'}</Text>
+                
+                <TouchableOpacity 
+                  style={[styles.saveButton, { marginBottom: 12, backgroundColor: notificationSound === 'default' ? colors.primary : colors.surface }]}
+                  onPress={() => handleSoundChange('default')}
+                >
+                  <Text style={[styles.saveButtonText, { color: notificationSound === 'default' ? '#000' : colors.text }]}>{isArabic ? 'النغمة الافتراضية' : 'Default'}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.saveButton, { marginBottom: 24, backgroundColor: notificationSound === 'alarm_tone.wav' ? colors.primary : colors.surface }]}
+                  onPress={() => handleSoundChange('alarm_tone.wav')}
+                >
+                  <Text style={[styles.saveButtonText, { color: notificationSound === 'alarm_tone.wav' ? '#000' : colors.text }]}>{isArabic ? 'نغمة مخصصة' : 'Custom Sound'}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.danger }]} onPress={() => setIsSoundModalVisible(false)}>
+                  <Text style={styles.saveButtonText}>{t.cancel || 'Cancel'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+
           {/* Preferences */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, isArabic && { textAlign: 'right' }]}>
@@ -271,6 +318,14 @@ const Settings = () => {
                 status={userSettings?.notificationsEnabled}
                 onPress={handleToggleNotifications}
                 color="#FF6B6B" 
+              />
+              <View style={styles.divider} />
+              <SettingItem 
+                icon="musical-notes-outline" 
+                label={isArabic ? 'نغمة الإشعار' : 'Notification Sound'}
+                value={notificationSound === 'default' ? (isArabic ? 'الافتراضية' : 'Default') : (isArabic ? 'مخصصة' : 'Custom')}
+                onPress={() => setIsSoundModalVisible(true)}
+                color="#FF9F43" 
               />
               <View style={styles.divider} />
               <SettingItem 

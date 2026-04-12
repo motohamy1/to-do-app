@@ -153,10 +153,10 @@ export const SubtaskRow = ({
 
   if (isEditing) {
     return (
-      <View style={[{ backgroundColor: cardBg, borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, borderColor: isBrightBg ? '#00000020' : colors.border + '40', marginBottom: 8 }, isArabic && { direction: 'rtl' }]}>
+      <View style={[{ backgroundColor: cardBg, borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, borderColor: isBrightBg ? '#00000020' : colors.border + '40', marginBottom: 8 }]}>
         <Text style={[{ fontSize: 10, fontWeight: '800', color: contentColor, letterSpacing: 0.5, textTransform: 'uppercase' }, isArabic && { textAlign: 'right' }]}>{t.editingSubtask}</Text>
 
-        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
           <TouchableOpacity onPress={() => onToggleComplete(sub._id, sub.status)}>
             <Ionicons
               name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
@@ -178,8 +178,7 @@ export const SubtaskRow = ({
             backgroundColor: hasTimer ? (isBrightBg ? '#00000010' : colors.surfaceText + '10') : 'transparent',
             borderColor: isBrightBg ? '#00000030' : colors.surfaceText + '30',
             borderWidth: 1,
-            alignSelf: isArabic ? 'flex-end' : 'flex-start',
-            flexDirection: isArabic ? 'row-reverse' : 'row'
+            alignSelf: isArabic ? 'flex-end' : 'flex-start'
           }]}
           onPress={() => setShowTimerPicker(!showTimerPicker)}
         >
@@ -206,7 +205,7 @@ export const SubtaskRow = ({
           />
         )}
 
-        <View style={[{ flexDirection: 'row', gap: 10 }, isArabic && { flexDirection: 'row-reverse' }]}>
+        <View style={[{ flexDirection: 'row', gap: 10 }]}>
            <TouchableOpacity
             style={{ flex: 1, backgroundColor: sub.status === 'in_progress' ? '#f85d08' : colors.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
             onPress={handleSaveEdit}
@@ -225,14 +224,14 @@ export const SubtaskRow = ({
   }
 
   return (
-    <View style={[{ backgroundColor: cardBg, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: isBrightBg ? '#00000010' : colors.border + '20' }, isArabic && { direction: 'rtl' }]}>
-      <View style={[{ flexDirection: 'row', alignItems: 'center', padding: 12 }, isArabic && { flexDirection: 'row-reverse' }]}>
+    <View style={[{ backgroundColor: cardBg, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: isBrightBg ? '#00000010' : colors.border + '20' }]}>
+      <View style={[{ flexDirection: 'row', alignItems: 'center', padding: 12 }]}>
         <TouchableOpacity onPress={() => onToggleComplete(sub._id, sub.status)}>
           <Ionicons
             name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
             size={24}
             color={isDone ? colors.success : contentMutedColor}
-            style={isArabic ? { marginLeft: 12 } : { marginRight: 12 }}
+            style={{ marginEnd: 12 }}
           />
         </TouchableOpacity>
 
@@ -257,15 +256,14 @@ export const SubtaskRow = ({
           <TouchableOpacity
             onPress={() => isRunning ? onPauseSubtask(sub._id) : onStartSubtask(sub._id)}
             style={[{
-              flexDirection: isArabic ? 'row-reverse' : 'row',
+              flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
               backgroundColor: isRunning ? (isBrightBg ? '#f85d08' : colors.warning + '15') : isPaused ? (isBrightBg ? '#00000010' : colors.surfaceText + '10') : (isBrightBg ? '#00000008' : colors.surfaceText + '08'),
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderRadius: 12,
-              marginLeft: isArabic ? 0 : 8,
-              marginRight: isArabic ? 8 : 0,
+              marginStart: 8,
               borderWidth: 1,
               borderColor: isRunning ? (isBrightBg ? '#f85d08' : colors.warning + '30') : (isBrightBg ? '#00000020' : colors.surfaceText + '20'),
             }]}
@@ -298,15 +296,15 @@ export const SubtaskRow = ({
 
         {hasTimer && isDone && (
           <View style={[{
-            flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 4,
-            backgroundColor: colors.success + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginLeft: isArabic ? 0 : 8, marginRight: isArabic ? 8 : 0
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            backgroundColor: colors.success + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginStart: 8
           }]}>
             <Ionicons name="checkmark" size={12} color={colors.success} />
             <Text style={{ fontSize: 11, color: colors.success, fontWeight: '800' }}>{t.done}</Text>
           </View>
         )}
 
-        <View style={[{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8, marginLeft: isArabic ? 0 : 8, marginRight: isArabic ? 8 : 0 }]}>
+        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, marginStart: 8 }]}>
            <TouchableOpacity onPress={() => (setIsEditing(true), setEditText(sub.text))}>
             <Ionicons name="create-outline" size={20} color={isBrightBg ? '#000000' : colors.primary} />
           </TouchableOpacity>

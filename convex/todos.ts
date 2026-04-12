@@ -99,6 +99,14 @@ export const addTodo = mutation({
       ...(args.type !== undefined && { type: args.type }),
       ...(args.status === 'done' && { completedAt: Date.now() }),
     });
+
+    if (args.parentId) {
+      const parent = await ctx.db.get(args.parentId);
+      if (parent && parent.status === "done") {
+        await ctx.db.patch(args.parentId, { status: "in_progress", completedAt: undefined });
+      }
+    }
+
     return todoId;
   },
 });
@@ -152,9 +160,13 @@ export const setTimer = mutation({
   },
   handler: async (ctx, args) => {
     // If this is a subtask, validate against parent budget
+    const todo = await ctx.db.get(args.id);
+    if (!todo) return;
+
+    let newTimeLeftAtPause = todo.timeLeftAtPause;
+
     if (args.duration !== undefined) {
-      const todo = await ctx.db.get(args.id);
-      if (todo?.parentId) {
+      if (todo.parentId) {
         const parent = await ctx.db.get(todo.parentId);
         if (parent?.timerDuration) {
           const siblings = await ctx.db
@@ -171,10 +183,30 @@ export const setTimer = mutation({
           }
         }
       }
+
+      // Calculate elapsed time
+      let elapsed = 0;
+      if (todo.status === "in_progress" && todo.timerStartTime) {
+        elapsed = Date.now() - todo.timerStartTime;
+      } else if (todo.status === "paused" && todo.timerDuration !== undefined && todo.timeLeftAtPause !== undefined) {
+        elapsed = todo.timerDuration - todo.timeLeftAtPause;
+      }
+
+      // Prevent saving a duration smaller than the elapsed time
+      if (args.duration < elapsed) {
+        throw new Error("Cannot set duration less than already elapsed time.");
+      }
+
+      // Adjust timeLeftAtPause by diff if paused
+      if (todo.status === "paused" && todo.timerDuration !== undefined && todo.timeLeftAtPause !== undefined) {
+        const diff = args.duration - todo.timerDuration;
+        newTimeLeftAtPause = Math.max(0, todo.timeLeftAtPause + diff);
+      }
     }
 
     await ctx.db.patch(args.id, { 
       ...(args.duration !== undefined && { timerDuration: args.duration }),
+      ...(args.duration !== undefined && newTimeLeftAtPause !== undefined && { timeLeftAtPause: newTimeLeftAtPause }),
       ...(args.timerDirection !== undefined && { timerDirection: args.timerDirection }),
       ...(args.dueDate !== undefined && { dueDate: args.dueDate }),
       ...(args.date !== undefined && { date: args.date })
@@ -187,6 +219,7 @@ export const resetTimer = mutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.id, {
       timerStartTime: undefined,
+      timerFirstStartTime: undefined,
       timeLeftAtPause: undefined,
       status: "not_started"
     });
@@ -213,14 +246,15 @@ export const startTimer = mutation({
     if (!todo) return;
     
     let newStartTime = Date.now();
-    if (todo.status === "paused" && todo.timeLeftAtPause !== undefined && todo.timerDuration) {
+    if ((todo.status === "paused" || todo.status === "not_done") && todo.timeLeftAtPause !== undefined && todo.timerDuration) {
         newStartTime = Date.now() - (todo.timerDuration - todo.timeLeftAtPause);
     }
 
     await ctx.db.patch(args.id, { 
       status: "in_progress",
       timerStartTime: newStartTime,
-      timeLeftAtPause: undefined 
+      timeLeftAtPause: undefined,
+      ...(!todo.timerFirstStartTime && { timerFirstStartTime: Date.now() }),
     });
   },
 });

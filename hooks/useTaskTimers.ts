@@ -5,7 +5,7 @@ import { scheduleTimerCompletion, cancelTaskNotification } from '../utils/notifi
 export function useTaskTimers(todos: any[] | undefined, updateStatus: any) {
   const appState = useRef(AppState.currentState);
   const todosRef = useRef(todos);
-  const scheduledNotifications = useRef(new Map<string, number>());
+  const scheduledNotifications = useRef(new Map<string, string>());
 
   useEffect(() => {
     todosRef.current = todos;
@@ -22,9 +22,13 @@ export function useTaskTimers(todos: any[] | undefined, updateStatus: any) {
         
         if (remaining > 0) {
            const lastScheduled = scheduledNotifications.current.get(todo._id);
-           if (lastScheduled !== todo.timerStartTime) {
-             scheduleTimerCompletion(todo._id, todo.title, remaining);
-             scheduledNotifications.current.set(todo._id, todo.timerStartTime);
+           const scheduleKey = `${todo.timerStartTime}-${todo.timerDuration}`;
+           if (lastScheduled !== scheduleKey) {
+             if (lastScheduled) {
+               cancelTaskNotification(todo._id);
+             }
+             scheduleTimerCompletion(todo._id, todo.text, remaining);
+             scheduledNotifications.current.set(todo._id, scheduleKey);
            }
         }
       } else {

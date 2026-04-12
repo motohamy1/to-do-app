@@ -122,7 +122,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
   if (!isAdding) {
     return (
       <>
-        <TouchableOpacity style={[homeStyles.addButton, isArabic && { flexDirection: 'row-reverse' }]} onPress={handleOpenDetails}>
+        <TouchableOpacity style={[homeStyles.addButton]} onPress={handleOpenDetails}>
           <Ionicons name="add" size={20} color={colors.primary} />
           <Text style={homeStyles.addButtonText}>{isArabic ? 'إضافة مهمة' : 'Add a task'}</Text>
         </TouchableOpacity>
@@ -143,7 +143,7 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
 
   return (
     <>
-      <View style={[homeStyles.addInputContainer, { flexDirection: 'column', alignItems: 'stretch' }, isArabic && { direction: 'rtl' }]}>
+      <View style={[homeStyles.addInputContainer, { flexDirection: 'column', alignItems: 'stretch' }]}>
 
         {/* Top Input Row */}
         <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', marginBottom: timerDuration ? 12 : 0 }}>

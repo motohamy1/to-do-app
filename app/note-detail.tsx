@@ -11,6 +11,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   FlatList,
+  KeyboardEvent,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,6 +68,7 @@ export default function NoteDetailScreen() {
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState<number>(0);
   const [isScheduleVisible, setScheduleVisible] = useState(isReminder === 'true');
+  const [dateTimeConfirmed, setDateTimeConfirmed] = useState(false);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
 
   interface Block {
@@ -95,6 +97,13 @@ export default function NoteDetailScreen() {
 
   type ActiveMenuType = 'none' | 'fontFamily' | 'fontSize' | 'color' | 'fontShape';
   const [activeMenu, setActiveMenu] = useState<ActiveMenuType>('none');
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e: KeyboardEvent) => setKeyboardHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   // Parser & Serializer
   const parseMarkdown = (text: string): Block[] => {
@@ -165,6 +174,7 @@ export default function NoteDetailScreen() {
         setCurrentMonth(d);
         setSelectedTime(d);
         setScheduleVisible(true);
+        setDateTimeConfirmed(true);
       }
     }
   }, [existingNote]);
@@ -453,12 +463,15 @@ export default function NoteDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.detailSafeArea} edges={['top', 'left', 'right', 'bottom']}>
+    <SafeAreaView style={[styles.detailSafeArea, { flex: 1 }]} edges={['top', 'left', 'right', 'bottom']}>
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : -110}
       >
-        <View style={[styles.detailHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={{ flex: 1 }}>
+            <View style={[styles.detailHeader, isArabic && { flexDirection: 'row-reverse' }]}>
           <TouchableOpacity style={styles.detailHeaderBtn} onPress={handleSaveNote}>
             <Ionicons name="chevron-back" size={24} style={styles.detailHeaderBtnIcon} />
           </TouchableOpacity>
@@ -466,7 +479,15 @@ export default function NoteDetailScreen() {
           <View style={styles.detailHeaderRight}>
             <TouchableOpacity 
               style={[styles.detailHeaderBtn, isScheduleVisible && { backgroundColor: colors.warning + '20' }]} 
-              onPress={() => setScheduleVisible(!isScheduleVisible)}
+              onPress={() => {
+                if (isScheduleVisible && dateTimeConfirmed) {
+                  // Re-open picker to edit
+                  setDateTimeConfirmed(false);
+                } else {
+                  setScheduleVisible(!isScheduleVisible);
+                  setDateTimeConfirmed(false);
+                }
+              }}
             >
                <Ionicons 
                  name={isScheduleVisible ? "alarm" : "alarm-outline"} 
@@ -489,93 +510,142 @@ export default function NoteDetailScreen() {
         <ScrollView 
           ref={scrollViewRef as any}
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 60 : 80 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
           {renderHeader()}
           
           {isScheduleVisible && (
-            <View style={{ paddingHorizontal: 24, marginBottom: 24 }}>
-              <View style={styles.inlineReminderHeader}>
-                <Text style={[styles.inlineReminderTitle, isArabic && { textAlign: 'right' }]}>
-                  {isArabic ? 'موعد التذكير' : 'Reminder Schedule'}
-                </Text>
-                
-                <View style={styles.calendarCard}>
-                  <View style={[styles.calendarHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-                    <TouchableOpacity onPress={prevMonth}>
-                      <Ionicons name="chevron-back" size={20} color={colors.text} />
-                    </TouchableOpacity>
-                    <Text style={styles.calendarTitle}>
-                      {currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })}
-                    </Text>
-                    <TouchableOpacity onPress={nextMonth}>
-                      <Ionicons name="chevron-forward" size={20} color={colors.text} />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={[styles.weekDaysRow, isArabic && { flexDirection: 'row-reverse' }]}>
-                    {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((d) => (
-                      <Text key={d} style={styles.weekDayText}>{d}</Text>
-                    ))}
-                  </View>
-
-                  <View style={[styles.daysGrid, isArabic && { flexDirection: 'row-reverse' }]}>
-                    {renderCalendarDays()}
-                  </View>
-                </View>
-
-                <View style={[styles.timePresetsRow, isArabic && { flexDirection: 'row-reverse' }, { alignItems: 'center', marginTop: 16 }]}>
-                  {Platform.OS === 'ios' ? (
-                    <DateTimePicker
-                      value={selectedTime}
-                      mode="time"
-                      display="spinner"
-                      themeVariant={isDarkMode ? 'dark' : 'light'}
-                      style={{ flex: 1, height: 100 }}
-                      onChange={(e, d) => {
-                        if (d) {
-                          setSelectedTime(d);
-                          const finalDate = new Date(selectedDate);
-                          finalDate.setHours(d.getHours(), d.getMinutes(), 0, 0);
-                          setDueDate(finalDate.getTime());
-                        }
-                      }}
-                    />
-                  ) : (
-                    <>
-                      <TouchableOpacity 
-                        style={[styles.timePresetBtn, { backgroundColor: colors.bg, flexDirection: 'row', alignItems: 'center', height: 50, borderRadius: 12 }]}
-                        onPress={() => setShowTimePicker(true)}
-                      >
-                        <Ionicons name="time-outline" size={20} color={colors.text} style={{ marginRight: 8 }} />
-                        <Text style={[styles.timePresetMain, { color: colors.text, fontSize: 18 }]}>
-                          {selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </Text>
+            <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
+              {dateTimeConfirmed ? (
+                // Collapsed summary chip
+                <TouchableOpacity
+                  onPress={() => setDateTimeConfirmed(false)}
+                  style={{
+                    flexDirection: isArabic ? 'row-reverse' : 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    backgroundColor: colors.warning + '18',
+                    borderWidth: 1,
+                    borderColor: colors.warning + '50',
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    alignSelf: 'flex-start',
+                  }}
+                >
+                  <Ionicons name="alarm" size={18} color={colors.warning} />
+                  <Text style={{ color: colors.warning, fontWeight: '700', fontSize: 14 }}>
+                    {new Date(dueDate).toLocaleDateString(isArabic ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {'  '}
+                    {new Date(dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                  <Ionicons name="pencil-outline" size={14} color={colors.warning} />
+                </TouchableOpacity>
+              ) : (
+                // Full picker
+                <View style={styles.inlineReminderHeader}>
+                  <Text style={[styles.inlineReminderTitle, isArabic && { textAlign: 'right' }]}>
+                    {isArabic ? 'موعد التذكير' : 'Reminder Schedule'}
+                  </Text>
+                  
+                  <View style={styles.calendarCard}>
+                    <View style={[styles.calendarHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+                      <TouchableOpacity onPress={prevMonth}>
+                        <Ionicons name="chevron-back" size={20} color={colors.text} />
                       </TouchableOpacity>
-                      {showTimePicker && (
-                        <DateTimePicker
-                          value={selectedTime}
-                          mode="time"
-                          display="default"
-                          themeVariant={isDarkMode ? 'dark' : 'light'}
-                          is24Hour={true}
-                          onChange={(e, d) => {
-                             setShowTimePicker(false);
-                             if (d) {
-                               setSelectedTime(d);
-                               const finalDate = new Date(selectedDate);
-                               finalDate.setHours(d.getHours(), d.getMinutes(), 0, 0);
-                               setDueDate(finalDate.getTime());
-                             }
-                          }}
-                        />
-                      )}
-                    </>
-                  )}
+                      <Text style={styles.calendarTitle}>
+                        {currentMonth.toLocaleString('en-US', { month: 'long', year: 'numeric' })}
+                      </Text>
+                      <TouchableOpacity onPress={nextMonth}>
+                        <Ionicons name="chevron-forward" size={20} color={colors.text} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={[styles.weekDaysRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                      {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((d) => (
+                        <Text key={d} style={styles.weekDayText}>{d}</Text>
+                      ))}
+                    </View>
+
+                    <View style={[styles.daysGrid, isArabic && { flexDirection: 'row-reverse' }]}>
+                      {renderCalendarDays()}
+                    </View>
+                  </View>
+
+                  <View style={[styles.timePresetsRow, isArabic && { flexDirection: 'row-reverse' }, { alignItems: 'center', marginTop: 16 }]}>
+                    {Platform.OS === 'ios' ? (
+                      <DateTimePicker
+                        value={selectedTime}
+                        mode="time"
+                        display="spinner"
+                        themeVariant={isDarkMode ? 'dark' : 'light'}
+                        style={{ flex: 1, height: 100 }}
+                        onChange={(e, d) => {
+                          if (d) {
+                            setSelectedTime(d);
+                            const finalDate = new Date(selectedDate);
+                            finalDate.setHours(d.getHours(), d.getMinutes(), 0, 0);
+                            setDueDate(finalDate.getTime());
+                          }
+                        }}
+                      />
+                    ) : (
+                      <>
+                        <TouchableOpacity 
+                          style={[styles.timePresetBtn, { backgroundColor: colors.bg, flexDirection: 'row', alignItems: 'center', height: 50, borderRadius: 12 }]}
+                          onPress={() => setShowTimePicker(true)}
+                        >
+                          <Ionicons name="time-outline" size={20} color={colors.text} style={{ marginRight: 8 }} />
+                          <Text style={[styles.timePresetMain, { color: colors.text, fontSize: 18 }]}>
+                            {selectedTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                        </TouchableOpacity>
+                        {showTimePicker && (
+                          <DateTimePicker
+                            value={selectedTime}
+                            mode="time"
+                            display="default"
+                            themeVariant={isDarkMode ? 'dark' : 'light'}
+                            is24Hour={true}
+                            onChange={(e, d) => {
+                               setShowTimePicker(false);
+                               if (d) {
+                                 setSelectedTime(d);
+                                 const finalDate = new Date(selectedDate);
+                                 finalDate.setHours(d.getHours(), d.getMinutes(), 0, 0);
+                                 setDueDate(finalDate.getTime());
+                               }
+                            }}
+                          />
+                        )}
+                      </>
+                    )}
+                  </View>
+
+                  {/* Confirm button */}
+                  <TouchableOpacity
+                    onPress={() => {
+                      const finalDate = new Date(selectedDate);
+                      finalDate.setHours(selectedTime.getHours(), selectedTime.getMinutes(), 0, 0);
+                      setDueDate(finalDate.getTime());
+                      setDateTimeConfirmed(true);
+                    }}
+                    style={{
+                      marginTop: 16,
+                      backgroundColor: colors.warning,
+                      borderRadius: 12,
+                      paddingVertical: 12,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: '#000', fontWeight: '800', fontSize: 15 }}>
+                      {isArabic ? 'تأكيد الموعد' : 'Confirm Date & Time'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
-              </View>
+              )}
             </View>
           )}
 
@@ -604,47 +674,55 @@ export default function NoteDetailScreen() {
             </Text>
           </TouchableOpacity>
         </ScrollView>
+          </View>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
 
+      {/* Toolbar — always anchored above keyboard */}
+      <View style={[
+        styles.toolbarWrapper,
+        {
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: keyboardHeight,
+          backgroundColor: '#1A1A1A',
+          paddingVertical: 12,
+          paddingHorizontal: 20,
+          borderTopWidth: 1,
+          borderColor: 'rgba(255,255,255,0.1)',
+          zIndex: 100,
+        }
+      ]}>
         <View style={[
-          styles.toolbarWrapper, 
-          { 
-            backgroundColor: '#1A1A1A',
-            paddingVertical: 12,
-            paddingHorizontal: 20,
-            borderTopWidth: 1,
-            borderColor: 'rgba(255,255,255,0.1)',
-          }
+          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+          isArabic && { flexDirection: 'row-reverse' }
         ]}>
-          <View style={[
-            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-            isArabic && { flexDirection: 'row-reverse' }
-          ]}>
-            <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-              <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveHeading}>
-                <Ionicons name="text-outline" size={22} color="#FFF" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveCheckbox}>
-                <Ionicons name="checkbox-outline" size={22} color="#FFF" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveBullet}>
-                <Ionicons name="list-outline" size={22} color="#FFF" />
-              </TouchableOpacity>
-            </View>
+          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+            <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveHeading}>
+              <Ionicons name="text-outline" size={22} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveCheckbox}>
+              <Ionicons name="checkbox-outline" size={22} color="#FFF" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveBullet}>
+              <Ionicons name="list-outline" size={22} color="#FFF" />
+            </TouchableOpacity>
+          </View>
 
-            <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-              <TouchableOpacity onPress={() => setActiveMenu('fontSize')} style={{ paddingHorizontal: 4 }}>
-                 <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{activeFontSize}pt</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveMenu('color')}>
-                <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: activeFontColor, borderWidth: 2, borderColor: '#FFF' }} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setActiveMenu('fontFamily')}>
-                <Ionicons name="language-outline" size={22} color="#FFF" />
-              </TouchableOpacity>
-            </View>
+          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+            <TouchableOpacity onPress={() => setActiveMenu('fontSize')} style={{ paddingHorizontal: 4 }}>
+              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{activeFontSize}pt</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setActiveMenu('color')}>
+              <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: activeFontColor, borderWidth: 2, borderColor: '#FFF' }} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setActiveMenu('fontFamily')}>
+              <Ionicons name="language-outline" size={22} color="#FFF" />
+            </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       {/* Action Menu Bottom Sheet */}
       <Modal

@@ -116,6 +116,16 @@ export const translations = {
     confirmDeleteTask: "Are you sure you want to delete this task?",
     actionSuccess: "Action successful",
     actionFailed: "Action failed",
+    tabTodo: "To Do",
+    tabPlanner: "Planner",
+    tabAdd: "Add",
+    tabProjects: "Projects",
+    tabSettings: "Settings",
+    notesAndReminders: "Notes & Reminders",
+    reminders: "Reminders",
+    notes: "Notes",
+    newReminder: "New Reminder",
+    quickNote: "Quick Note",
   },
 
 
@@ -236,6 +246,16 @@ export const translations = {
     confirmDeleteTask: "هل أنت متأكد من أنك تريد حذف هذه المهمة؟",
     actionSuccess: "تمت العملية بنجاح",
     actionFailed: "فشلت العملية",
+    tabTodo: "المهام",
+    tabPlanner: "المخطط",
+    tabAdd: "إضافة",
+    tabProjects: "المشاريع",
+    tabSettings: "الإعدادات",
+    notesAndReminders: "الملاحظات والتذكيرات",
+    reminders: "التذكيرات",
+    notes: "الملاحظات",
+    newReminder: "تذكير جديد",
+    quickNote: "ملاحظة سريعة",
   }
 
 

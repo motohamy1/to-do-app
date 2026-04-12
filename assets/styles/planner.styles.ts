@@ -80,7 +80,7 @@ export const createPlannerStyles = (colors: ColorScheme, isArabic: boolean = fal
     monthIndicator: {
       position: 'absolute',
       top: 10,
-      right: 10,
+      end: 10,
       width: 6,
       height: 6,
       borderRadius: 3,

@@ -247,7 +247,7 @@ const Planner = () => {
                 <View style={{ marginBottom: 32 }}>
                     <Text style={[{ fontSize: 20, fontWeight: '800', paddingHorizontal: 24, marginBottom: 16, color: colors.text }, isArabic && { textAlign: 'right' }]}>{isArabic ? 'التذكيرات' : 'Reminders'}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View style={[styles.horizontalGridContainer, isArabic && { flexDirection: 'column-reverse' }]}>
+                        <View style={[styles.horizontalGridContainer]}>
                             {tasks.filter(t => t.type === 'reminder').map((task) => (
                                 <TouchableOpacity 
                                     key={task._id}
@@ -283,7 +283,7 @@ const Planner = () => {
                 <View style={{ marginBottom: 32 }}>
                     <Text style={[{ fontSize: 20, fontWeight: '800', paddingHorizontal: 24, marginBottom: 16, color: colors.text }, isArabic && { textAlign: 'right' }]}>{isArabic ? 'الملاحظات' : 'Notes'}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                        <View style={[styles.horizontalGridContainer, isArabic && { flexDirection: 'column-reverse' }]}>
+                        <View style={[styles.horizontalGridContainer]}>
                             {tasks.filter(t => t.type === 'note').map((task) => (
                                 <TouchableOpacity 
                                     key={task._id}
@@ -490,7 +490,7 @@ const Planner = () => {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, isArabic && { direction: 'rtl' }]}
+      style={[styles.container]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >

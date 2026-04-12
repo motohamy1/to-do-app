@@ -18,6 +18,8 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useTranslation } from "@/utils/i18n";
 import { NOTIFICATION_CATEGORIES, TIMER_ACTIONS, Notifications } from "@/utils/notifications";
 import { BACKGROUND_NOTIFICATION_TASK } from "@/utils/backgroundTask";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import WelcomeOnboarding from "@/components/WelcomeOnboarding";
 
 // Register the background task
 Notifications?.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
@@ -29,8 +31,9 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 function RootLayoutContent() {
   useSyncManager();
   const { hasPermission } = useNotifications();
-  const { isLoading, language } = useAuth();
+  const { isLoading, language, setLanguage } = useAuth();
   const { t } = useTranslation(language);
+  const { isFirstLaunch, completeOnboarding } = useOnboarding();
 
   useEffect(() => {
     Notifications?.setNotificationCategoryAsync(NOTIFICATION_CATEGORIES.TIMER_ACTIVE, [
@@ -52,7 +55,19 @@ function RootLayoutContent() {
     ]);
   }, [language, t]);
 
-  if (isLoading) return null;
+  // Still checking storage
+  if (isLoading || isFirstLaunch === null) return null;
+
+  if (isFirstLaunch) {
+    return (
+      <WelcomeOnboarding
+        onComplete={async (lang) => {
+          await setLanguage(lang);
+          await completeOnboarding();
+        }}
+      />
+    );
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

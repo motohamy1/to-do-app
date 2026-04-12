@@ -20,7 +20,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
     },
     headerLeft: {
       flexDirection: "column",
-      alignItems: isArabic ? "flex-end" : "flex-start",
+      alignItems: "flex-start",
       gap: 4,
     },
     headerDate: {
@@ -129,7 +129,8 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
 
     // --- Old Card styles repurposed for timeline/category cards ---
     cardContainer: {
-      marginHorizontal: 24,
+      marginStart: 24,
+      marginEnd: 24,
       marginBottom: 16,
       flexDirection: 'row',
     },
@@ -310,7 +311,8 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
     fab: {
       position: 'absolute',
       bottom: 100,
-      right: 24,
+      right: isArabic ? undefined : 24,
+      left: isArabic ? 24 : undefined,
       width: 60,
       height: 60,
       borderRadius: 30,

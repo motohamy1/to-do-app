@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import type * as NotificationsType from 'expo-notifications';
+import { getNotificationSound, NotificationSound } from './soundPreferences';
 
 export const getTimerNotificationId = (taskId: string) => `timer_${taskId}`;
 export const getMorningNotificationId = () => `daily_morning_9am`;
@@ -37,10 +38,59 @@ function getNotificationsAPI(): typeof NotificationsType | null {
 
 export const Notifications = getNotificationsAPI();
 
-// Custom alarm sound name (without extension)
-// Android: looks in android/app/src/main/res/raw/alarm_tone.wav
-// iOS: looks for alarm_tone.wav in the app bundle
-const ALARM_SOUND = Platform.OS === 'android' ? 'alarm_tone' : 'alarm_tone.wav';
+// Get current preferred sound
+const getAlarmSound = async () => {
+  const soundPref = await getNotificationSound();
+  return soundPref === 'default' ? true : (Platform.OS === 'android' ? 'alarm_tone' : 'alarm_tone.wav');
+};
+
+export async function updateNotificationSoundPreference(soundFile: NotificationSound) {
+  if (!Notifications || Platform.OS !== 'android') return;
+
+  const androidSound = soundFile === 'default' ? true : 'alarm_tone';
+  const channelIds = ['tasks', 'subtasks', 'reminders'];
+  for (const id of channelIds) {
+    try {
+      await Notifications.deleteNotificationChannelAsync(id);
+    } catch (_) {}
+  }
+
+  await Notifications.setNotificationChannelAsync('tasks', {
+    name: 'Task Timers',
+    importance: Notifications.AndroidImportance.MAX,
+    sound: androidSound,
+    enableVibrate: true,
+    vibrationPattern: [0, 500, 200, 500, 200, 500],
+    lightColor: '#FF231F7C',
+    enableLights: true,
+    bypassDnd: true,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  } as any);
+
+  await Notifications.setNotificationChannelAsync('subtasks', {
+    name: 'Subtask Timers',
+    importance: Notifications.AndroidImportance.MAX,
+    sound: androidSound,
+    enableVibrate: true,
+    vibrationPattern: [0, 400, 150, 400, 150, 400],
+    lightColor: '#D4F82D',
+    enableLights: true,
+    bypassDnd: true,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  } as any);
+
+  await Notifications.setNotificationChannelAsync('reminders', {
+    name: 'Reminders',
+    importance: Notifications.AndroidImportance.MAX,
+    sound: androidSound,
+    enableVibrate: true,
+    vibrationPattern: [0, 500, 200, 500, 200, 500],
+    lightColor: '#FF5C77',
+    enableLights: true,
+    bypassDnd: true,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  } as any);
+}
 
 if (Notifications) {
   try {
@@ -67,6 +117,7 @@ export async function requestPermissionsAsync() {
 
   try {
     if (Platform.OS === 'android') {
+      const activeSound = await getAlarmSound();
       // IMPORTANT: Delete existing channels first so they get recreated 
       // with the new alarm sound. Android caches channel settings permanently.
       const channelIds = ['tasks', 'subtasks', 'reminders', 'daily'];
@@ -82,7 +133,7 @@ export async function requestPermissionsAsync() {
       await Notifications.setNotificationChannelAsync('tasks', {
         name: 'Task Timers',
         importance: Notifications.AndroidImportance.MAX,
-        sound: ALARM_SOUND,
+        sound: activeSound,
         enableVibrate: true,
         vibrationPattern: [0, 500, 200, 500, 200, 500],
         lightColor: '#FF231F7C',
@@ -95,7 +146,7 @@ export async function requestPermissionsAsync() {
       await Notifications.setNotificationChannelAsync('subtasks', {
         name: 'Subtask Timers',
         importance: Notifications.AndroidImportance.MAX,
-        sound: ALARM_SOUND,
+        sound: activeSound,
         enableVibrate: true,
         vibrationPattern: [0, 400, 150, 400, 150, 400],
         lightColor: '#D4F82D',
@@ -108,7 +159,7 @@ export async function requestPermissionsAsync() {
       await Notifications.setNotificationChannelAsync('reminders', {
         name: 'Reminders',
         importance: Notifications.AndroidImportance.MAX,
-        sound: ALARM_SOUND,
+        sound: activeSound,
         enableVibrate: true,
         vibrationPattern: [0, 500, 200, 500, 200, 500],
         lightColor: '#FF5C77',
@@ -147,7 +198,7 @@ import { translations } from './i18n';
 
 export async function scheduleTimerCompletion(
   taskId: string,
-  title: string, 
+  text: string, 
   durationMs: number, 
   isSubtask = false, 
   language: string = 'en'
@@ -157,14 +208,15 @@ export async function scheduleTimerCompletion(
   const t: any = translations[language as keyof typeof translations] || translations.en;
   
   try {
+    const activeSound = await getAlarmSound();
     const seconds = Math.floor(durationMs / 1000);
     const identifier = getTimerNotificationId(taskId);
     await Notifications.scheduleNotificationAsync({
       identifier,
       content: {
         title: isSubtask ? t.notifSubtaskTitle : t.notifTaskTitle,
-        body: (isSubtask ? t.notifSubtaskBody : t.notifTaskBody) + `"${title}"`,
-        sound: ALARM_SOUND,
+        body: (isSubtask ? t.notifSubtaskBody : t.notifTaskBody) + `"${text}"`,
+        sound: activeSound,
         priority: Notifications.AndroidNotificationPriority?.MAX,
         vibrate: [0, 500, 200, 500, 200, 500],
         categoryIdentifier: NOTIFICATION_CATEGORIES.TIMER_ACTIVE,
@@ -180,6 +232,35 @@ export async function scheduleTimerCompletion(
   } catch (error) {
     console.warn("Error scheduling timer notification:", error);
     return "";
+  }
+}
+
+export async function updateTimerNotificationText(
+  taskId: string,
+  newText: string,
+  isSubtask = false,
+  language: string = 'en'
+) {
+  if (!Notifications) return;
+  const identifier = getTimerNotificationId(taskId);
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const existing = scheduled.find(n => n.identifier === identifier);
+    if (existing) {
+      const t: any = translations[language as keyof typeof translations] || translations.en;
+      await Notifications.cancelScheduledNotificationAsync(identifier);
+      await Notifications.scheduleNotificationAsync({
+        identifier,
+        content: {
+          ...existing.content,
+          title: isSubtask ? t.notifSubtaskTitle : t.notifTaskTitle,
+          body: (isSubtask ? t.notifSubtaskBody : t.notifTaskBody) + `"${newText}"`,
+        } as any,
+        trigger: existing.trigger as any,
+      });
+    }
+  } catch (error) {
+    console.warn("Error updating timer notification:", error);
   }
 }
 
@@ -207,6 +288,7 @@ export async function scheduleReminderNotification(
   const t: any = translations[language as keyof typeof translations] || translations.en;
 
   try {
+    const activeSound = await getAlarmSound();
     const now = Date.now();
     // If the reminder time already passed, don't schedule
     if (dueDateMs <= now) return "";
@@ -217,7 +299,7 @@ export async function scheduleReminderNotification(
       content: {
         title: t.reminderNotifTitle || '⏰ Reminder',
         body: (t.reminderNotifBody || 'Time for: ') + `"${title}"`,
-        sound: ALARM_SOUND,
+        sound: activeSound,
         priority: Notifications.AndroidNotificationPriority?.MAX,
         sticky: false,
         autoDismiss: false,

@@ -104,7 +104,7 @@ export default function NotesScreen() {
             fontWeight: '700',
             fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif-medium'
           }, isArabic && { textAlign: 'right' }]}>
-            {isRem ? 'New Reminder' : 'Quick Note'}
+            {isRem ? t.newReminder : t.quickNote}
           </Text>
         </TouchableOpacity>
       );
@@ -143,13 +143,13 @@ export default function NotesScreen() {
   return (
     <SafeAreaView style={[styles.safeArea, { overflow: 'hidden' }]} edges={['left', 'right', 'bottom']}>
       <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }, { paddingTop: Math.max(insets.top, 16) }]}>
-        <Text style={[styles.headerTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif', fontSize: 32 }]}>Notes & Reminders</Text>
+        <Text style={[styles.headerTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif', fontSize: 32 }]}>{t.notesAndReminders}</Text>
       </View>
 
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={styles.sectionContainer}>
           <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={[styles.sectionTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif' }]}>Reminders</Text>
+            <Text style={[styles.sectionTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif' }]}>{t.reminders}</Text>
             <Text style={{ color: colors.textMuted, fontSize: 16 }}>{reminders.length}</Text>
           </View>
 
@@ -174,7 +174,7 @@ export default function NotesScreen() {
 
         <View style={styles.sectionContainer}>
           <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
-            <Text style={[styles.sectionTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif' }]}>Notes</Text>
+            <Text style={[styles.sectionTitle, { fontFamily: Platform.OS === 'ios' ? 'Baskerville' : 'serif' }]}>{t.notes}</Text>
             <Text style={{ color: colors.textMuted, fontSize: 16 }}>{notes.length}</Text>
           </View>
 
@@ -201,29 +201,12 @@ export default function NotesScreen() {
       <ActionModal 
         visible={isActionModalVisible}
         onClose={() => { setActionModalVisible(false); setSelectedItem(null); }}
-        title={selectedItem?.text || (selectedItem?.type === 'reminder' ? 'Reminder Options' : 'Note Options')}
+        title={selectedItem?.text || (selectedItem?.type === 'reminder' ? t.reminders : t.notes)}
         isArabic={isArabic}
         options={[
-          { 
-            label: isArabic ? 'تعديل' : 'Edit', 
-            icon: 'create-outline', 
-            onPress: () => router.push({ pathname: '/note-detail', params: { id: selectedItem?._id } }) 
-          },
-          { 
-            label: isArabic ? 'مشاركة' : 'Share', 
-            icon: 'share-social-outline', 
-            onPress: () => Share.share({ message: `${selectedItem?.text || 'Untitled'}\n\n${selectedItem?.description || ''}` }) 
-          },
-          { 
-            label: isArabic ? 'حذف' : 'Delete', 
-            icon: 'trash-outline', 
-            variant: 'destructive',
-            onPress: () => {
-              if (selectedItem) {
-                deleteTodo({ id: selectedItem._id });
-              }
-            }
-          }
+          { label: t.edit, icon: 'create-outline', onPress: () => router.push({ pathname: '/note-detail', params: { id: selectedItem?._id } }) },
+          { label: t.share, icon: 'share-social-outline', onPress: () => Share.share({ message: `${selectedItem?.text || 'Untitled'}\n\n${selectedItem?.description || ''}` }) },
+          { label: t.delete, icon: 'trash-outline', variant: 'destructive', onPress: () => { if (selectedItem) deleteTodo({ id: selectedItem._id }); } }
         ]}
       />
 

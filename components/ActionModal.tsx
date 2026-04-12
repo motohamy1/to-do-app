@@ -44,7 +44,7 @@ const ActionModal: React.FC<ActionModalProps> = ({ visible, onClose, options, ti
               <View style={styles.handle} />
               
               {title && (
-                <View style={[styles.header, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.header]}>
                   <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
                   <TouchableOpacity onPress={onClose}>
                     <Ionicons name="close-circle" size={28} color={colors.textMuted} />
@@ -59,7 +59,6 @@ const ActionModal: React.FC<ActionModalProps> = ({ visible, onClose, options, ti
                     style={[
                       styles.option,
                       { backgroundColor: colors.surface },
-                      isArabic && { flexDirection: 'row-reverse' },
                       index === 0 && { borderTopLeftRadius: 20, borderTopRightRadius: 20 },
                       index === options.length - 1 && { borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
                       index < options.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }
@@ -82,8 +81,8 @@ const ActionModal: React.FC<ActionModalProps> = ({ visible, onClose, options, ti
                     <Text style={[
                       styles.optionLabel, 
                       { color: option.variant === 'destructive' ? colors.danger : colors.text },
-                      isArabic && { textAlign: 'right', marginRight: 16 },
-                      !isArabic && { marginLeft: 16 }
+                      isArabic && { textAlign: 'right' },
+                      { marginHorizontal: 16 }
                     ]}>
                       {option.label}
                     </Text>

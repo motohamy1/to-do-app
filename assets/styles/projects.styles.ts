@@ -125,7 +125,7 @@ export const createProjectsStyles = (colors: ColorScheme) =>
       borderRadius: 16,
       justifyContent: "center",
       alignItems: "center",
-      marginRight: 16,
+      marginEnd: 16,
     },
     categoryInfo: {
       flex: 1,
@@ -149,7 +149,7 @@ export const createProjectsStyles = (colors: ColorScheme) =>
       backgroundColor: colors.danger + '15',
       justifyContent: "center",
       alignItems: "center",
-      marginLeft: 12,
+      marginStart: 12,
     },
     // ── LAYER 2: Sub-Category Cards (FULL WIDTH) ──────────────────────────────
     subCategoriesList: {
@@ -178,7 +178,7 @@ export const createProjectsStyles = (colors: ColorScheme) =>
       borderRadius: 12,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: 14,
+      marginEnd: 14,
     },
     subCategoryName: {
       fontSize: 16,

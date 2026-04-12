@@ -67,6 +67,7 @@ interface AuthContextType {
   signIn: (id: Id<"users">) => Promise<void>;
   signOut: () => Promise<void>;
   linkAccount: (id: Id<"users">) => Promise<void>;
+  setLanguage: (lang: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -74,8 +75,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userId, setUserId] = useState<Id<"users"> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingLanguage, setPendingLanguage] = useState<string | null>(null);
   
   const createAnonMutation = useMutation(api.auth.createAnonymousUser);
+  const updateSettingsMutation = useMutation(api.auth.updateSettings);
   const user = useQuery(api.auth.getUserSettings, userId ? { userId } : "skip");
 
   useEffect(() => {
@@ -124,18 +127,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await safeStorage.setItem("userId", id);
   };
 
+  const setLanguage = async (lang: string) => {
+    setPendingLanguage(lang);
+    if (userId) {
+      try {
+        await updateSettingsMutation({ userId, language: lang });
+      } catch (e) {
+        console.warn('Failed to update language', e);
+      }
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       userId, 
       isLoading, 
       isAnonymous: user ? (user.isAnonymous ?? false) : true,
-      language: user?.language ?? "en",
+      language: user?.language ?? pendingLanguage ?? "en",
       notificationsEnabled: user?.notificationsEnabled ?? true,
       userName: user?.name ?? null,
       userEmail: user?.email ?? null,
       signIn, 
       signOut,
-      linkAccount
+      linkAccount,
+      setLanguage,
     }}>
       {children}
     </AuthContext.Provider>

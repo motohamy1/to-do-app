@@ -16,8 +16,8 @@
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/app_logo.png",
-        "backgroundImage": "./assets/images/icon.png",
-        "monochromeImage": "./assets/images/icon.png"
+        "backgroundImage": "./assets/images/app_logo.png",
+        "monochromeImage": "./assets/images/app_logo.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.motohamy.todoapp",

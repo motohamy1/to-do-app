@@ -21,6 +21,7 @@ export default defineSchema({
     isAnonymous: v.optional(v.boolean()),
     language: v.optional(v.string()), // "en", "ar"
     notificationsEnabled: v.optional(v.boolean()),
+    notificationSound: v.optional(v.string()),
     profilePictureUrl: v.optional(v.string()),
     profilePictureId: v.optional(v.id("_storage")),
   }).index("by_email", ["email"]),
@@ -33,6 +34,7 @@ export default defineSchema({
     timerDuration: v.optional(v.number()), 
     timerDirection: v.optional(v.string()), // 'up' | 'down'
     timerStartTime: v.optional(v.number()), 
+    timerFirstStartTime: v.optional(v.number()), 
     timeLeftAtPause: v.optional(v.number()), 
     dueDate: v.optional(v.number()), 
     projectId: v.optional(v.string()), 

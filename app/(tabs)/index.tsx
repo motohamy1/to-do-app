@@ -11,8 +11,9 @@ import { api } from "../../convex/_generated/api";
 import { Id } from '../../convex/_generated/dataModel';
 import { useRouter } from "expo-router";
 import Header from "@/components/Header";
-import TodoInput from "@/components/TodoInput";
 import TodoCard from "@/components/TodoCard";
+import FloatingActionButton from "@/components/FloatingActionButton";
+import TaskDetailModal from "@/components/TaskDetailModal";
 import TimerModal from "@/components/TimerModal";
 import ProjectPickerModal from "@/components/ProjectPickerModal";
 import ActionModal from "@/components/ActionModal";
@@ -46,6 +47,7 @@ const Index = () => {
     const [isGlobalActionModalVisible, setGlobalActionModalVisible] = useState(false);
     const [showOverdue, setShowOverdue] = useState(false);
     const [sortActive, setSortActive] = useState('');
+    const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
 
     const scrollViewRef = useRef<ScrollView>(null);
     const homeStyles = createHomeStyles(colors, isArabic);
@@ -63,11 +65,6 @@ const Index = () => {
       { icon: 'hand-left-outline', title: 'Long Press', description: 'Long press any task to delete, share, or link it to a project.', accentColor: '#5CB2FF' },
     ];
 
-    const scrollToBottom = () => {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 200);
-    };
 
 
     const normalizedTodos = todos?.filter(t => t.type !== 'note' && t.type !== 'reminder').map(t => ({
@@ -93,7 +90,6 @@ const Index = () => {
         const isScheduledForToday = !t.date || (t.date >= todayStart && t.date < tomorrowStart);
 
         if (t.status === 'done') {
-          if (isDoneToday) today.push(t);
           const completionDay = t.completedAt 
             ? new Date(t.completedAt).setHours(0, 0, 0, 0)
             : (t.date ? new Date(t.date).setHours(0, 0, 0, 0) : todayStart);
@@ -166,6 +162,7 @@ const Index = () => {
     };
 
     const displayedTodos = useMemo(() => {
+        if (activeFilter === 'All') return todayTodos.filter(t => t.status !== 'done');
         if (activeFilter === 'In Progress') return todayTodos.filter(t => t.status === 'in_progress');
         return todayTodos;
     }, [todayTodos, activeFilter]);
@@ -177,7 +174,7 @@ const Index = () => {
 
     return (
         <KeyboardAvoidingView 
-            style={[homeStyles.container, isArabic && { direction: 'rtl' }]}
+            style={homeStyles.container}
             behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : -110}
         >
@@ -224,7 +221,7 @@ const Index = () => {
                               if (filter === 'In Progress') count = inProgressCount;
                               if (filter === 'Done') count = totalDoneCount;
 
-                              const filterLabel = filter === 'All' ? t.all : 
+                              const filterLabel = filter === 'All' ? (isArabic ? 'المهام' : 'To-Do') : 
                                                 filter === 'In Progress' ? t.inProgress : t.done;
 
                               return (
@@ -327,11 +324,6 @@ const Index = () => {
                          );
                        })}
                        
-                       {activeFilter === 'All' && (
-                           <View style={{ marginTop: 24, marginBottom: 24 }}>
-                               <TodoInput onFocus={scrollToBottom} />
-                           </View>
-                       )}
 
                        {/* Not Done Tasks (Overdue) */}
                        {displayedOverdue.length > 0 && (
@@ -388,6 +380,17 @@ const Index = () => {
 
                    </ScrollView>
                 )}
+
+                <FloatingActionButton 
+                    onPress={() => setIsTaskModalVisible(true)} 
+                    style={[homeStyles.fab, isArabic && homeStyles.fabRtl]}
+                />
+                <TaskDetailModal 
+                    visible={isTaskModalVisible}
+                    onClose={() => setIsTaskModalVisible(false)}
+                    todoId={null}
+                    initialDate={Date.now()}
+                />
             </SafeAreaView>
 
             <TimerModal 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Platform, LayoutAnimation, ActivityIndicator, KeyboardAvoidingView, Alert } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView, Platform, LayoutAnimation, ActivityIndicator, KeyboardAvoidingView, Alert, Keyboard, InputAccessoryView } from 'react-native';
 import useTheme from '@/hooks/useTheme';
 import { Ionicons } from '@expo/vector-icons';
 import { useOfflineQuery } from '@/hooks/useOfflineQuery';
@@ -166,8 +166,17 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   };
 
   const saveText = () => {
-    if (currentTodoId && editText.trim() && editText !== todo?.text) {
-      updateTodo({ id: currentTodoId, text: editText.trim() });
+    if (currentTodoId) {
+      if (!editText.trim()) {
+        setEditText(todo?.text || "");
+        Keyboard.dismiss();
+        return;
+      }
+      if (editText !== todo?.text) {
+        updateTodo({ id: currentTodoId, text: editText.trim() });
+        import('@/utils/notifications').then(n => n.updateTimerNotificationText(currentTodoId, editText.trim(), false, isArabic ? 'ar' : 'en'));
+      }
+      Keyboard.dismiss();
     }
   };
 
@@ -210,8 +219,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const handleDeleteSub = (id: Id<"todos">) => deleteTodo({ id });
   const handleSetSubTimer = (id: Id<"todos">, ms: number, direction: string) => 
     setTimer({ id, duration: ms, timerDirection: direction });
-  const handleUpdateSubText = (id: Id<"todos">, text: string) => 
+  const handleUpdateSubText = (id: Id<"todos">, text: string) => {
     updateTodo({ id, text });
+    import('@/utils/notifications').then(n => n.updateTimerNotificationText(id, text, true, isArabic ? 'ar' : 'en'));
+  };
 
 
   const handleAddSubtask = () => {
@@ -236,6 +247,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
         userId: userId!,
         text: newSubtaskText.trim(),
         parentId: currentTodoId!,
+        status: "not_started",
         projectId: todo?.projectId,
         ...(newSubDuration && { timerDuration: newSubDuration })
       });
@@ -281,13 +293,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
             style={{ flex: 1 }}
           >
             {/* Header */}
-           <View style={[styles.header, { borderBottomColor: colors.border + '40' }, isArabic && { flexDirection: 'row-reverse' }]}>
+           <View style={[styles.header, { borderBottomColor: colors.border + '40' }]}>
             <TouchableOpacity onPress={handleBack} style={styles.headerIcon}>
               <Ionicons name={taskStack.length > 0 ? (isArabic ? "chevron-forward" : "chevron-back") : "close"} size={28} color={colors.text} />
             </TouchableOpacity>
             
             <View style={{ flex: 1, alignItems: 'center' }}>
-               <View style={[styles.breadcrumb, isArabic && { flexDirection: 'row-reverse' }]}>
+               <View style={[styles.breadcrumb]}>
                  <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
                    {isArabic ? "تفاصيل المهمة" : "Task Details"}
                  </Text>
@@ -323,36 +335,56 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               <ActivityIndicator size="large" color={projectColor} />
             </View>
           ) : (
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               
               {/* Project Badge */}
               {project && (
-                <View style={[styles.projectBadge, { backgroundColor: projectColor + '15', borderColor: projectColor + '30' }, isArabic && { alignSelf: 'flex-end' }]}>
+                <View style={[styles.projectBadge, { backgroundColor: projectColor + '15', borderColor: projectColor + '30' }]}>
                   <Ionicons name="folder-open-outline" size={14} color={projectColor} />
                   <Text style={[styles.projectBadgeText, { color: projectColor }]}>{project.name}</Text>
                 </View>
               )}
 
               {/* Task Title Input */}
-              <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
+              <View style={[styles.section]}>
                 <TextInput
                   style={[styles.titleInput, { color: colors.text }, isArabic && { textAlign: 'right' }]}
                   value={editText}
                   onChangeText={setEditText}
-                  onBlur={saveText}
+                  blurOnSubmit={false}
                   multiline
                   placeholder={isArabic ? "عنوان المهمة..." : "Task Title..."}
                   placeholderTextColor={isDarkMode ? "#FFFFFF40" : "#00000040"}
-
+                  inputAccessoryViewID="saveTaskTitle"
                 />
+                {Platform.OS === 'ios' && (
+                  <InputAccessoryView nativeID="saveTaskTitle">
+                    <View style={{ backgroundColor: isDarkMode ? '#1E1E1E' : '#F2F2F7', padding: 8, alignItems: 'flex-end' }}>
+                      <TouchableOpacity onPress={saveText}>
+                        <Text style={{ color: projectColor || '#0A7EA4', fontWeight: 'bold', fontSize: 16, paddingHorizontal: 8, paddingVertical: 4 }}>
+                          {isArabic ? 'حفظ' : 'Confirm'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </InputAccessoryView>
+                )}
+                {Platform.OS !== 'ios' && (
+                  <View style={{ marginTop: 8, alignItems: 'flex-end' }}>
+                    <TouchableOpacity onPress={saveText} style={{ padding: 8, backgroundColor: isDarkMode ? '#333' : '#E5E5EA', borderRadius: 8 }}>
+                      <Text style={{ color: projectColor || '#0A7EA4', fontWeight: 'bold', fontSize: 14 }}>
+                        {isArabic ? 'حفظ' : 'Confirm'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               {/* Timer Section Selection */}
               {(!todo || !todo.timerDuration) && !isEditingTimer && (
-                <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
+                <View style={[styles.section]}>
                   <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{t.timer}</Text>
                   <TouchableOpacity 
-                    style={[styles.deadlineButton, { borderColor: projectColor + '60', backgroundColor: projectColor + '10' }, isArabic && { flexDirection: 'row-reverse' }]}
+                    style={[styles.deadlineButton, { borderColor: projectColor + '60', backgroundColor: projectColor + '10' }]}
                     onPress={() => {
                         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                         setIsEditingTimer(true);
@@ -367,8 +399,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               )}
 
               {isEditingTimer && (
-                <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
-                  <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.section]}>
+                  <View style={[styles.sectionHeader]}>
                     <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{t.timer}</Text>
 
                     <TouchableOpacity onPress={() => {
@@ -380,7 +412,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                   </View>
 
                   {/* Custom Timer Input Row */}
-                  <View style={[styles.customTimerRow, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[styles.customTimerRow]}>
                     <View style={styles.customTimerInputGroup}>
                       <TextInput
                         style={[styles.customTimerInput, { color: colors.text, borderColor: colors.border }]}
@@ -415,8 +447,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               )}
 
               {/* Deadline Selection */}
-              <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
-                <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+              <View style={[styles.section]}>
+                <View style={[styles.sectionHeader]}>
                   <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{t.deadline || (isArabic ? 'الموعد النهائي' : 'Deadline')}</Text>
                   {dueDate && (
                     <TouchableOpacity onPress={() => {
@@ -429,7 +461,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                 </View>
                 
                 <TouchableOpacity 
-                  style={[styles.deadlineButton, { borderColor: dueDate ? projectColor : colors.border, backgroundColor: dueDate ? projectColor + '10' : 'transparent' }, isArabic && { flexDirection: 'row-reverse' }]}
+                  style={[styles.deadlineButton, { borderColor: dueDate ? projectColor : colors.border, backgroundColor: dueDate ? projectColor + '10' : 'transparent' }]}
                   onPress={() => setShowDatePicker(true)}
                 >
                   <Ionicons name="calendar-outline" size={20} color={dueDate ? projectColor : colors.textMuted} />
@@ -504,7 +536,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     </SvgText>
                   </Svg>
 
-                  <View style={[styles.timerControls, isArabic && { flexDirection: 'row-reverse' }]}>
+                  <View style={[styles.timerControls]}>
                     <TouchableOpacity 
                       style={[styles.mainControlButton, { backgroundColor: projectColor }]}
                       onPress={() => {
@@ -560,10 +592,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
 
 
               {/* Status Section */}
-              <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
+              <View style={[styles.section]}>
                 <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{isArabic ? "الحالة" : "Status"}</Text>
                 
-                <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', padding: 4, borderRadius: 12 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', padding: 4, borderRadius: 12 }]}>
                   <TouchableOpacity
                     onPress={() => {
                       setStatus('in_progress');
@@ -606,9 +638,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               </View>
 
               {/* Priority Section */}
-              <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
+              <View style={[styles.section]}>
                 <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{isArabic ? "الأولوية" : "Priority"}</Text>
-                <View style={[styles.priorityPills, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.priorityPills]}>
                   {['Low', 'Medium', 'High'].map((p) => (
                     <TouchableOpacity 
                       key={p} 
@@ -628,7 +660,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               </View>
 
               {/* Description */}
-              <View style={[styles.section, isArabic && { alignItems: 'flex-end' }]}>
+              <View style={[styles.section]}>
                 <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{isArabic ? "الوصف" : "Description"}</Text>
 
                 <TextInput
@@ -645,7 +677,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
 
               {/* Subtasks Section */}
               <View style={[styles.section, { marginTop: 24 }]}>
-                <View style={[styles.sectionHeader, isArabic && { flexDirection: 'row-reverse' }]}>
+                <View style={[styles.sectionHeader]}>
                   <Text style={[styles.sectionLabel, { color: colors.surfaceText, marginBottom: 0 }]}>{isArabic ? "المهام الفرعية" : "Subtasks"}</Text>
 
                   <Text style={{ fontSize: 12, fontWeight: '700', color: projectColor }}>
@@ -671,7 +703,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                   ))}
 
                   <View style={[{ backgroundColor: colors.surface, borderRadius: 20, borderWidth: 1, borderColor: projectColor + '30', overflow: 'hidden' }]}>
-                    <View style={[styles.addSubtaskContainer, { borderBottomWidth: showNewSubTimerPicker ? 1 : 0, borderBottomColor: colors.border + '20' }, isArabic && { flexDirection: 'row-reverse' }]}>
+                    <View style={[styles.addSubtaskContainer, { borderBottomWidth: showNewSubTimerPicker ? 1 : 0, borderBottomColor: colors.border + '20' }]}>
                       <TextInput
                         style={[styles.addSubtaskInput, { color: colors.text }, isArabic && { textAlign: 'right' }]}
                         placeholder={isArabic ? "إضافة مهمة فرعية..." : "Add a subtask..."}
@@ -706,7 +738,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                           {isArabic ? "ضبط وقت المهمة الفرعية" : "Subtask Duration"}
                         </Text>
                         
-                        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 12 }, isArabic && { flexDirection: 'row-reverse' }]}>
+                        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
                           <View style={{ alignItems: 'center', gap: 4 }}>
                             <TextInput
                               style={{ width: 60, height: 44, backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, color: colors.text, textAlign: 'center', fontSize: 18, fontWeight: '800' }}
