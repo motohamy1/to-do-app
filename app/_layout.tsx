@@ -3,6 +3,10 @@ import "react-native-get-random-values";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { Stack } from "expo-router";
 import { ThemeProvider } from "@/hooks/useTheme";
+import * as SplashScreen from "expo-splash-screen";
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const convexUrl = process.env.EXPO_PUBLIC_CONVEX_URL || "https://dummy-fallback.convex.cloud";
 const convex = new ConvexReactClient(convexUrl, {
@@ -21,8 +25,7 @@ import { BACKGROUND_NOTIFICATION_TASK } from "@/utils/backgroundTask";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import WelcomeOnboarding from "@/components/WelcomeOnboarding";
 
-// Register the background task
-Notifications?.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
+// Register the background task (already defined in backgroundTask.ts via defineTask)
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -53,7 +56,12 @@ function RootLayoutContent() {
         }
       },
     ]);
-  }, [language, t]);
+    
+    // Hide splash screen once loading and onboarding check are complete
+    if (!isLoading && isFirstLaunch !== null) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [language, t, isLoading, isFirstLaunch]);
 
   // Still checking storage
   if (isLoading || isFirstLaunch === null) return null;

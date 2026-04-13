@@ -94,6 +94,13 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
   const [timeLeft, setTimeLeft] = useState(todo.timerDuration || 0);
   const hasAutoCompletedRef = useRef(false);
+  // Optimistic status: updates immediately on user action, syncs from server
+  const [optimisticStatus, setOptimisticStatus] = useState(todo.status);
+
+  // Keep optimistic status in sync with server (server is source of truth)
+  useEffect(() => {
+    setOptimisticStatus(todo.status);
+  }, [todo.status]);
 
   const [showSubtasks, setShowSubtasks] = useState(false);
   const [isAddingSub, setIsAddingSub] = useState(false);
@@ -213,10 +220,12 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   };
 
   const handleStartTimer = async () => {
+    setOptimisticStatus('in_progress'); // instant UI feedback
     startTimer({ id: todo._id });
   };
 
   const handlePauseTimer = async () => {
+    setOptimisticStatus('paused'); // instant UI feedback
     pauseTimer({ id: todo._id });
   };
 
@@ -293,7 +302,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     setShowSubtasks(!showSubtasks);
   };
 
-  const isTimerSet = !!todo.timerDuration;
+  const isTimerSet = !!todo.timerDuration || todo.timerDirection === 'up';
   const isDueSoon = todo.status === 'not_started' && todo.dueDate && (todo.dueDate - Date.now() < 86400000);
   const isPastDue = todo.status === 'not_started' && todo.dueDate && todo.dueDate < Date.now();
 
@@ -461,7 +470,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
             <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 12 }]}>
               {!hasSubtaskTimers && (
                 <>
-                  {(todo.status === 'not_started' || todo.status === 'not_done') && (
+                  {(optimisticStatus === 'not_started' || optimisticStatus === 'not_done') && (
                     <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
                       {!isTimerSet ? (
                         <TouchableOpacity style={[homeStyles.actionBtn, { backgroundColor: isBrightBg ? '#00000010' : colors.surfaceText + '10', borderColor: isBrightBg ? '#00000030' : colors.surfaceText + '30', borderWidth: 1 }]} onPress={() => onSetTimer(todo._id)}>
@@ -476,18 +485,28 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                       )}
                     </View>
                   )}
-                  {todo.status === 'in_progress' && (
+                  {optimisticStatus === 'in_progress' && (
                     <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
                       <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: isBrightBg ? 'rgba(255,255,255,0.4)' : colors.surface, borderColor: isBrightBg ? 'rgba(0,0,0,0.1)' : colors.border, borderWidth: 1 }]} onPress={handlePauseTimer}>
                         <Ionicons name="pause" size={16} color={contentColor} />
                       </TouchableOpacity>
+                      {todo.timerDirection === 'up' && (
+                        <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: isBrightBg ? 'rgba(34,197,94,0.3)' : 'rgba(34,197,94,0.15)', borderColor: isBrightBg ? 'rgba(0,0,0,0.1)' : '#22c55e40', borderWidth: 1 }]} onPress={() => updateStatus({ id: todo._id, status: 'done' })}>
+                          <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   )}
-                  {todo.status === 'paused' && (
+                  {optimisticStatus === 'paused' && (
                     <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
                       <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: isBrightBg ? '#000000' : colors.primary }]} onPress={handleStartTimer}>
                         <Ionicons name="play" size={16} color={isBrightBg ? '#FFF' : (isDarkMode ? '#000' : '#FFF')} />
                       </TouchableOpacity>
+                      {todo.timerDirection === 'up' && (
+                        <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: isBrightBg ? 'rgba(34,197,94,0.3)' : 'rgba(34,197,94,0.15)', borderColor: isBrightBg ? 'rgba(0,0,0,0.1)' : '#22c55e40', borderWidth: 1 }]} onPress={() => updateStatus({ id: todo._id, status: 'done' })}>
+                          <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
+                        </TouchableOpacity>
+                      )}
                     </View>
                   )}
                 </>

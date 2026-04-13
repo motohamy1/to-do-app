@@ -103,6 +103,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
     }
   }, [todo?._id]);
 
+  // Keep local status in sync with server-side changes (e.g. timer resume sets in_progress)
+  useEffect(() => {
+    if (todo?.status && todo.status !== status) {
+      setStatus(todo.status);
+    }
+  }, [todo?.status]);
+
   // Reset to blank draft when modal opens with no todoId
   useEffect(() => {
     if (visible && !todoId) {
@@ -366,7 +373,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               </View>
 
               {/* Timer Section Selection */}
-              {(!todo || (!todo.timerDuration && todo.timerDirection !== 'up')) && !isEditingTimer && (
+              {(!todo || (!todo.timerDuration && todo.timerDirection !== 'up' && timerDirection !== 'up')) && !isEditingTimer && (
                 <View style={[styles.section]}>
                   <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{t.timer}</Text>
                   <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -488,8 +495,10 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                 )}
               </View>
 
-              {/* Circular Timer Visualization */}
-              {(todo?.timerDuration || todo?.timerDirection === 'up') && !isEditingTimer && (
+              {(todo?.timerDuration || todo?.timerDirection === 'up' || timerDirection === 'up') && !isEditingTimer && (() => {
+                const effectiveDirection = todo?.timerDirection || timerDirection;
+                const isCountUp = effectiveDirection === 'up';
+                return (
                 <View style={styles.timerContainer}>
                   <Svg width="200" height="200" viewBox="0 0 220 220">
                     <G rotation="-90" origin="110, 110">
@@ -511,7 +520,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                         stroke={projectColor}
                         strokeWidth="12"
                         fill="none"
-                        strokeDasharray={todo!.timerDirection === 'up' ? "565, 565" : `${(timeLeft / (todo!.timerDuration || 1)) * 565}, 565`}
+                        strokeDasharray={isCountUp ? "565, 565" : `${(timeLeft / (todo?.timerDuration || 1)) * 565}, 565`}
                         strokeLinecap="round"
                       />
                     </G>
@@ -525,7 +534,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       textAnchor="middle"
                       alignmentBaseline="middle"
                     >
-                      {todo!.timerDirection === 'up' && timeLeft >= 3600000
+                      {isCountUp && timeLeft >= 3600000
                         ? `${Math.floor(timeLeft / 3600000)}:${String(Math.floor((timeLeft % 3600000) / 60000)).padStart(2, '0')}:${String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}`
                         : `${Math.floor(timeLeft / 60000)}:${String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}`}
                     </SvgText>
@@ -539,7 +548,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       textAnchor="middle"
                       opacity={0.8}
                     >
-                      {todo!.status === 'in_progress' ? (isArabic ? 'جاهز؟ ركز!' : 'Stay Focused') : (isArabic ? 'جاهز للبدء؟' : 'Ready to start?')}
+                      {todo?.status === 'in_progress' ? (isArabic ? 'جاهز؟ ركز!' : 'Stay Focused') : (isArabic ? 'جاهز للبدء؟' : 'Ready to start?')}
                     </SvgText>
                   </Svg>
 
@@ -547,13 +556,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     <TouchableOpacity 
                       style={[styles.mainControlButton, { backgroundColor: projectColor }]}
                       onPress={() => {
-                        if (todo!.status === 'in_progress') pauseTimer({ id: currentTodoId! });
+                        if (todo?.status === 'in_progress') pauseTimer({ id: currentTodoId! });
                         else startTimer({ id: currentTodoId! });
                       }}
                     >
-                      <Ionicons name={todo!.status === 'in_progress' ? "pause" : "play"} size={22} color={isDarkMode ? "#000" : "#FFF"} />
+                      <Ionicons name={todo?.status === 'in_progress' ? "pause" : "play"} size={22} color={isDarkMode ? "#000" : "#FFF"} />
                       <Text style={[styles.mainControlButtonText, { color: isDarkMode ? "#000" : "#FFF" }]}>
-                        {todo!.status === 'in_progress' ? (isArabic ? 'إيقاف' : 'Pause Task') : todo!.status === 'paused' ? (isArabic ? 'استئناف المهمة' : 'Resume Task') : (isArabic ? 'ابدأ المهمة' : 'Start Task')}
+                        {todo?.status === 'in_progress' ? (isArabic ? 'إيقاف' : 'Pause Task') : todo?.status === 'paused' ? (isArabic ? 'استئناف المهمة' : 'Resume Task') : (isArabic ? 'ابدأ المهمة' : 'Start Task')}
                       </Text>
                     </TouchableOpacity>
                     
@@ -563,6 +572,17 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     >
                       <Ionicons name="refresh" size={20} color={projectColor} />
                     </TouchableOpacity>
+
+                    {isCountUp && (
+                      <TouchableOpacity 
+                        style={[styles.secondaryButton, { borderColor: '#22c55e40', backgroundColor: isDarkMode ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.1)' }]}
+                        onPress={() => {
+                          if (currentTodoId) updateStatus({ id: currentTodoId, status: 'done' });
+                        }}
+                      >
+                        <Ionicons name="checkmark-circle" size={20} color="#22c55e" />
+                      </TouchableOpacity>
+                    )}
                   </View>
 
                   <View style={styles.secondaryActionsRow}>
@@ -584,6 +604,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       onPress={() => {
                         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                         if (currentTodoId) removeTimer({ id: currentTodoId });
+                        setTimerDirection('down');
                         setIsEditingTimer(false);
                       }}
                     >
@@ -594,7 +615,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     </TouchableOpacity>
                   </View>
                 </View>
-              )}
+                );
+              })()}
 
 
 
@@ -607,7 +629,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     onPress={() => {
                       setStatus('in_progress');
                       if (currentTodoId) {
-                        if (todo?.timerDuration && todo.timerDuration > 0) {
+                        if ((todo?.timerDuration && todo.timerDuration > 0) || todo?.timerDirection === 'up') {
                           startTimer({ id: currentTodoId });
                         } else {
                           updateStatus({ id: currentTodoId, status: 'in_progress' });

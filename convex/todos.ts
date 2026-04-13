@@ -133,10 +133,16 @@ export const updateStatus = mutation({
         if (sub.status === "in_progress") {
           // If pausing parent, pause running subtasks
           if (args.status === "paused") {
-            if (sub.timerStartTime && sub.timerDuration) {
+            if (sub.timerStartTime) {
               const subElapsed = Date.now() - sub.timerStartTime;
-              const subRemaining = Math.max(0, sub.timerDuration - subElapsed);
-              await ctx.db.patch(sub._id, { status: "paused", timeLeftAtPause: subRemaining });
+              if (sub.timerDirection === 'up') {
+                await ctx.db.patch(sub._id, { status: "paused", timeLeftAtPause: subElapsed });
+              } else if (sub.timerDuration) {
+                const subRemaining = Math.max(0, sub.timerDuration - subElapsed);
+                await ctx.db.patch(sub._id, { status: "paused", timeLeftAtPause: subRemaining });
+              } else {
+                await ctx.db.patch(sub._id, { status: "paused" });
+              }
             } else {
               await ctx.db.patch(sub._id, { status: "paused" });
             }
@@ -246,8 +252,14 @@ export const startTimer = mutation({
     if (!todo) return;
     
     let newStartTime = Date.now();
-    if ((todo.status === "paused" || todo.status === "not_done") && todo.timeLeftAtPause !== undefined && todo.timerDuration) {
+    if ((todo.status === "paused" || todo.status === "not_done") && todo.timeLeftAtPause !== undefined) {
+      if (todo.timerDirection === 'up') {
+        // Count-up: timeLeftAtPause stores elapsed time so far
+        newStartTime = Date.now() - todo.timeLeftAtPause;
+      } else if (todo.timerDuration) {
+        // Count-down: timeLeftAtPause stores remaining time
         newStartTime = Date.now() - (todo.timerDuration - todo.timeLeftAtPause);
+      }
     }
 
     await ctx.db.patch(args.id, { 
@@ -263,14 +275,23 @@ export const pauseTimer = mutation({
   args: { id: v.id("todos") },
   handler: async (ctx, args) => {
     const todo = await ctx.db.get(args.id);
-    if (!todo || todo.status !== "in_progress" || !todo.timerStartTime || !todo.timerDuration) return;
+    if (!todo || todo.status !== "in_progress" || !todo.timerStartTime) return;
 
     const elapsed = Date.now() - todo.timerStartTime;
-    const remaining = Math.max(0, todo.timerDuration - elapsed);
+    let pauseValue: number;
+
+    if (todo.timerDirection === 'up') {
+      // Count-up: store elapsed time so we can resume from it
+      pauseValue = elapsed;
+    } else {
+      if (!todo.timerDuration) return;
+      // Count-down: store remaining time
+      pauseValue = Math.max(0, todo.timerDuration - elapsed);
+    }
 
     await ctx.db.patch(args.id, {
       status: "paused",
-      timeLeftAtPause: remaining
+      timeLeftAtPause: pauseValue
     });
 
     // Cascade pause to any running subtasks
@@ -280,13 +301,20 @@ export const pauseTimer = mutation({
       .collect();
 
     for (const sub of subtasks) {
-      if (sub.status === "in_progress" && sub.timerStartTime && sub.timerDuration) {
+      if (sub.status === "in_progress" && sub.timerStartTime) {
         const subElapsed = Date.now() - sub.timerStartTime;
-        const subRemaining = Math.max(0, sub.timerDuration - subElapsed);
-        await ctx.db.patch(sub._id, {
-          status: "paused",
-          timeLeftAtPause: subRemaining
-        });
+        if (sub.timerDirection === 'up') {
+          await ctx.db.patch(sub._id, {
+            status: "paused",
+            timeLeftAtPause: subElapsed
+          });
+        } else if (sub.timerDuration) {
+          const subRemaining = Math.max(0, sub.timerDuration - subElapsed);
+          await ctx.db.patch(sub._id, {
+            status: "paused",
+            timeLeftAtPause: subRemaining
+          });
+        }
       }
     }
   }
@@ -297,12 +325,18 @@ export const startSubtaskTimer = mutation({
   args: { id: v.id("todos") },
   handler: async (ctx, args) => {
     const sub = await ctx.db.get(args.id);
-    if (!sub || !sub.parentId || !sub.timerDuration) return;
+    if (!sub || !sub.parentId) return;
+    // Must have a timer set (either count-down duration or count-up direction)
+    if (!sub.timerDuration && sub.timerDirection !== 'up') return;
 
     // Start subtask timer
     let subStartTime = Date.now();
     if (sub.status === "paused" && sub.timeLeftAtPause !== undefined) {
-      subStartTime = Date.now() - (sub.timerDuration - sub.timeLeftAtPause);
+      if (sub.timerDirection === 'up') {
+        subStartTime = Date.now() - sub.timeLeftAtPause;
+      } else if (sub.timerDuration) {
+        subStartTime = Date.now() - (sub.timerDuration - sub.timeLeftAtPause);
+      }
     }
     await ctx.db.patch(args.id, {
       status: "in_progress",
@@ -312,10 +346,14 @@ export const startSubtaskTimer = mutation({
 
     // Auto-start parent if not already running
     const parent = await ctx.db.get(sub.parentId);
-    if (parent && parent.status !== "in_progress" && parent.timerDuration) {
+    if (parent && parent.status !== "in_progress" && (parent.timerDuration || parent.timerDirection === 'up')) {
       let parentStartTime = Date.now();
       if (parent.status === "paused" && parent.timeLeftAtPause !== undefined) {
-        parentStartTime = Date.now() - (parent.timerDuration - parent.timeLeftAtPause);
+        if (parent.timerDirection === 'up') {
+          parentStartTime = Date.now() - parent.timeLeftAtPause;
+        } else if (parent.timerDuration) {
+          parentStartTime = Date.now() - (parent.timerDuration - parent.timeLeftAtPause);
+        }
       }
       await ctx.db.patch(sub.parentId, {
         status: "in_progress",
@@ -331,14 +369,20 @@ export const pauseSubtaskTimer = mutation({
   args: { id: v.id("todos") },
   handler: async (ctx, args) => {
     const sub = await ctx.db.get(args.id);
-    if (!sub || !sub.parentId || sub.status !== "in_progress" || !sub.timerStartTime || !sub.timerDuration) return;
+    if (!sub || !sub.parentId || sub.status !== "in_progress" || !sub.timerStartTime) return;
 
     // Pause subtask
     const elapsed = Date.now() - sub.timerStartTime;
-    const remaining = Math.max(0, sub.timerDuration - elapsed);
+    let pauseValue: number;
+    if (sub.timerDirection === 'up') {
+      pauseValue = elapsed;
+    } else {
+      if (!sub.timerDuration) return;
+      pauseValue = Math.max(0, sub.timerDuration - elapsed);
+    }
     await ctx.db.patch(args.id, {
       status: "paused",
-      timeLeftAtPause: remaining,
+      timeLeftAtPause: pauseValue,
     });
 
     // Check if any sibling subtasks are still running
@@ -353,13 +397,20 @@ export const pauseSubtaskTimer = mutation({
     // If no siblings running, pause parent too
     if (!anyStillRunning) {
       const parent = await ctx.db.get(sub.parentId);
-      if (parent && parent.status === "in_progress" && parent.timerStartTime && parent.timerDuration) {
+      if (parent && parent.status === "in_progress" && parent.timerStartTime) {
         const parentElapsed = Date.now() - parent.timerStartTime;
-        const parentRemaining = Math.max(0, parent.timerDuration - parentElapsed);
-        await ctx.db.patch(sub.parentId, {
-          status: "paused",
-          timeLeftAtPause: parentRemaining,
-        });
+        if (parent.timerDirection === 'up') {
+          await ctx.db.patch(sub.parentId, {
+            status: "paused",
+            timeLeftAtPause: parentElapsed,
+          });
+        } else if (parent.timerDuration) {
+          const parentRemaining = Math.max(0, parent.timerDuration - parentElapsed);
+          await ctx.db.patch(sub.parentId, {
+            status: "paused",
+            timeLeftAtPause: parentRemaining,
+          });
+        }
       }
     }
   },
