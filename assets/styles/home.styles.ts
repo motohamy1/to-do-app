@@ -135,21 +135,23 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       flexDirection: 'row',
     },
     timelineColumn: {
-      width: 70,
+      width: 52,
       alignItems: 'center',
-      paddingLeft: 4,
+      paddingEnd: 4,
     },
     timelineTimeTop: {
-      fontSize: 10,
+      fontSize: 9,
       fontWeight: '800',
       color: colors.textMuted,
       textAlign: 'center',
+      flexWrap: 'wrap',
     },
     timelineTimeBottom: {
-      fontSize: 10,
+      fontSize: 9,
       fontWeight: '800',
       color: colors.textMuted,
       textAlign: 'center',
+      flexWrap: 'wrap',
     },
     timelineTime: {
       fontSize: 14,

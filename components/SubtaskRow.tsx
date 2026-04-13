@@ -123,12 +123,13 @@ export const SubtaskRow = ({
     } else if (sub.status === 'paused' && sub.timeLeftAtPause !== undefined) {
       setSubTimeLeft(sub.timeLeftAtPause);
     } else if (sub.status === 'done') {
-      setSubTimeLeft(sub.timerDirection === 'up' && sub.timerStartTime && sub.timeLeftAtPause ? sub.timeLeftAtPause : 0);
+      setSubTimeLeft(sub.timerDirection === 'up' && sub.timeLeftAtPause !== undefined ? sub.timeLeftAtPause : 0);
     } else {
       setSubTimeLeft(sub.timerDirection === 'up' ? 0 : (sub.timerDuration || 0));
     }
     return () => { if (interval) clearInterval(interval); };
-  }, [sub.status, sub.timerStartTime, sub.timerDuration, sub.timeLeftAtPause, sub.timerDirection, sub._id, onUpdateStatus]);
+    }, [sub.status, sub.timerStartTime, sub.timerDuration, sub.timeLeftAtPause, sub.timerDirection, sub._id, onUpdateStatus]);
+
 
   const handleSaveEdit = () => {
     if (editText.trim() && editText !== sub.text) onUpdateText(sub._id, editText.trim());

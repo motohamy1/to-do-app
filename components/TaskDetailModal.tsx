@@ -51,6 +51,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const [newSubtaskText, setNewSubtaskText] = useState("");
   const [timeLeft, setTimeLeft] = useState(0);
   const [isEditingTimer, setIsEditingTimer] = useState(false);
+  const [timerDirection, setTimerDirection] = useState<'up'|'down'>('down');
   const [hours, setHours] = useState("0");
   const [minutes, setMinutes] = useState("0");
   const [datePickerMode, setDatePickerMode] = useState<'dueDate'>('dueDate');
@@ -59,21 +60,24 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   useEffect(() => {
 
     let interval: any;
-    if (todo?.status === 'in_progress' && todo?.timerStartTime && todo?.timerDuration) {
+    if (todo?.status === 'in_progress' && todo?.timerStartTime) {
       const tick = () => {
-        const elapsed = Date.now() - todo.timerStartTime!;
-        const remaining = Math.max(0, todo.timerDuration! - elapsed);
-        setTimeLeft(remaining);
+        const elapsed = Math.max(0, Date.now() - todo.timerStartTime!);
+        if (todo.timerDirection === 'up') {
+          setTimeLeft(elapsed);
+        } else if (todo.timerDuration) {
+          setTimeLeft(Math.max(0, todo.timerDuration - elapsed));
+        }
       };
       tick();
       interval = setInterval(tick, 1000);
     } else if (todo?.status === 'paused' && todo?.timeLeftAtPause !== undefined) {
       setTimeLeft(todo.timeLeftAtPause);
     } else {
-      setTimeLeft(todo?.timerDuration || 0);
+      setTimeLeft(todo?.timerDirection === 'up' ? 0 : (todo?.timerDuration || 0));
     }
     return () => clearInterval(interval);
-  }, [todo?.status, todo?.timerStartTime, todo?.timerDuration, todo?.timeLeftAtPause]);
+  }, [todo?.status, todo?.timerStartTime, todo?.timerDuration, todo?.timeLeftAtPause, todo?.timerDirection]);
 
 
   // Only initialize form state when navigating to a *different* task
@@ -94,6 +98,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
       }
       setDueDate(todo.dueDate);
       setStatus(todo.status);
+      setTimerDirection(todo.timerDirection || 'down');
       setInitializedForId(todo._id);
     }
   }, [todo?._id]);
@@ -110,6 +115,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
       setStatus("not_started");
       setNewSubtaskText("");
       setIsEditingTimer(false);
+      setTimerDirection('down');
       setInitializedForId(null);
     }
   }, [visible, todoId]);
@@ -134,7 +140,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
         dueDate: dueDate,
         status: status,
         ...(projectId ? { projectId } : {}),
-        ...(ms > 0 ? { timerDuration: ms } : {}),
+        ...(timerDirection === 'up' ? { timerDirection: 'up' } : ms > 0 ? { timerDuration: ms, timerDirection: 'down' } : {}),
       });
     }
     
@@ -264,7 +270,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
     const m = parseInt(minutes) || 0;
     const ms = (h * 3600 + m * 60) * 1000;
     if (currentTodoId) {
-      setTimer({ id: currentTodoId, duration: ms });
+      setTimer({ id: currentTodoId, duration: ms, timerDirection: 'down' });
     }
     setIsEditingTimer(false);
   };
@@ -351,50 +357,49 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                   style={[styles.titleInput, { color: colors.text }, isArabic && { textAlign: 'right' }]}
                   value={editText}
                   onChangeText={setEditText}
-                  blurOnSubmit={false}
+                  blurOnSubmit={true}
+                  onBlur={saveText}
                   multiline
                   placeholder={isArabic ? "عنوان المهمة..." : "Task Title..."}
                   placeholderTextColor={isDarkMode ? "#FFFFFF40" : "#00000040"}
-                  inputAccessoryViewID="saveTaskTitle"
                 />
-                {Platform.OS === 'ios' && (
-                  <InputAccessoryView nativeID="saveTaskTitle">
-                    <View style={{ backgroundColor: isDarkMode ? '#1E1E1E' : '#F2F2F7', padding: 8, alignItems: 'flex-end' }}>
-                      <TouchableOpacity onPress={saveText}>
-                        <Text style={{ color: projectColor || '#0A7EA4', fontWeight: 'bold', fontSize: 16, paddingHorizontal: 8, paddingVertical: 4 }}>
-                          {isArabic ? 'حفظ' : 'Confirm'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </InputAccessoryView>
-                )}
-                {Platform.OS !== 'ios' && (
-                  <View style={{ marginTop: 8, alignItems: 'flex-end' }}>
-                    <TouchableOpacity onPress={saveText} style={{ padding: 8, backgroundColor: isDarkMode ? '#333' : '#E5E5EA', borderRadius: 8 }}>
-                      <Text style={{ color: projectColor || '#0A7EA4', fontWeight: 'bold', fontSize: 14 }}>
-                        {isArabic ? 'حفظ' : 'Confirm'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                )}
               </View>
 
               {/* Timer Section Selection */}
-              {(!todo || !todo.timerDuration) && !isEditingTimer && (
+              {(!todo || (!todo.timerDuration && todo.timerDirection !== 'up')) && !isEditingTimer && (
                 <View style={[styles.section]}>
                   <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{t.timer}</Text>
-                  <TouchableOpacity 
-                    style={[styles.deadlineButton, { borderColor: projectColor + '60', backgroundColor: projectColor + '10' }]}
-                    onPress={() => {
-                        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                        setIsEditingTimer(true);
-                    }}
-                  >
-                    <Ionicons name="timer-outline" size={20} color={projectColor} />
-                    <Text style={[styles.deadlineButtonText, { color: colors.text, fontWeight: '700' }]}>
-                      {isArabic ? 'إضافة مؤقت' : 'Add a Timer'}
-                    </Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity 
+                      style={[styles.deadlineButton, { flex: 1, borderColor: projectColor + '60', backgroundColor: projectColor + '10' }]}
+                      onPress={() => {
+                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                          setTimerDirection('down');
+                          setIsEditingTimer(true);
+                      }}
+                    >
+                      <Ionicons name="timer-outline" size={20} color={projectColor} />
+                      <Text style={[styles.deadlineButtonText, { color: colors.text, fontWeight: '700' }]}>
+                        {isArabic ? 'مؤقت تنازلي' : 'Count Down'}
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity 
+                      style={[styles.deadlineButton, { flex: 1, borderColor: projectColor + '60', backgroundColor: projectColor + '10' }]}
+                      onPress={() => {
+                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                          setTimerDirection('up');
+                          if (currentTodoId) {
+                            setTimer({ id: currentTodoId, duration: 0, timerDirection: 'up' });
+                          }
+                      }}
+                    >
+                      <Ionicons name="stopwatch-outline" size={20} color={projectColor} />
+                      <Text style={[styles.deadlineButtonText, { color: colors.text, fontWeight: '700' }]}>
+                        {isArabic ? 'مؤقت تصاعدي' : 'Count Up'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               )}
 
@@ -484,7 +489,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               </View>
 
               {/* Circular Timer Visualization */}
-              {todo?.timerDuration && !isEditingTimer && (
+              {(todo?.timerDuration || todo?.timerDirection === 'up') && !isEditingTimer && (
                 <View style={styles.timerContainer}>
                   <Svg width="200" height="200" viewBox="0 0 220 220">
                     <G rotation="-90" origin="110, 110">
@@ -506,7 +511,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                         stroke={projectColor}
                         strokeWidth="12"
                         fill="none"
-                        strokeDasharray={`${(timeLeft / (todo!.timerDuration || 1)) * 565}, 565`}
+                        strokeDasharray={todo!.timerDirection === 'up' ? "565, 565" : `${(timeLeft / (todo!.timerDuration || 1)) * 565}, 565`}
                         strokeLinecap="round"
                       />
                     </G>
@@ -520,7 +525,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       textAnchor="middle"
                       alignmentBaseline="middle"
                     >
-                      {`${Math.floor(timeLeft / 60000)}:${String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}`}
+                      {todo!.timerDirection === 'up' && timeLeft >= 3600000
+                        ? `${Math.floor(timeLeft / 3600000)}:${String(Math.floor((timeLeft % 3600000) / 60000)).padStart(2, '0')}:${String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}`
+                        : `${Math.floor(timeLeft / 60000)}:${String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, '0')}`}
                     </SvgText>
                     {/* Status Text Under Time */}
                     <SvgText

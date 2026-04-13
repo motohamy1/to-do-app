@@ -249,7 +249,14 @@ const Index = () => {
                            </TouchableOpacity>
                        </View>
 
-                       {activeFilter !== 'Done' && displayedTodos.length === 0 && (
+                       {activeFilter === 'All' && todayTodos.length === 0 && (
+                         <View style={homeStyles.emptyContainer}>
+                            <Ionicons name="clipboard-outline" size={48} color={colors.border} />
+                            <Text style={homeStyles.emptyText}>{t.noTasksFound}</Text>
+                         </View>
+                       )}
+
+                       {activeFilter === 'In Progress' && displayedTodos.length === 0 && (
                          <View style={homeStyles.emptyContainer}>
                             <Ionicons name="clipboard-outline" size={48} color={colors.border} />
                             <Text style={homeStyles.emptyText}>{t.noTasksFound}</Text>
@@ -274,12 +281,12 @@ const Index = () => {
                            />
                        ))}
 
-                       {activeFilter === 'All' && displayedTodos.some(t => t.status === 'done') && (
+                       {activeFilter === 'All' && todayTodos.some(t => t.status === 'done') && (
                            <View style={{ marginTop: 24 }}>
                                <View style={homeStyles.sectionTitleContainer}>
                                    <Text style={homeStyles.sectionTitleText}>{isArabic ? 'المهام المكتملة اليوم' : 'Completed Today'}</Text>
                                </View>
-                               {displayedTodos.filter(t => t.status === 'done').map(todo => (
+                               {todayTodos.filter(t => t.status === 'done').map(todo => (
                                    <TodoCard 
                                        key={todo._id} 
                                        todo={todo} 
@@ -309,7 +316,7 @@ const Index = () => {
                                  keyExtractor={(item) => item._id}
                                  contentContainerStyle={{ paddingHorizontal: 16, gap: 16 }}
                                  renderItem={({ item }) => (
-                                   <View style={{ width: 300 }}>
+                                   <View style={{ width: 320 }}>
                                      <TodoCard 
                                          todo={item} 
                                          onSetTimer={handleOpenTimerModal}
