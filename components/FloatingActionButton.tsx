@@ -1,7 +1,8 @@
-import React from 'react';
-import { TouchableOpacity, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
+import { useAuth } from '@/hooks/useAuth';
+import { useTranslation } from '@/utils/i18n';
+import React from 'react';
+import { StyleProp, StyleSheet, Text, TouchableOpacity, ViewStyle, Platform } from 'react-native';
 
 interface FloatingActionButtonProps {
   onPress: () => void;
@@ -10,26 +11,32 @@ interface FloatingActionButtonProps {
 
 export default function FloatingActionButton({ onPress, style }: FloatingActionButtonProps) {
   const { colors } = useTheme();
+  const { language } = useAuth();
+  const { isArabic } = useTranslation(language);
 
   return (
-    <TouchableOpacity 
-      style={[styles.fab, { backgroundColor: colors.primary || '#D4F82D' }, style]} 
+    <TouchableOpacity
+      style={[styles.fab, { backgroundColor: colors.primary || '#D4F82D' }, style]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <Ionicons name="add" size={32} color="#000000" />
+      <Text style={[
+        styles.text, 
+        { 
+          color: '#000000',
+          fontSize: 12,
+          fontWeight: '800',
+          fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif-medium'
+        }
+      ]}>
+        {isArabic ? 'إضافة مهمة' : 'Add a Task'}
+      </Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 24,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -38,5 +45,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 6,
     zIndex: 100,
+  },
+  text: {
+    textAlign: 'center',
   },
 });

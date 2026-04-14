@@ -282,10 +282,16 @@ const Index = () => {
                        {activeFilter !== 'Done' && activeFilter !== 'Not Done' && (
                          <View style={[homeStyles.sectionTitleContainer, isArabic && { flexDirection: 'row-reverse' }]}>
                              <Text style={homeStyles.sectionTitleText}>{t.tasksForToday}</Text>
-                             <TouchableOpacity onPress={() => setGlobalActionModalVisible(true)}>
-                                 <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
-                             </TouchableOpacity>
-                         </View>
+                              <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 25 }}>
+                                  <FloatingActionButton 
+                                      onPress={() => setIsTaskModalVisible(true)} 
+                                      style={homeStyles.fab}
+                                  />
+                                  <TouchableOpacity onPress={() => setGlobalActionModalVisible(true)}>
+                                      <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
+                                  </TouchableOpacity>
+                              </View>
+                          </View>
                        )}
 
                        {activeFilter === 'All' && todayTodos.length === 0 && (
@@ -442,10 +448,6 @@ const Index = () => {
                    </ScrollView>
                 )}
 
-                <FloatingActionButton 
-                    onPress={() => setIsTaskModalVisible(true)} 
-                    style={[homeStyles.fab, isArabic && homeStyles.fabRtl]}
-                />
                 <TaskDetailModal 
                     visible={isTaskModalVisible}
                     onClose={() => setIsTaskModalVisible(false)}
