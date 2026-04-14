@@ -49,6 +49,8 @@ const NoteHeader = React.memo(({
       value={title}
       onChangeText={setTitle}
       blurOnSubmit={true}
+      multiline={true}
+      scrollEnabled={false}
     />
     <Text style={[styles.dateSubtitle, isArabic && { textAlign: 'right' }]}>{formattedNoteDate}</Text>
   </View>
@@ -243,32 +245,46 @@ export default function NoteDetailScreen() {
   });
 
   // Block Manipulation Handlers
-  const handleBlockTextChange = useCallback((blockId: string, newContent: string, currentContent: string) => {
-    const prevLength = currentContent.length;
-    const newLength = newContent.length;
-    
-    if (newLength > prevLength) {
-      const addedChar = newContent.slice(prevLength);
-      if (addedChar === '\n') {
-        setBlocks(prev => {
-          const block = prev.find(b => b.id === blockId);
-          const textBeforeNewline = currentContent;
-          if (block) {
-            const idx = prev.findIndex(b => b.id === blockId);
-            const newBlock: Block = { id: Math.random().toString(), type: 'text', content: '', color: activeFontColor };
-            const newBlocks = [...prev];
-            newBlocks[idx] = { ...block, content: textBeforeNewline };
-            newBlocks.splice(idx + 1, 0, newBlock);
-            setTimeout(() => {
-              blockRefs.current[newBlock.id]?.focus();
-              scrollToBottom();
-            }, 50);
-            return newBlocks;
-          }
-          return prev.map(b => b.id === blockId ? { ...b, content: newContent } : b);
-        });
-        return;
-      }
+  const handleBlockTextChange = useCallback((blockId: string, newContent: string) => {
+    // Check if a newline was added somewhere in the content
+    if (newContent.includes('\n')) {
+      const parts = newContent.split('\n');
+      const textBefore = parts[0];
+      const textAfter = parts.slice(1).join('\n');
+
+      setBlocks(prev => {
+        const idx = prev.findIndex(b => b.id === blockId);
+        if (idx === -1) return prev;
+        
+        const currentBlock = prev[idx];
+        const newBlocks = [...prev];
+        
+        // Update current block content
+        newBlocks[idx] = { ...currentBlock, content: textBefore };
+        
+        // Create new block inheriting type if checkbox or bullet
+        const newType = (currentBlock.type === 'todo' || currentBlock.type === 'bullet') 
+          ? currentBlock.type 
+          : 'text';
+          
+        const newBlock: Block = { 
+          id: Math.random().toString(), 
+          type: newType, 
+          content: textAfter, 
+          color: activeFontColor 
+        };
+        
+        newBlocks.splice(idx + 1, 0, newBlock);
+        
+        setTimeout(() => {
+          blockRefs.current[newBlock.id]?.focus();
+          // If we inserted in the middle, we might need to scroll
+          scrollToBottom();
+        }, 50);
+        
+        return newBlocks;
+      });
+      return;
     }
     setBlocks(prev => prev.map(b => b.id === blockId ? { ...b, content: newContent } : b));
   }, [activeFontColor]);
@@ -419,7 +435,7 @@ export default function NoteDetailScreen() {
         placeholder={item.type.startsWith('h') ? `HEADING ${item.type.charAt(1)}` : "Type away..."}
         placeholderTextColor={colors.textMuted + '60'}
         value={item.content}
-        onChangeText={txt => handleBlockTextChange(item.id, txt, item.content)}
+        onChangeText={txt => handleBlockTextChange(item.id, txt)}
         onFocus={() => setActiveBlockId(item.id)}
         onKeyPress={e => handleKeyPress(e, item.id)}
         onSubmitEditing={() => {
@@ -427,7 +443,7 @@ export default function NoteDetailScreen() {
             addNewBlock(item.id, 'text');
           }
         }}
-        multiline={item.type === 'text'}
+        multiline={true}
         blurOnSubmit={false}
       />
     </View>
@@ -467,7 +483,7 @@ export default function NoteDetailScreen() {
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : -110}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={{ flex: 1 }}>
@@ -676,53 +692,52 @@ export default function NoteDetailScreen() {
         </ScrollView>
           </View>
         </TouchableWithoutFeedback>
+          {/* Toolbar — always anchored above keyboard */}
+          <View style={[
+            styles.toolbarWrapper,
+            {
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: keyboardHeight > 0 ? 25 : insets.bottom,
+              backgroundColor: '#1A1A1A',
+              paddingVertical: 12,
+              paddingHorizontal: 20,
+              borderTopWidth: 1,
+              borderColor: 'rgba(255,255,255,0.1)',
+              zIndex: 100,
+            }
+          ]}>
+            <View style={[
+              { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+              isArabic && { flexDirection: 'row-reverse' }
+            ]}>
+              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveHeading}>
+                  <Ionicons name="text-outline" size={22} color="#FFF" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveCheckbox}>
+                  <Ionicons name="checkbox-outline" size={22} color="#FFF" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveBullet}>
+                  <Ionicons name="list-outline" size={22} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+                <TouchableOpacity onPress={() => setActiveMenu('fontSize')} style={{ paddingHorizontal: 4 }}>
+                  <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{activeFontSize}pt</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setActiveMenu('color')}>
+                  <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: activeFontColor, borderWidth: 2, borderColor: '#FFF' }} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setActiveMenu('fontFamily')}>
+                  <Ionicons name="language-outline" size={22} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
       </KeyboardAvoidingView>
-
-      {/* Toolbar — always anchored above keyboard */}
-      <View style={[
-        styles.toolbarWrapper,
-        {
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: keyboardHeight,
-          backgroundColor: '#1A1A1A',
-          paddingVertical: 12,
-          paddingHorizontal: 20,
-          borderTopWidth: 1,
-          borderColor: 'rgba(255,255,255,0.1)',
-          zIndex: 100,
-        }
-      ]}>
-        <View style={[
-          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-          isArabic && { flexDirection: 'row-reverse' }
-        ]}>
-          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-            <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveHeading}>
-              <Ionicons name="text-outline" size={22} color="#FFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveCheckbox}>
-              <Ionicons name="checkbox-outline" size={22} color="#FFF" />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.toolbarIconBtn} onPress={toggleInteractiveBullet}>
-              <Ionicons name="list-outline" size={22} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-            <TouchableOpacity onPress={() => setActiveMenu('fontSize')} style={{ paddingHorizontal: 4 }}>
-              <Text style={{ color: '#FFF', fontSize: 16, fontWeight: '700' }}>{activeFontSize}pt</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setActiveMenu('color')}>
-              <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: activeFontColor, borderWidth: 2, borderColor: '#FFF' }} />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setActiveMenu('fontFamily')}>
-              <Ionicons name="language-outline" size={22} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
 
       {/* Action Menu Bottom Sheet */}
       <Modal

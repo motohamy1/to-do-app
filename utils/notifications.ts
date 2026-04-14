@@ -41,7 +41,14 @@ export const Notifications = getNotificationsAPI();
 // Get current preferred sound
 const getAlarmSound = async () => {
   const soundPref = await getNotificationSound();
-  return soundPref === 'default' ? true : (Platform.OS === 'android' ? 'alarm_tone' : 'alarm_tone.wav');
+  if (soundPref === 'default') return true;
+  
+  // On Android, use the filename without extension
+  if (Platform.OS === 'android') {
+    return soundPref.split('.')[0];
+  }
+  // On iOS, uses it as is
+  return soundPref;
 };
 
 export async function updateNotificationSoundPreference(soundFile: NotificationSound) {
@@ -306,8 +313,8 @@ export async function scheduleReminderNotification(
         vibrate: [0, 500, 200, 500, 200, 500],
       } as any,
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: secondsFromNow,
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: new Date(dueDateMs),
         channelId: 'reminders',
       } as any,
     });
@@ -315,6 +322,30 @@ export async function scheduleReminderNotification(
   } catch (error) {
     console.warn("Error scheduling reminder notification:", error);
     return "";
+  }
+}
+
+/**
+ * Show an immediate notification when a task is completed.
+ */
+export async function showTaskCompletedNotification(title: string, language: string = 'en') {
+  if (!Notifications) return;
+
+  const t: any = translations[language as keyof typeof translations] || translations.en;
+  
+  try {
+    const activeSound = await getAlarmSound();
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: t.taskCompletedNotifTitle || '🎯 Task Completed!',
+        body: (t.taskCompletedNotifBody || 'Great job finishing: ') + `"${title}"`,
+        sound: 'default', // Usually completion is a subtle sound
+        priority: Notifications.AndroidNotificationPriority?.HIGH,
+      } as any,
+      trigger: null, // show immediately
+    });
+  } catch (error) {
+    console.warn("Error showing task completed notification:", error);
   }
 }
 

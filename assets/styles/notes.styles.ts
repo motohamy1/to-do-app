@@ -18,7 +18,7 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
     },
     header: {
       paddingHorizontal: 24,
-      paddingTop: 32,
+      paddingTop: 15,
       paddingBottom: 16,
       flexDirection: 'row',
       alignItems: 'center',
@@ -30,7 +30,7 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
       color: colors.text,
     },
     sectionContainer: {
-      marginBottom: 32,
+      marginBottom: 20,
     },
     sectionHeader: {
       flexDirection: 'row',
@@ -70,7 +70,7 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
     },
     loneColumnCentered: {
       justifyContent: 'center',
-      height: 290, // Match horizontalGridContainer height
+      height: 265, // Match horizontalGridContainer height
     },
     cardDesc: {
       fontSize: 14,
@@ -168,7 +168,7 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
     // Rich Toolbar
     toolbarWrapper: {
       position: 'absolute',
-      bottom: 20,
+      bottom: 2,
       left: 20,
       right: 20,
       backgroundColor: '#1C1C1E', // Charcoal dark
@@ -408,7 +408,7 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
     },
     gridCard: {
       width: gridCardWidth,
-      height: 145,
+      height: 110,
       borderRadius: 32,
       padding: 16,
       justifyContent: 'space-between',
@@ -422,7 +422,7 @@ export const createNotesStyles = (colors: ColorScheme, isArabic: boolean = false
       flexDirection: 'column',
       flexWrap: 'wrap',
       paddingHorizontal: 24,
-      height: 310, // 145 * 2 + 20 gap
+      height: 245, // Reduced to fit both sections on one screen
       gap: 12,
     },
     inlineReminderHeader: {

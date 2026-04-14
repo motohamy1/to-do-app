@@ -13,6 +13,7 @@ import TaskDetailModal from './TaskDetailModal';
 import { SubtaskRow } from './SubtaskRow';
 import ActionModal from './ActionModal';
 import { InlineTimerPicker } from './InlineTimerPicker';
+import { showTaskCompletedNotification } from '@/utils/notifications';
 
 interface TodoCardProps {
   todo: {
@@ -178,6 +179,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
           if (remaining === 0 && !hasAutoCompletedRef.current) {
             hasAutoCompletedRef.current = true;
             updateStatus({ id: todo._id, status: 'done' });
+            showTaskCompletedNotification(todo.text, isArabic ? 'ar' : 'en');
           }
         };
         calculateTimeInfo();
@@ -203,13 +205,20 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     // Only auto-complete if ALL subtasks are done AND the parent hasn't been manually set
     if (totalSubtasks > 0 && completedSubtasks === totalSubtasks && (todo.status === 'not_started' || todo.status === 'not_done' || todo.status === 'in_progress')) {
       updateStatus({ id: todo._id, status: 'done' });
+      showTaskCompletedNotification(todo.text, isArabic ? 'ar' : 'en');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subtasks?.map((s: any) => s.status).join(','), todo.status, todo._id]);
 
   useEffect(() => {
-    if (todo.status === 'not_started' && todo.dueDate && todo.dueDate < Date.now()) {
-      updateStatus({ id: todo._id, status: 'not_done' });
+    if (todo.status === 'not_started' && todo.dueDate) {
+      // Only mark as not_done if the due date's entire day has passed
+      // (i.e. it's now past midnight of the day AFTER the due date)
+      const dueDateEndOfDay = new Date(todo.dueDate);
+      dueDateEndOfDay.setHours(23, 59, 59, 999);
+      if (dueDateEndOfDay.getTime() < Date.now()) {
+        updateStatus({ id: todo._id, status: 'not_done' });
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [todo.status, todo.dueDate, todo._id]);
@@ -253,7 +262,12 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     updateTodo({ id: subId, text });
   }, [updateTodo]);
 
-  const moveToStatus = (status: string) => updateStatus({ id: todo._id, status });
+  const moveToStatus = (status: string) => {
+    updateStatus({ id: todo._id, status });
+    if (status === 'done') {
+      showTaskCompletedNotification(todo.text, isArabic ? 'ar' : 'en');
+    }
+  };
 
   const newSubBudget = useMemo(() => {
     if (!todo.timerDuration || !subtasks) return undefined;
@@ -304,7 +318,8 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
   const isTimerSet = !!todo.timerDuration || todo.timerDirection === 'up';
   const isDueSoon = todo.status === 'not_started' && todo.dueDate && (todo.dueDate - Date.now() < 86400000);
-  const isPastDue = todo.status === 'not_started' && todo.dueDate && todo.dueDate < Date.now();
+  const dueDateEnd = todo.dueDate ? new Date(todo.dueDate).setHours(23, 59, 59, 999) : 0;
+  const isPastDue = todo.status === 'not_started' && todo.dueDate && dueDateEnd < Date.now();
 
   let badgeText = t.notStarted;
   let badgeBg = colors.border;
@@ -491,7 +506,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                         <Ionicons name="pause" size={16} color={contentColor} />
                       </TouchableOpacity>
                       {todo.timerDirection === 'up' && (
-                        <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: isBrightBg ? 'rgba(34,197,94,0.3)' : 'rgba(34,197,94,0.15)', borderColor: isBrightBg ? 'rgba(0,0,0,0.1)' : '#22c55e40', borderWidth: 1 }]} onPress={() => updateStatus({ id: todo._id, status: 'done' })}>
+                        <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: isBrightBg ? 'rgba(34,197,94,0.3)' : 'rgba(34,197,94,0.15)', borderColor: isBrightBg ? 'rgba(0,0,0,0.1)' : '#22c55e40', borderWidth: 1 }]} onPress={() => { updateStatus({ id: todo._id, status: 'done' }); showTaskCompletedNotification(todo.text, isArabic ? 'ar' : 'en'); }}>
                           <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
                         </TouchableOpacity>
                       )}
@@ -503,7 +518,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                         <Ionicons name="play" size={16} color={isBrightBg ? '#FFF' : (isDarkMode ? '#000' : '#FFF')} />
                       </TouchableOpacity>
                       {todo.timerDirection === 'up' && (
-                        <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: isBrightBg ? 'rgba(34,197,94,0.3)' : 'rgba(34,197,94,0.15)', borderColor: isBrightBg ? 'rgba(0,0,0,0.1)' : '#22c55e40', borderWidth: 1 }]} onPress={() => updateStatus({ id: todo._id, status: 'done' })}>
+                        <TouchableOpacity style={[homeStyles.iconBtn, { backgroundColor: isBrightBg ? 'rgba(34,197,94,0.3)' : 'rgba(34,197,94,0.15)', borderColor: isBrightBg ? 'rgba(0,0,0,0.1)' : '#22c55e40', borderWidth: 1 }]} onPress={() => { updateStatus({ id: todo._id, status: 'done' }); showTaskCompletedNotification(todo.text, isArabic ? 'ar' : 'en'); }}>
                           <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
                         </TouchableOpacity>
                       )}

@@ -126,6 +126,11 @@ export const translations = {
     notes: "Notes",
     newReminder: "New Reminder",
     quickNote: "Quick Note",
+    taskCompletedNotifTitle: "🎯 Task Completed!",
+    taskCompletedNotifBody: "Great job finishing: ",
+    taskTimers: "Task Timers",
+    subtaskTimers: "Subtask Timers",
+    remindersLabel: "Reminders",
   },
 
 
@@ -256,6 +261,11 @@ export const translations = {
     notes: "الملاحظات",
     newReminder: "تذكير جديد",
     quickNote: "ملاحظة سريعة",
+    taskCompletedNotifTitle: "🎯 اكتملت المهمة!",
+    taskCompletedNotifBody: "عمل رائع في إنهاء: ",
+    taskTimers: "مؤقتات المهام",
+    subtaskTimers: "مؤقتات المهام الفرعية",
+    remindersLabel: "التذكيرات",
   }
 
 

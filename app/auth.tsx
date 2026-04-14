@@ -101,7 +101,8 @@ const AuthScreen = () => {
                   <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
                     <Ionicons name="person-outline" size={20} color={colors.surfaceText + '60'} />
                     <TextInput
-                      style={[styles.input, { color: colors.surfaceText }, isArabic && { textAlign: 'right' }]}
+                      style={[styles.input, { color: colors.surfaceText, minHeight: 50, paddingVertical: Platform.OS === 'ios' ? 12 : 8 }, isArabic && { textAlign: 'right' }]}
+                      multiline={true} blurOnSubmit={true} scrollEnabled={false}
                       placeholder={isArabic ? "جون دو" : "John Doe"}
                       placeholderTextColor={colors.surfaceText + '40'}
                       value={name}
@@ -116,7 +117,7 @@ const AuthScreen = () => {
                 <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
                   <Ionicons name="mail-outline" size={20} color={colors.surfaceText + '60'} />
                   <TextInput
-                    style={[styles.input, { color: colors.surfaceText }, isArabic && { textAlign: 'right' }]}
+                    style={[styles.input, { color: colors.surfaceText, textAlign: 'left' }]}
                     placeholder="example@gmail.com"
                     placeholderTextColor={colors.surfaceText + '40'}
                     value={email}
@@ -132,7 +133,7 @@ const AuthScreen = () => {
                 <View style={[styles.inputWrapper, { backgroundColor: colors.surface, borderColor: colors.border, flexDirection: isArabic ? 'row-reverse' : 'row' }]}>
                   <Ionicons name="lock-closed-outline" size={20} color={colors.surfaceText + '60'} />
                   <TextInput
-                    style={[styles.input, { color: colors.surfaceText }, isArabic && { textAlign: 'right' }]}
+                    style={[styles.input, { color: colors.surfaceText, textAlign: 'left' }]}
                     placeholder="••••••••"
                     placeholderTextColor={colors.surfaceText + '40'}
                     value={password}

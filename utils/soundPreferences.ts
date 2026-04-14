@@ -2,12 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const SOUND_PREFERENCE_KEY = 'notificationSoundPreference';
 
-export type NotificationSound = 'default' | 'alarm_tone.wav';
+export type NotificationSound = 'default' | 'alarm_tone.wav' | 'chime' | 'alert' | 'zen' | 'success';
 
 export const getNotificationSound = async (): Promise<NotificationSound> => {
   try {
     const sound = await AsyncStorage.getItem(SOUND_PREFERENCE_KEY);
-    if (sound === 'default' || sound === 'alarm_tone.wav') {
+    const validSounds: NotificationSound[] = ['default', 'alarm_tone.wav', 'chime', 'alert', 'zen', 'success'];
+    if (validSounds.includes(sound as NotificationSound)) {
       return sound as NotificationSound;
     }
   } catch (error) {

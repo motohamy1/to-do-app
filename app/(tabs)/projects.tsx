@@ -132,7 +132,7 @@ const AddSubCategoryModal = ({ visible, onClose, colors, styles, onAdd, initialD
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>{initialData ? 'Edit Sub-Category' : 'New Sub-Category'}</Text>
             <Text style={styles.modalLabel}>Name</Text>
-            <TextInput style={styles.modalInput} placeholder="e.g. Frontend, Cardiology, Sci-Fi..." placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus />
+            <TextInput style={[styles.modalInput, { minHeight: 40, paddingVertical: Platform.OS === 'ios' ? 8 : 4 }]} placeholder="e.g. Frontend, Cardiology, Sci-Fi..." placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus multiline={true} blurOnSubmit={true} scrollEnabled={false} />
             <Text style={styles.modalLabel}>Color</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorPicker}>
               {ACCENT_COLORS.map(c => (
@@ -178,7 +178,7 @@ const AddCategoryModal = ({ visible, onClose, colors, styles, onAdd, initialData
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>{initialData ? 'Edit Category' : 'New Category'}</Text>
             <Text style={styles.modalLabel}>Name</Text>
-            <TextInput style={styles.modalInput} placeholder="e.g. Programming, Medicine…" placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus />
+            <TextInput style={[styles.modalInput, { minHeight: 40, paddingVertical: Platform.OS === 'ios' ? 8 : 4 }]} placeholder="e.g. Programming, Medicine…" placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus multiline={true} blurOnSubmit={true} scrollEnabled={false} />
             <Text style={styles.modalLabel}>Icon</Text>
             <View style={styles.iconPicker}>
               {CATEGORY_ICONS.map(ic => (
@@ -235,7 +235,7 @@ const AddProjectModal = ({ visible, onClose, colors, styles, onAdd, initialData 
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>{initialData ? 'Edit Project' : 'New Project'}</Text>
             <Text style={styles.modalLabel}>Project Name</Text>
-            <TextInput style={styles.modalInput} placeholder="e.g. Todo App, Research Paper…" placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus />
+            <TextInput style={[styles.modalInput, { minHeight: 40, paddingVertical: Platform.OS === 'ios' ? 8 : 4 }]} placeholder="e.g. Todo App, Research Paper…" placeholderTextColor={colors.textMuted} value={name} onChangeText={setName} autoFocus multiline={true} blurOnSubmit={true} scrollEnabled={false} />
             <Text style={styles.modalLabel}>Short Description (optional)</Text>
             <TextInput style={[styles.modalInput, { minHeight: 60, textAlignVertical: 'top' }]} placeholder="What is this project about?" placeholderTextColor={colors.textMuted} value={desc} onChangeText={setDesc} multiline />
             <Text style={styles.modalLabel}>Color</Text>
@@ -279,7 +279,7 @@ const AddResourceModal = ({ visible, onClose, colors, styles, onAdd }: {
               ))}
             </View>
             <Text style={styles.modalLabel}>Title</Text>
-            <TextInput style={styles.modalInput} placeholder="Resource title…" placeholderTextColor={colors.textMuted} value={title} onChangeText={setTitle} />
+            <TextInput style={[styles.modalInput, { minHeight: 40, paddingVertical: Platform.OS === 'ios' ? 8 : 4 }]} placeholder="Resource title…" placeholderTextColor={colors.textMuted} value={title} onChangeText={setTitle} multiline={true} blurOnSubmit={true} scrollEnabled={false} />
             <TouchableOpacity style={styles.modalPrimaryBtn} onPress={handleAdd}><Text style={styles.modalPrimaryBtnText}>Add Resource</Text></TouchableOpacity>
             <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}><Text style={styles.modalSecondaryBtnText}>Cancel</Text></TouchableOpacity>
           </View>
@@ -1132,7 +1132,11 @@ const Projects: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
       <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.bg} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
@@ -1249,7 +1253,7 @@ const Projects: React.FC = () => {
       />
 
       <ScreenGuide visible={showGuide} tips={projectsTips} onDismiss={dismissGuide} isArabic={isArabic} />
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 

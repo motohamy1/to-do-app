@@ -42,10 +42,10 @@ const Index = () => {
     const [isTimerModalVisible, setTimerModalVisible] = useState(false);
     const [isProjectModalVisible, setProjectModalVisible] = useState(false);
     const [selectedTodoId, setSelectedTodoId] = useState<Id<"todos"> | null>(null);
-    const [activeFilter, setActiveFilter] = useState<'All' | 'In Progress' | 'Done'>('All');
+    const [activeFilter, setActiveFilter] = useState<'All' | 'In Progress' | 'Done' | 'Not Done'>('All');
     
     const [isGlobalActionModalVisible, setGlobalActionModalVisible] = useState(false);
-    const [showOverdue, setShowOverdue] = useState(false);
+    const [showOverdue, setShowOverdue] = useState(true);
     const [sortActive, setSortActive] = useState('');
     const [isTaskModalVisible, setIsTaskModalVisible] = useState(false);
 
@@ -73,20 +73,21 @@ const Index = () => {
       status: t.status || ((t as any).isCompleted ? 'done' : 'not_started')
     })) || [];
 
-    const { todayTodos, overdueTodos, overdueByDay, groupedDoneTodos } = useMemo(() => {
+    const { todayTodos, todayNotDone, overdueTodos, overdueByDay, groupedDoneTodos, todayDoneForProgress, todayAllForProgress } = useMemo(() => {
       const todayStart = new Date().setHours(0, 0, 0, 0);
       const tomorrowStart = todayStart + 86400000;
       
       const today: any[] = [];
+      const todayNotDoneList: any[] = [];
       const overdue: any[] = [];
 
-      // A task is overdue when its scheduled date has passed and it's NOT completed.
-      // This includes paused, in_progress, not_started, and not_done tasks.
-      // When the user marks a task as done, it leaves the overdue section.
       const groupedDoneDayMap = new Map<number, any[]>();
 
+      // Track ALL today-scoped tasks for progress (including done ones)
+      let todayDoneCount = 0;
+      let todayTotalCount = 0;
+
       normalizedTodos.forEach(t => {
-        const isDoneToday = t.status === 'done' && t.completedAt !== undefined && t.completedAt >= todayStart && t.completedAt < tomorrowStart;
         const isScheduledForToday = !t.date || (t.date >= todayStart && t.date < tomorrowStart);
 
         if (t.status === 'done') {
@@ -95,9 +96,19 @@ const Index = () => {
             : (t.date ? new Date(t.date).setHours(0, 0, 0, 0) : todayStart);
           if (!groupedDoneDayMap.has(completionDay)) groupedDoneDayMap.set(completionDay, []);
           groupedDoneDayMap.get(completionDay)!.push(t);
+          // Count done tasks that belong to today for progress tracking
+          if (isScheduledForToday || (t.completedAt && t.completedAt >= todayStart && t.completedAt < tomorrowStart)) {
+            todayDoneCount++;
+            todayTotalCount++;
+          }
+        } else if (t.status === 'not_done' && isScheduledForToday) {
+          // Separate not_done tasks into their own list
+          todayNotDoneList.push(t);
+          todayTotalCount++;
         } else {
           if (isScheduledForToday) {
             today.push(t);
+            todayTotalCount++;
           } else if (t.date !== undefined && t.date < todayStart) {
             overdue.push(t);
           }
@@ -108,12 +119,25 @@ const Index = () => {
         .sort(([a], [b]) => b - a)
         .map(([dayTimestamp, tasks]) => ({ dayTimestamp, tasks }));
       
-      if (sortActive === 'priority') {
-        const pScores: any = { 'Urgent': 3, 'High': 2, 'Medium': 1, 'Low': 0, undefined: -1 };
-        today.sort((a, b) => (pScores[b.priority] || -1) - (pScores[a.priority] || -1));
-      } else if (sortActive === 'date') {
+      // Default sort: priority descending, then creation time ascending (oldest first)
+      const pScores: any = { 'Urgent': 3, 'High': 2, 'Medium': 1, 'Low': 0, undefined: -1 };
+      if (sortActive === 'date') {
         today.sort((a, b) => (a.dueDate || 0) - (b.dueDate || 0));
+      } else {
+        // Always sort by priority first, then by creation time (oldest first)
+        today.sort((a, b) => {
+          const pDiff = (pScores[b.priority] ?? -1) - (pScores[a.priority] ?? -1);
+          if (pDiff !== 0) return pDiff;
+          return (a._creationTime || 0) - (b._creationTime || 0); // oldest first
+        });
       }
+
+      // Sort not_done the same way
+      todayNotDoneList.sort((a, b) => {
+        const pDiff = (pScores[b.priority] ?? -1) - (pScores[a.priority] ?? -1);
+        if (pDiff !== 0) return pDiff;
+        return (a._creationTime || 0) - (b._creationTime || 0);
+      });
 
       // Sort overdue by date descending (latest first)
       overdue.sort((a, b) => (b.date || 0) - (a.date || 0));
@@ -126,18 +150,27 @@ const Index = () => {
         dayMap.get(dayStart)!.push(t);
       });
       const grouped = Array.from(dayMap.entries())
-        .sort(([a], [b]) => b - a) // descending: latest day first
+        .sort(([a], [b]) => b - a)
         .map(([dayTimestamp, tasks]) => ({ dayTimestamp, tasks }));
 
-      return { todayTodos: today, overdueTodos: overdue, overdueByDay: grouped, groupedDoneTodos };
+      return { 
+        todayTodos: today, 
+        todayNotDone: todayNotDoneList, 
+        overdueTodos: overdue, 
+        overdueByDay: grouped, 
+        groupedDoneTodos,
+        todayDoneForProgress: todayDoneCount,
+        todayAllForProgress: todayTotalCount
+      };
     }, [normalizedTodos, sortActive]);
-    const doneTodosCount = todayTodos.filter(t => t.status === 'done').length;
     const inProgressCount = todayTodos.filter(t => t.status === 'in_progress').length;
-    const totalCount = todayTodos.length;
+    const totalCount = todayTodos.filter(t => t.status !== 'done' && t.status !== 'in_progress').length;
     
     const totalDoneCount = groupedDoneTodos.reduce((sum, group) => sum + group.tasks.length, 0);
 
-    const progressPercent = totalCount === 0 ? 0 : Math.round((doneTodosCount / totalCount) * 100);
+    // Progress uses ALL today-scoped tasks (done + active + not_done) so adding new tasks
+    // doesn't reset the percentage — it properly recalculates with the full picture
+    const progressPercent = todayAllForProgress === 0 ? 0 : Math.round((todayDoneForProgress / todayAllForProgress) * 100);
 
     const handleOpenTimerModal = (id: Id<"todos">) => {
       setSelectedTodoId(id);
@@ -162,21 +195,22 @@ const Index = () => {
     };
 
     const displayedTodos = useMemo(() => {
-        if (activeFilter === 'All') return todayTodos.filter(t => t.status !== 'done');
+        if (activeFilter === 'All') return todayTodos.filter(t => t.status !== 'done' && t.status !== 'in_progress');
         if (activeFilter === 'In Progress') return todayTodos.filter(t => t.status === 'in_progress');
+        if (activeFilter === 'Done' || activeFilter === 'Not Done') return [];
         return todayTodos;
     }, [todayTodos, activeFilter]);
 
     const displayedOverdue = useMemo(() => {
-        if (activeFilter !== 'All') return [];
+        if (activeFilter !== 'Not Done') return [];
         return overdueTodos;
     }, [overdueTodos, activeFilter]);
 
     return (
         <KeyboardAvoidingView 
             style={homeStyles.container}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : -110}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
 
             <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.bg} />
@@ -196,15 +230,15 @@ const Index = () => {
 
                       
                       {/* Today's Plan Card */}
-                      <View style={[homeStyles.todaysPlanCard, isArabic && { flexDirection: 'row-reverse' }]}>
-                          <View style={isArabic && { alignItems: 'flex-end' }}>
-                              <Text style={homeStyles.todaysPlanTitle}>{t.todaysPlan}</Text>
-                              <Text style={homeStyles.todaysPlanSubtitle}>{doneTodosCount}/{totalCount} {t.tasksCompleted}</Text>
-                          </View>
-                          <CircularProgress 
-                              size={64} 
-                              strokeWidth={6} 
-                              progress={progressPercent} 
+                       <View style={[homeStyles.todaysPlanCard, isArabic && { flexDirection: 'row-reverse' }]}>
+                           <View style={isArabic && { alignItems: 'flex-end' }}>
+                               <Text style={homeStyles.todaysPlanTitle}>{t.todaysPlan}</Text>
+                               <Text style={homeStyles.todaysPlanSubtitle}>{todayDoneForProgress}/{todayAllForProgress} {t.tasksCompleted}</Text>
+                           </View>
+                           <CircularProgress 
+                               size={64} 
+                               strokeWidth={6} 
+                               progress={progressPercent} 
                               color="#000000" 
                               unfilledColor="rgba(0,0,0,0.1)"
                           >
@@ -214,15 +248,18 @@ const Index = () => {
 
                       {/* Filter Pills */}
                       <View style={[homeStyles.pillsContainer, isArabic && { flexDirection: 'row-reverse' }]}>
-                          {(['All', 'In Progress', 'Done'] as const).map(filter => {
+                          {(['All', 'In Progress', 'Done', 'Not Done'] as const).map(filter => {
                               const isActive = activeFilter === filter;
                               let count = 0;
                               if (filter === 'All') count = totalCount;
                               if (filter === 'In Progress') count = inProgressCount;
                               if (filter === 'Done') count = totalDoneCount;
+                              if (filter === 'Not Done') count = todayNotDone.length + overdueTodos.length;
 
                               const filterLabel = filter === 'All' ? (isArabic ? 'المهام' : 'To-Do') : 
-                                                filter === 'In Progress' ? t.inProgress : t.done;
+                                                filter === 'In Progress' ? t.inProgress : 
+                                                filter === 'Done' ? t.done : 
+                                                (isArabic ? 'لم تُنجز' : 'Not Done');
 
                               return (
                                   <TouchableOpacity 
@@ -242,12 +279,14 @@ const Index = () => {
                       </View>
 
                        {/* Today's Tasks List */}
-                       <View style={[homeStyles.sectionTitleContainer, isArabic && { flexDirection: 'row-reverse' }]}>
-                           <Text style={homeStyles.sectionTitleText}>{t.tasksForToday}</Text>
-                           <TouchableOpacity onPress={() => setGlobalActionModalVisible(true)}>
-                               <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
-                           </TouchableOpacity>
-                       </View>
+                       {activeFilter !== 'Done' && activeFilter !== 'Not Done' && (
+                         <View style={[homeStyles.sectionTitleContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+                             <Text style={homeStyles.sectionTitleText}>{t.tasksForToday}</Text>
+                             <TouchableOpacity onPress={() => setGlobalActionModalVisible(true)}>
+                                 <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
+                             </TouchableOpacity>
+                         </View>
+                       )}
 
                        {activeFilter === 'All' && todayTodos.length === 0 && (
                          <View style={homeStyles.emptyContainer}>
@@ -270,7 +309,14 @@ const Index = () => {
                          </View>
                        )}
 
-                       {activeFilter !== 'Done' && displayedTodos.filter(t => t.status !== 'done').map(todo => (
+                       {activeFilter === 'Not Done' && todayNotDone.length === 0 && overdueTodos.length === 0 && (
+                         <View style={homeStyles.emptyContainer}>
+                            <Ionicons name="close-circle-outline" size={48} color={colors.border} />
+                            <Text style={homeStyles.emptyText}>{t.noTasksFound}</Text>
+                         </View>
+                       )}
+
+                       {activeFilter !== 'Done' && activeFilter !== 'Not Done' && displayedTodos.filter(t => t.status !== 'done').map(todo => (
                            <TodoCard 
                                key={todo._id} 
                                todo={todo} 
@@ -281,23 +327,30 @@ const Index = () => {
                            />
                        ))}
 
-                       {activeFilter === 'All' && todayTodos.some(t => t.status === 'done') && (
-                           <View style={{ marginTop: 24 }}>
-                               <View style={homeStyles.sectionTitleContainer}>
-                                   <Text style={homeStyles.sectionTitleText}>{isArabic ? 'المهام المكتملة اليوم' : 'Completed Today'}</Text>
-                               </View>
-                               {todayTodos.filter(t => t.status === 'done').map(todo => (
-                                   <TodoCard 
-                                       key={todo._id} 
-                                       todo={todo} 
-                                       onSetTimer={handleOpenTimerModal}
-                                       onLinkProject={handleOpenProjectModal}
-                                       homeStyles={homeStyles}
-                                       isTimelineMode={true}
-                                   />
-                               ))}
-                           </View>
-                       )}
+                       {/* Not Done Tasks (today) - separate section */}
+                       {activeFilter === 'Not Done' && todayNotDone.length > 0 && (
+                            <View style={{ marginTop: 24 }}>
+                                <View style={[homeStyles.sectionTitleContainer, isArabic && { flexDirection: 'row-reverse' }]}>
+                                    <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+                                        <Text style={[homeStyles.sectionTitleText, { color: colors.danger }]}>{isArabic ? 'اليوم' : 'Today'}</Text>
+                                        <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                                            <Text style={{ fontSize: 12, fontWeight: '800', color: colors.danger }}>{todayNotDone.length}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                                {todayNotDone.map(todo => (
+                                    <TodoCard 
+                                        key={todo._id} 
+                                        todo={todo} 
+                                        onSetTimer={handleOpenTimerModal}
+                                        onLinkProject={handleOpenProjectModal}
+                                        homeStyles={homeStyles}
+                                        isTimelineMode={true}
+                                    />
+                                ))}
+                            </View>
+                        )}
+
 
                        {activeFilter === 'Done' && groupedDoneTodos.map(({ dayTimestamp, tasks }) => {
                          const dayLabel = new Date(dayTimestamp).toLocaleDateString(
@@ -340,7 +393,7 @@ const Index = () => {
                              onPress={() => setShowOverdue(!showOverdue)}
                            >
                              <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
-                               <Text style={[homeStyles.sectionTitleText, { color: colors.danger }]}>{t.notDoneTasks}</Text>
+                               <Text style={[homeStyles.sectionTitleText, { color: colors.danger }]}>{isArabic ? 'سابقاً' : 'Previous'}</Text>
                                <View style={{ backgroundColor: colors.danger + '15', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
                                  <Text style={{ fontSize: 12, fontWeight: '800', color: colors.danger }}>{displayedOverdue.length}</Text>
                                </View>
@@ -354,7 +407,8 @@ const Index = () => {
                            
                            {showOverdue && overdueByDay.map(({ dayTimestamp, tasks: dayTasks }) => {
                              const filteredDayTasks = activeFilter === 'Done' ? dayTasks.filter(t => t.status === 'done')
-                               : activeFilter === 'In Progress' ? dayTasks.filter(t => t.status === 'in_progress' || t.status === 'paused')
+                               : activeFilter === 'In Progress' ? dayTasks.filter(t => t.status === 'in_progress')
+                               : activeFilter === 'All' ? dayTasks.filter(t => t.status !== 'done' && t.status !== 'in_progress')
                                : dayTasks;
                              if (filteredDayTasks.length === 0) return null;
 

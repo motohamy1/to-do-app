@@ -1,5 +1,5 @@
 import { ColorScheme } from "@/hooks/useTheme";
-import { StyleSheet, Platform } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 
 export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false) => {
   const styles = StyleSheet.create({
@@ -14,7 +14,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
-      paddingHorizontal: 24,
+      paddingHorizontal: 16,
       paddingTop: 16,
       paddingBottom: 12,
     },
@@ -48,13 +48,13 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       paddingVertical: 12,
       paddingBottom: 110,
     },
-    
+
     // --- Today's Plan Banner ---
     todaysPlanCard: {
       backgroundColor: colors.primary,
       borderRadius: 24,
       padding: 20,
-      marginHorizontal: 24,
+      marginHorizontal: 16,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -71,11 +71,11 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       color: 'rgba(0,0,0,0.6)',
       fontWeight: '700',
     },
-    
+
     // --- Filter Pills ---
     pillsContainer: {
       flexDirection: 'row',
-      marginHorizontal: 24,
+      marginHorizontal: 16,
       backgroundColor: colors.surface + '80', // semi-transparent surface
       borderRadius: 16,
       padding: 4,
@@ -118,7 +118,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 24,
+      paddingHorizontal: 16,
       marginBottom: 16,
     },
     sectionTitleText: {
@@ -129,8 +129,8 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
 
     // --- Old Card styles repurposed for timeline/category cards ---
     cardContainer: {
-      marginStart: 24,
-      marginEnd: 24,
+      marginStart: 16,
+      marginEnd: 16,
       marginBottom: 16,
       flexDirection: 'row',
     },
@@ -184,7 +184,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       writingDirection: 'auto',
       fontFamily: Platform.OS === 'ios' ? 'Inter' : 'sans-serif-medium',
     },
-    
+
     // Utilities
     statusAndActionRow: {
       flexDirection: 'row',
@@ -282,7 +282,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.surface,
-      marginHorizontal: 24,
+      marginHorizontal: 16,
       padding: 16,
       borderRadius: 16,
       gap: 12,
@@ -298,7 +298,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
 
     addInputContainer: {
       backgroundColor: colors.surface,
-      marginHorizontal: 24,
+      marginHorizontal: 16,
       padding: 16,
       borderRadius: 20,
       borderWidth: 1,
@@ -312,12 +312,12 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
     },
     fab: {
       position: 'absolute',
-      bottom: 100,
-      right: isArabic ? undefined : 24,
-      left: isArabic ? 24 : undefined,
-      width: 60,
-      height: 60,
-      borderRadius: 30,
+      bottom: 75,
+      left: 15,
+      right: undefined,
+      width: 75,
+      height: 75,
+      borderRadius: 37.5,
       backgroundColor: colors.primary,
       justifyContent: 'center',
       alignItems: 'center',
@@ -329,8 +329,11 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       zIndex: 100,
     },
     fabRtl: {
-      right: undefined,
       left: 24,
+      right: undefined,
+      bottom: 115,
+      zIndex: 100,
+      elevation: 8
     },
   });
 

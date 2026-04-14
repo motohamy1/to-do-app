@@ -148,18 +148,19 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
         {/* Top Input Row */}
         <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', marginBottom: timerDuration ? 12 : 0 }}>
           <TextInput
-            style={[homeStyles.addInput, { flex: 1, paddingVertical: 0, marginHorizontal: 12 }, isArabic && { textAlign: 'right' }]}
+            style={[homeStyles.addInput, { flex: 1, paddingVertical: Platform.OS === 'ios' ? 8 : 4, minHeight: 40, marginHorizontal: 12 }, isArabic && { textAlign: 'right' }]}
             placeholder={isArabic ? "...عنوان المهمة" : "Task title..."}
             value={newTodo}
             onChangeText={setNewTodo}
             onSubmitEditing={handleAddTodo}
             onFocus={onFocus}
             onBlur={() => {
-
               if (!newTodo.trim() && !timerDuration && pendingSubtasks.length === 0) setIsAdding(false);
             }}
             placeholderTextColor={colors.surfaceText + '70'}
-
+            multiline={true}
+            blurOnSubmit={true}
+            scrollEnabled={false}
             autoFocus
             returnKeyType="done"
           />
@@ -221,15 +222,16 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
           <Ionicons name={isArabic ? "return-down-back" : "return-down-forward"} size={16} color={colors.surfaceText} style={isArabic ? { marginLeft: 8 } : { marginRight: 8 }} />
 
           <TextInput
-            style={[homeStyles.addInput, { flex: 1, paddingVertical: 4, fontSize: 14, fontWeight: '600' }, isArabic && { textAlign: 'right' }]}
+            style={[homeStyles.addInput, { flex: 1, paddingVertical: Platform.OS === 'ios' ? 8 : 4, minHeight: 40, fontSize: 14, fontWeight: '600' }, isArabic && { textAlign: 'right' }]}
             placeholder={isArabic ? "...إضافة مهمة فرعية" : "Add a sub-task..."}
             placeholderTextColor={colors.surfaceText + '70'}
-
+            multiline={true}
+            blurOnSubmit={true}
+            scrollEnabled={false}
             value={newSubtaskText}
             onChangeText={setNewSubtaskText}
             onFocus={onFocus}
             onSubmitEditing={() => {
-
               if (newSubtaskText.trim()) {
                 setPendingSubtasks(prev => [...prev, { text: newSubtaskText.trim() }]);
                 setNewSubtaskText("");
