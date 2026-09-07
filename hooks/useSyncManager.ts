@@ -1,5 +1,12 @@
 import { api } from '@/convex/_generated/api';
-import { clearMutationQueue, getMutationQueue, setMutationQueue } from '@/utils/offlineStorage';
+import {
+  getMutationQueue,
+  getIdMappings,
+  saveIdMapping,
+  removeQueuedMutation,
+  bumpQueuedItemRetry,
+  setServerClock,
+} from '@/utils/offlineStorage';
 import NetInfo from '@react-native-community/netinfo';
 import { useConvex } from 'convex/react';
 import { useEffect, useRef } from 'react';
@@ -16,6 +23,7 @@ const mutationMap: Record<string, any> = {
   'todos:setTimer': apiAny.todos.setTimer,
   'todos:startTimer': apiAny.todos.startTimer,
   'todos:pauseTimer': apiAny.todos.pauseTimer,
+  'todos:setTimerRunState': apiAny.todos.setTimerRunState,
   'todos:startSubtaskTimer': apiAny.todos.startSubtaskTimer,
   'todos:pauseSubtaskTimer': apiAny.todos.pauseSubtaskTimer,
   'todos:resetTimer': apiAny.todos.resetTimer,
@@ -74,6 +82,39 @@ const mutationMap: Record<string, any> = {
   'auth:updateSettings': apiAny.auth.updateSettings,
 };
 
+const TEMP_ID_RE = /^temp_/;
+
+const isTempIdString = (v: any): v is string => typeof v === 'string' && TEMP_ID_RE.test(v);
+
+// Replace any (persisted-)mapped temp ids inside args with their server ids.
+const remapValue = (v: any, map: Record<string, string>): any => {
+  if (Array.isArray(v)) return v.map((x) => remapValue(x, map));
+  if (v && typeof v === 'object') {
+    const out: Record<string, any> = {};
+    Object.entries(v).forEach(([k, val]) => {
+      out[k] = k !== 'localId' && typeof val === 'string' && /id$/i.test(k) && map[val] ? map[val] : remapValue(val, map);
+    });
+    return out;
+  }
+  return v;
+};
+
+// Temp ids still present after remapping: the creation mutation that owns them
+// must sync first, so dependent items stay deferred (never counted as failed).
+const remainingTempIds = (args: any, found: Set<string> = new Set()): Set<string> => {
+  if (!args || typeof args !== 'object') return found;
+  if (Array.isArray(args)) {
+    args.forEach((x) => remainingTempIds(x, found));
+    return found;
+  }
+  Object.entries(args).forEach(([k, val]) => {
+    if (k === 'localId') return;
+    if (/id$/i.test(k) && isTempIdString(val)) found.add(val);
+    else if (val && typeof val === 'object') remainingTempIds(val, found);
+  });
+  return found;
+};
+
 export function useSyncManager() {
   const convex = useConvex();
   const isSyncing = useRef(false);
@@ -93,19 +134,6 @@ export function useSyncManager() {
     return unsub;
   }, [convex]);
 
-  const remapArgs = (args: any, idMap: Record<string, string>): any => {
-    if (!args || typeof args !== 'object') return args;
-    const remapped = { ...args };
-
-    ['id', 'todoId', 'parentId', 'categoryId', 'subCategoryId', 'projectId'].forEach((field) => {
-      if (remapped[field] && typeof remapped[field] === 'string' && idMap[remapped[field]]) {
-        remapped[field] = idMap[remapped[field]];
-      }
-    });
-
-    return remapped;
-  };
-
   const processQueue = async () => {
     if (isSyncing.current) return;
     isSyncing.current = true;
@@ -118,56 +146,73 @@ export function useSyncManager() {
       }
 
       console.log('Syncing offline mutations. Total items:', queue.length);
-      const remainingQueue = [];
-      const idMap: Record<string, string> = {};
+      const idMap = { ...(await getIdMappings()) };
 
       for (let i = 0; i < queue.length; i++) {
         const item = queue[i];
         const mutationFn = mutationMap[item.mutationPath];
 
-        if (mutationFn) {
-          try {
-            // Remap any temp IDs to real server IDs from previous creation steps
-            const preparedArgs = remapArgs(item.args, idMap);
+        if (!mutationFn) {
+          console.warn(`No matching convex function found for ${item.mutationPath}, dropping.`);
+          await removeQueuedMutation(item.id);
+          continue;
+        }
 
-            const result = await convex.mutation(mutationFn, preparedArgs);
-            console.log(`Successfully synced mutation: ${item.mutationPath}`);
+        const preparedArgs = remapValue(item.args, idMap);
 
-            // If this mutation created a new document and returned a server ID, map it
-            if (item.tempId && (typeof result === 'string' || result?._id)) {
-              const serverId = typeof result === 'string' ? result : result._id;
+        // Wait for the creation of referenced docs instead of burning retries.
+        const blocking = Array.from(remainingTempIds(preparedArgs)).filter((t) => !idMap[t]);
+        if (blocking.length > 0) {
+          if (Date.now() - item.timestamp > 10 * 60 * 1000) {
+            console.warn(`Dropping ${item.mutationPath}: referenced temp ids never synced:`, blocking);
+            await removeQueuedMutation(item.id);
+            continue;
+          }
+          console.warn(`Deferring ${item.mutationPath}: waiting on ${blocking.length} unsynced id(s).`);
+          // Keep order: stop the whole pass; later items must not overtake.
+          break;
+        }
+
+        try {
+          const result = await convex.mutation(mutationFn, preparedArgs);
+          console.log(`Successfully synced mutation: ${item.mutationPath}`);
+
+          if (result && typeof result === 'object' && typeof (result as any).serverTime === 'number') {
+            setServerClock((result as any).serverTime);
+          }
+
+          // Record creation mappings so dependent items (this batch or later
+          // batches after a restart) can resolve their temp ids.
+          if (item.tempId) {
+            const serverId = typeof result === 'string' ? result : (result as any)?._id;
+            if (serverId && serverId !== item.tempId) {
               idMap[item.tempId] = serverId;
-            }
-          } catch (err: any) {
-            console.warn(`Failed to sync mutation ${item.mutationPath}`, err);
-
-            item.retryCount = (item.retryCount || 0) + 1;
-
-            if (item.retryCount <= 5) {
-              remainingQueue.push(item);
-            } else {
-              console.warn(`Dropping mutation ${item.mutationPath} after exceeding retry limit.`);
-            }
-
-            // Check if network is still connected
-            const state = await NetInfo.fetch();
-            if (!state.isConnected) {
-              console.warn('Network lost during sync. Pausing queue processing.');
-              remainingQueue.push(...queue.slice(i + 1));
-              break;
+              await saveIdMapping(item.tempId, serverId);
             }
           }
-        } else {
-          console.warn(`No matching convex function found for ${item.mutationPath}, dropping.`);
-        }
-      }
 
-      if (remainingQueue.length === 0) {
-        await clearMutationQueue();
-        console.log('Sync complete, mutation queue cleared!');
-      } else {
-        await setMutationQueue(remainingQueue);
-        console.log(`Sync paused, ${remainingQueue.length} items remaining in queue.`);
+          // Commit removal per item: if the app dies mid-batch, already
+          // applied mutations can never be replayed.
+          await removeQueuedMutation(item.id);
+        } catch (err: any) {
+          console.warn(`Failed to sync mutation ${item.mutationPath}`, err);
+
+          item.retryCount = (item.retryCount || 0) + 1;
+
+          if (item.retryCount > 5) {
+            console.warn(`Dropping mutation ${item.mutationPath} after exceeding retry limit.`);
+            await removeQueuedMutation(item.id);
+          } else {
+            await bumpQueuedItemRetry(item.id, item.retryCount);
+          }
+
+          // Check if network is still connected
+          const state = await NetInfo.fetch();
+          if (!state.isConnected) {
+            console.warn('Network lost during sync. Pausing queue processing.');
+            break;
+          }
+        }
       }
     } catch (err) {
       console.error('Error during offline sync processing', err);

@@ -13,6 +13,7 @@ import type * as aiNotes from "../aiNotes.js";
 import type * as audio from "../audio.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
+import type * as idempotency from "../idempotency.js";
 import type * as insights from "../insights.js";
 import type * as projects from "../projects.js";
 import type * as todos from "../todos.js";
@@ -31,6 +32,7 @@ declare const fullApi: ApiFromModules<{
   audio: typeof audio;
   auth: typeof auth;
   crons: typeof crons;
+  idempotency: typeof idempotency;
   insights: typeof insights;
   projects: typeof projects;
   todos: typeof todos;

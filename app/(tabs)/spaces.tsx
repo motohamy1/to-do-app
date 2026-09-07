@@ -31,7 +31,8 @@ import { Id, Doc } from '@/convex/_generated/dataModel';
 import TodoCard from '@/components/TodoCard';
 import ActionModal from '@/components/ActionModal';
 import TimerModal from '@/components/TimerModal';
-import ProjectPickerModal from '@/components/ProjectPickerModal';
+import UniversalLinkPickerModal from '@/components/UniversalLinkPickerModal';
+import TaskDetailModal from '@/components/TaskDetailModal';
 import { createHomeStyles } from '@/assets/styles/home.styles';
 import { useScreenGuide } from '@/hooks/useScreenGuide';
 import ScreenGuide from '@/components/ScreenGuide';
@@ -685,17 +686,27 @@ const CategoryDetailView = ({
 }) => {
   const { t } = useTranslation();
   const category = useOfflineQuery<any>('projects.getCategory', api.projects.getCategory, { id: categoryId });
+  const linkedGoal = useOfflineQuery<any>('yearlyGoals.getGoal', api.yearlyGoals.getGoal, category?.goalId ? { id: category.goalId } : 'skip');
   const directProjects = useOfflineQuery<any[]>('projects.getProjectsByCategory', api.projects.getProjectsByCategory, { categoryId });
   const allTodos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip');
+  const categoryTasks = useOfflineQuery<any[]>('todos.getTasksByCategory', api.todos.getTasksByCategory, userId ? { userId, categoryId } : 'skip') || [];
   
   // Real-time reactive items for this category from Convex
   const toggleItems = useOfflineQuery<any[]>('categoryItems_toggle', api.projects.getCategoryItems, { categoryId, listType: 'toggle' }) || [];
   const checklistItems = useOfflineQuery<any[]>('categoryItems_checklist', api.projects.getCategoryItems, { categoryId, listType: 'checklist' }) || [];
 
   const updateCategoryMutation = useOfflineMutation(api.projects.updateCategory, 'projects:updateCategory');
+  const linkCategoryToGoal = useOfflineMutation(api.projects.linkCategoryToGoal, 'projects:linkCategoryToGoal');
   const addCategoryItemMutation = useOfflineMutation(api.projects.addCategoryItem, 'projects:addCategoryItem');
   const updateCategoryItemMutation = useOfflineMutation(api.projects.updateCategoryItem, 'projects:updateCategoryItem');
   const deleteCategoryItemMutation = useOfflineMutation(api.projects.deleteCategoryItem, 'projects:deleteCategoryItem');
+  const updateTodoStatus = useOfflineMutation(api.todos.updateStatus, 'todos:updateStatus');
+  const addTodoMutation = useOfflineMutation(api.todos.addTodo, 'todos:addTodo');
+
+  const [isGoalPickerVisible, setIsGoalPickerVisible] = useState(false);
+  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<any | null>(null);
+  const [showAddCategoryTask, setShowAddCategoryTask] = useState(false);
+  const [newCategoryTaskText, setNewCategoryTaskText] = useState('');
 
   // Description / Workspace Overview state
   const [editingDesc, setEditingDesc] = useState(false);
@@ -768,6 +779,64 @@ const CategoryDetailView = ({
 
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120, paddingTop: 6 }}>
+      {/* ─── Goal Cross-Link Banner ─── */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 14 }}>
+        {linkedGoal ? (
+          <View style={{
+            flexDirection: isArabic ? 'row-reverse' : 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: '#8B5CF618',
+            borderRadius: 14,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderWidth: 1,
+            borderColor: '#8B5CF630',
+          }}>
+            <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <Ionicons name="flag" size={18} color="#8B5CF6" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '600', textAlign: isArabic ? 'right' : 'left' }}>
+                  {isArabic ? 'الهدف المرتبط بهذه المساحة' : 'Linked Goal'}
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                  {linkedGoal.title}
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <TouchableOpacity onPress={() => setIsGoalPickerVisible(true)} style={{ padding: 4 }}>
+                <Ionicons name="pencil" size={15} color="#8B5CF6" />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => linkCategoryToGoal({ categoryId, goalId: undefined })} style={{ padding: 4 }}>
+                <Ionicons name="close-circle" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={() => setIsGoalPickerVisible(true)}
+            style={{
+              flexDirection: isArabic ? 'row-reverse' : 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+              paddingVertical: 8,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderStyle: 'dashed',
+              backgroundColor: colors.surface + '60',
+            }}
+          >
+            <Ionicons name="flag-outline" size={15} color={colors.textMuted} />
+            <Text style={{ fontSize: 12, fontWeight: '600', color: colors.textMuted }}>
+              {isArabic ? '+ ربط هذه المساحة بهدف (Goal)' : '+ Link this space to a Goal'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {/* ─── 1. Projects Section (3D Folder Grid) ────────────────────── */}
       <View style={{ paddingHorizontal: 20, marginTop: 4 }}>
         <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -1141,6 +1210,158 @@ const CategoryDetailView = ({
           </View>
         )}
       </View>
+
+      {/* ─── 5. Space Linked Tasks ─────────────────────────────────────── */}
+      <View style={[styles.workspaceSection, { marginTop: 16 }]}>
+        <View style={[styles.sectionHeaderRow, isArabic && { flexDirection: 'row-reverse' }]}>
+          <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 8 }}>
+            <Ionicons name="link-outline" size={17} color={colors.primary} />
+            <Text style={styles.workspaceSectionTitle}>
+              {isArabic ? 'المهام المرتبطة بهذه المساحة' : 'Linked Tasks'}
+            </Text>
+            <View style={[styles.countBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.countBadgeText, { color: colors.textMuted }]}>
+                {categoryTasks.filter((t: any) => t.status === 'done').length}/{categoryTasks.length}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            onPress={() => setShowAddCategoryTask(!showAddCategoryTask)}
+            style={[styles.sectionPillBtn, { backgroundColor: showAddCategoryTask ? colors.surface : colors.primary + '18' }]}
+          >
+            <Ionicons name={showAddCategoryTask ? "close" : "add"} size={14} color={colors.primary} />
+            <Text style={[styles.sectionPillBtnText, { color: colors.primary }]}>
+              {showAddCategoryTask ? (isArabic ? 'إغلاق' : 'Close') : (isArabic ? 'إضافة مهمة' : 'Add Task')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {showAddCategoryTask && (
+          <View style={[styles.addInlineRow, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }, isArabic && { flexDirection: 'row-reverse' }]}>
+            <TextInput
+              style={[styles.inlineInput, { color: colors.text, textAlign: isArabic ? 'right' : 'left' }]}
+              placeholder={isArabic ? 'اكتب مهمة مرتبطة بهذه المساحة...' : 'Task for this space...'}
+              placeholderTextColor={colors.textMuted}
+              value={newCategoryTaskText}
+              onChangeText={setNewCategoryTaskText}
+              autoFocus
+              onSubmitEditing={async () => {
+                if (!newCategoryTaskText.trim() || !userId) return;
+                await addTodoMutation({
+                  userId,
+                  text: newCategoryTaskText.trim(),
+                  date: Date.now(),
+                  status: 'not_started',
+                  categoryId,
+                });
+                setNewCategoryTaskText('');
+                setShowAddCategoryTask(false);
+              }}
+            />
+            <TouchableOpacity
+              onPress={async () => {
+                if (!newCategoryTaskText.trim() || !userId) return;
+                await addTodoMutation({
+                  userId,
+                  text: newCategoryTaskText.trim(),
+                  date: Date.now(),
+                  status: 'not_started',
+                  categoryId,
+                });
+                setNewCategoryTaskText('');
+                setShowAddCategoryTask(false);
+              }}
+              style={[styles.inlineAddBtn, { backgroundColor: colors.primary }]}
+            >
+              <Ionicons name="arrow-up" size={16} color="#000" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {categoryTasks.length === 0 && !showAddCategoryTask ? (
+          <Text style={[styles.emptyText, { color: colors.textMuted, textAlign: isArabic ? 'right' : 'left', marginTop: 8 }]}>
+            {isArabic ? 'لا توجد مهام مخصصة لهذه المساحة مباشرة.' : 'No tasks linked directly to this space yet.'}
+          </Text>
+        ) : (
+          <View style={{ gap: 6, marginTop: 10 }}>
+            {categoryTasks.map((task: any) => {
+              const isDone = task.status === 'done';
+              return (
+                <View
+                  key={task._id}
+                  style={[
+                    styles.checklistItemRow,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: isDone ? colors.success + '40' : colors.border,
+                    },
+                    isArabic && { flexDirection: 'row-reverse' },
+                  ]}
+                >
+                  <TouchableOpacity
+                    onPress={() => updateTodoStatus({ id: task._id, status: isDone ? 'not_started' : 'done' })}
+                    style={styles.checkboxTouchable}
+                  >
+                    <Ionicons
+                      name={isDone ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={20}
+                      color={isDone ? '#34D399' : colors.border}
+                    />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    onPress={() => setSelectedTaskForDetail(task._id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.checkItemText,
+                        {
+                          color: isDone ? colors.textMuted : colors.text,
+                          textDecorationLine: isDone ? 'line-through' : 'none',
+                          opacity: isDone ? 0.6 : 1,
+                          textAlign: isArabic ? 'right' : 'left',
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {task.text}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setSelectedTaskForDetail(task._id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Ionicons name="open-outline" size={16} color={colors.textMuted} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+
+      <UniversalLinkPickerModal
+        visible={isGoalPickerVisible}
+        onClose={() => setIsGoalPickerVisible(false)}
+        onSelect={(selection) => {
+          if (selection.type === 'goal') {
+            linkCategoryToGoal({ categoryId, goalId: selection.goalId });
+          } else if (selection.type === 'none') {
+            linkCategoryToGoal({ categoryId, goalId: undefined });
+          }
+          setIsGoalPickerVisible(false);
+        }}
+        currentGoalId={category?.goalId}
+      />
+
+      <TaskDetailModal
+        visible={!!selectedTaskForDetail}
+        onClose={() => setSelectedTaskForDetail(null)}
+        todoId={selectedTaskForDetail}
+      />
     </ScrollView>
   );
 };
@@ -1274,6 +1495,7 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId,
   const { language } = useAuth();
   const { isArabic } = useTranslation(language);
   const project = useOfflineQuery<any>('projects.getProject', api.projects.getProject, { id: projectId });
+  const linkedGoal = useOfflineQuery<any>('yearlyGoals.getGoal', api.yearlyGoals.getGoal, project?.goalId ? { id: project.goalId } : 'skip');
   const resources = useOfflineQuery<any[]>('projects.getProjectResources', api.projects.getProjectResources, { projectId });
   const checklists = useOfflineQuery<any[]>('projects.getChecklists', api.projects.getChecklists, { projectId });
   const linkedTodos = useOfflineQuery<any[]>('projects.getTodosByProject', api.projects.getTodosByProject, project ? { projectId: project._id } : 'skip');
@@ -1282,6 +1504,7 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId,
   const deleteResource = useOfflineMutation(api.projects.deleteResource, 'projects:deleteResource');
   const updateTodoStatus = useOfflineMutation(api.todos.updateStatus, 'todos:updateStatus');
   const updateProject = useOfflineMutation(api.projects.updateProject, 'projects:updateProject');
+  const linkProjectToGoal = useOfflineMutation(api.projects.linkProjectToGoal, 'projects:linkProjectToGoal');
   const addCheckItem = useOfflineMutation(api.projects.addChecklistItem, 'projects:addChecklistItem');
   const toggleCheckItem = useOfflineMutation(api.projects.toggleChecklistItem, 'projects:toggleChecklistItem');
   const deleteCheckItem = useOfflineMutation(api.projects.deleteChecklistItem, 'projects:deleteChecklistItem');
@@ -1289,6 +1512,8 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId,
   const addTodoMutation = useOfflineMutation(api.todos.addTodo, 'todos:addTodo');
   const setTimerMutation = useOfflineMutation(api.todos.setTimer, 'todos:setTimer');
   const linkTodoProjectMutation = useOfflineMutation(api.todos.linkTask, 'todos:linkTask');
+
+  const [isGoalPickerVisible, setIsGoalPickerVisible] = useState(false);
 
   const [tasksOpen, setTasksOpen] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(false);
@@ -1399,7 +1624,52 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId,
             <View style={[styles.detailIconWrap, { backgroundColor: project.color + '22' }]}><Ionicons name={project.icon as any} size={32} color={project.color} /></View>
             <View style={{ flex: 1 }}>
               <Text style={styles.detailHeroTitle}>{project.name}</Text>
-              <View style={[styles.detailHeroStatus, { backgroundColor: sc.bg }]}><Text style={[styles.detailHeroStatusText, { color: sc.text }]}>{project.status || 'active'}</Text></View>
+              <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                <View style={[styles.detailHeroStatus, { backgroundColor: sc.bg }]}><Text style={[styles.detailHeroStatusText, { color: sc.text }]}>{project.status || 'active'}</Text></View>
+                
+                {linkedGoal ? (
+                  <TouchableOpacity
+                    onPress={() => setIsGoalPickerVisible(true)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: '#8B5CF620',
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#8B5CF640',
+                    }}
+                  >
+                    <Ionicons name="flag" size={11} color="#8B5CF6" />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#8B5CF6' }} numberOfLines={1}>
+                      {linkedGoal.title}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => setIsGoalPickerVisible(true)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      backgroundColor: colors.surface,
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderStyle: 'dashed',
+                    }}
+                  >
+                    <Ionicons name="flag-outline" size={11} color={colors.textMuted} />
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: colors.textMuted }}>
+                      {isArabic ? '+ هدف' : '+ Goal'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             <TouchableOpacity 
               onPress={() => {
@@ -1773,13 +2043,15 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId,
         initialDate={todos.find(t => t._id === selectedTodoId)?.date}
       />
 
-      <ProjectPickerModal
+      <UniversalLinkPickerModal
         visible={isProjectModalVisible}
         onClose={() => { setProjectModalVisible(false); setSelectedTodoId(null); }}
         onSelect={(selection) => { 
           if (!selectedTodoId) return;
           if (selection.type === 'none') {
-            linkTodoProjectMutation({ id: selectedTodoId, categoryId: undefined, subCategoryId: undefined, projectId: undefined });
+            linkTodoProjectMutation({ id: selectedTodoId, categoryId: undefined, subCategoryId: undefined, projectId: undefined, goalId: undefined });
+          } else if (selection.type === 'goal') {
+            linkTodoProjectMutation({ id: selectedTodoId, goalId: selection.goalId });
           } else if (selection.type === 'category') {
             linkTodoProjectMutation({ id: selectedTodoId, categoryId: selection.categoryId, subCategoryId: undefined, projectId: undefined });
           } else if (selection.type === 'subCategory') {
@@ -1788,6 +2060,20 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId,
             linkTodoProjectMutation({ id: selectedTodoId, categoryId: undefined, subCategoryId: undefined, projectId: selection.projectId });
           }
         }}
+      />
+
+      <UniversalLinkPickerModal
+        visible={isGoalPickerVisible}
+        onClose={() => setIsGoalPickerVisible(false)}
+        onSelect={(selection) => {
+          if (selection.type === 'goal') {
+            linkProjectToGoal({ projectId: project._id, goalId: selection.goalId });
+          } else if (selection.type === 'none') {
+            linkProjectToGoal({ projectId: project._id, goalId: undefined });
+          }
+          setIsGoalPickerVisible(false);
+        }}
+        currentGoalId={project?.goalId}
       />
 
       <ActionModal 

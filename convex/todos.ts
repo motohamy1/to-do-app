@@ -1,6 +1,9 @@
 import { v } from "convex/values";
 import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
 import { api, internal } from "./_generated/api";
+import { Doc } from "./_generated/dataModel";
+import { taskStatusValidator } from "./schema";
+import { insertWithLocalId } from "./idempotency";
 
 
 export const get = query({
@@ -93,10 +96,22 @@ export const addTodo = mutation({
     priority: v.optional(v.string()),
     categoryId: v.optional(v.id("projectCategories")),
     subCategoryId: v.optional(v.id("projectSubCategories")),
+    goalId: v.optional(v.id("yearlyGoals")),
     type: v.optional(v.string()),
     hashtags: v.optional(v.array(v.string())),
+    localId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Idempotent replay guard: if the same client-generated localId already
+    // created a doc, return it instead of inserting a duplicate.
+    if (args.localId) {
+      const existing = await ctx.db
+        .query("todos")
+        .withIndex("by_local_id", (q) => q.eq("localId", args.localId))
+        .first();
+      if (existing) return existing._id;
+    }
+
     let finalStatus = args.status;
     if (!finalStatus) {
       finalStatus = "not_started";
@@ -119,8 +134,10 @@ export const addTodo = mutation({
       ...(args.priority !== undefined && { priority: args.priority }),
       ...(args.categoryId !== undefined && { categoryId: args.categoryId }),
       ...(args.subCategoryId !== undefined && { subCategoryId: args.subCategoryId }),
+      ...(args.goalId !== undefined && { goalId: args.goalId }),
       ...(args.type !== undefined && { type: args.type }),
       ...(args.hashtags !== undefined && { hashtags: args.hashtags }),
+      ...(args.localId && { localId: args.localId }),
       ...(args.status === 'done' && { completedAt: Date.now() }),
     });
 
@@ -360,6 +377,58 @@ export const pauseTimer = mutation({
   }
 });
 
+// Deterministic, replay-safe timer/status write used by the offline queue.
+// The client computes the exact intended state at action time (server-corrected
+// clock); applying the same updates twice yields the same result.
+export const setTimerRunState = mutation({
+  args: {
+    updates: v.array(
+      v.object({
+        id: v.id("todos"),
+        status: taskStatusValidator,
+        timerStartTime: v.optional(v.union(v.number(), v.null())),
+        timeLeftAtPause: v.optional(v.union(v.number(), v.null())),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    const serverTime = Date.now();
+    for (const update of args.updates) {
+      const todo = await ctx.db.get(update.id);
+      if (!todo) continue;
+
+      const patch: Partial<Doc<"todos">> = { status: update.status };
+      const todoHasTimer = todo.timerDirection === "up" || !!todo.timerDuration;
+      if (update.status === "in_progress") {
+        if (todoHasTimer) {
+          patch.timerStartTime =
+            typeof update.timerStartTime === "number" ? update.timerStartTime : serverTime;
+          patch.timeLeftAtPause = undefined;
+          if (!todo.timerFirstStartTime) patch.timerFirstStartTime = serverTime;
+        }
+      } else if (update.status === "paused") {
+        patch.timerStartTime = undefined;
+        if (typeof update.timeLeftAtPause === "number") {
+          patch.timeLeftAtPause = update.timeLeftAtPause;
+        } else if (todo.status === "in_progress" && todo.timerStartTime) {
+          const elapsed = serverTime - todo.timerStartTime;
+          patch.timeLeftAtPause =
+            todo.timerDirection === "up"
+              ? elapsed
+              : todo.timerDuration
+                ? Math.max(0, todo.timerDuration - elapsed)
+                : todo.timeLeftAtPause;
+        }
+      } else {
+        patch.timerStartTime = undefined;
+        if (update.status === "done") patch.completedAt = serverTime;
+      }
+      await ctx.db.patch(update.id, patch);
+    }
+    return { serverTime };
+  },
+});
+
 // Start a subtask timer and sync the parent timer
 export const startSubtaskTimer = mutation({
   args: { id: v.id("todos") },
@@ -505,6 +574,7 @@ export const updateTodo = mutation({
     timerDirection: v.optional(v.string()),
     categoryId: v.optional(v.id("projectCategories")),
     subCategoryId: v.optional(v.id("projectSubCategories")),
+    goalId: v.optional(v.id("yearlyGoals")),
     type: v.optional(v.string()),
     dueDate: v.optional(v.number()),
     date: v.optional(v.number()),
@@ -582,16 +652,49 @@ export const linkTask = mutation({
     categoryId: v.optional(v.id("projectCategories")),
     subCategoryId: v.optional(v.id("projectSubCategories")),
     projectId: v.optional(v.string()),
+    goalId: v.optional(v.id("yearlyGoals")),
   },
   handler: async (ctx, args) => {
     const { id, ...links } = args;
-    // Unset all link fields if none provided (unlink)
     const patch: Record<string, any> = {};
-    const hasLinks = links.categoryId !== undefined || links.subCategoryId !== undefined || links.projectId !== undefined;
-    patch.categoryId = hasLinks ? links.categoryId : undefined;
-    patch.subCategoryId = hasLinks ? links.subCategoryId : undefined;
-    patch.projectId = hasLinks ? links.projectId : undefined;
+    patch.categoryId = links.categoryId !== undefined ? links.categoryId : undefined;
+    patch.subCategoryId = links.subCategoryId !== undefined ? links.subCategoryId : undefined;
+    patch.projectId = links.projectId !== undefined ? links.projectId : undefined;
+    patch.goalId = links.goalId !== undefined ? links.goalId : undefined;
     await ctx.db.patch(id, patch);
+  },
+});
+
+export const getTasksByGoal = query({
+  args: { goalId: v.id("yearlyGoals") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("todos")
+      .withIndex("by_goal", (q) => q.eq("goalId", args.goalId))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const getTasksByCategory = query({
+  args: { categoryId: v.id("projectCategories") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("todos")
+      .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const getTasksByProject = query({
+  args: { projectId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("todos")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .order("desc")
+      .collect();
   },
 });
 
@@ -635,12 +738,12 @@ export const addTaskChecklistItem = mutation({
     userId: v.union(v.id("users"), v.string()),
     todoId: v.id("todos"),
     text: v.string(),
+    localId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("taskChecklists", {
-      userId: args.userId,
-      todoId: args.todoId,
-      text: args.text,
+    const { localId, ...fields } = args;
+    return await insertWithLocalId(ctx, "taskChecklists", localId, {
+      ...fields,
       isCompleted: false,
     });
   },

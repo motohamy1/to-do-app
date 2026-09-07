@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { insertWithLocalId } from "./idempotency";
 
 const goalMeta = v.object({
   description: v.optional(v.string()),
@@ -7,6 +8,11 @@ const goalMeta = v.object({
   color: v.optional(v.string()),
   icon: v.optional(v.string()),
   templateId: v.optional(v.string()),
+  categoryId: v.optional(v.id("projectCategories")),
+  subCategoryId: v.optional(v.id("projectSubCategories")),
+  projectId: v.optional(v.string()),
+  tag: v.optional(v.string()),
+  hashtags: v.optional(v.array(v.string())),
   milestones: v.optional(
     v.array(
       v.object({
@@ -19,6 +25,50 @@ const goalMeta = v.object({
 });
 
 const achievementMeta = goalMeta.omit("milestones");
+
+export const getGoal = query({
+  args: { id: v.id("yearlyGoals") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.id);
+  },
+});
+
+export const getGoalsByCategory = query({
+  args: { categoryId: v.id("projectCategories") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("yearlyGoals")
+      .withIndex("by_category", (q) => q.eq("categoryId", args.categoryId))
+      .collect();
+  },
+});
+
+export const getGoalsByProject = query({
+  args: { projectId: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("yearlyGoals")
+      .withIndex("by_project", (q) => q.eq("projectId", args.projectId))
+      .collect();
+  },
+});
+
+export const linkGoal = mutation({
+  args: {
+    id: v.id("yearlyGoals"),
+    categoryId: v.optional(v.id("projectCategories")),
+    subCategoryId: v.optional(v.id("projectSubCategories")),
+    projectId: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const { id, ...links } = args;
+    const patch: Record<string, any> = {};
+    patch.categoryId = links.categoryId !== undefined ? links.categoryId : undefined;
+    patch.subCategoryId = links.subCategoryId !== undefined ? links.subCategoryId : undefined;
+    patch.projectId = links.projectId !== undefined ? links.projectId : undefined;
+    await ctx.db.patch(id, patch);
+  },
+});
 
 export const getGoals = query({
   args: { userId: v.union(v.id("users"), v.string()), year: v.number() },
@@ -49,11 +99,12 @@ export const addGoal = mutation({
     userId: v.union(v.id("users"), v.string()),
     year: v.number(),
     text: v.string(),
+    localId: v.optional(v.string()),
     ...goalMeta.fields,
   },
   handler: async (ctx, args) => {
-    const { userId, year, text, ...meta } = args;
-    return await ctx.db.insert("yearlyGoals", {
+    const { userId, year, text, localId, ...meta } = args;
+    return await insertWithLocalId(ctx, "yearlyGoals", localId, {
       userId,
       year,
       text,
@@ -73,6 +124,11 @@ export const updateGoal = mutation({
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
     templateId: v.optional(v.string()),
+    categoryId: v.optional(v.id("projectCategories")),
+    subCategoryId: v.optional(v.id("projectSubCategories")),
+    projectId: v.optional(v.string()),
+    tag: v.optional(v.string()),
+    hashtags: v.optional(v.array(v.string())),
     milestones: v.optional(
       v.array(
         v.object({
@@ -133,11 +189,12 @@ export const addAchievement = mutation({
     userId: v.union(v.id("users"), v.string()),
     year: v.number(),
     text: v.string(),
+    localId: v.optional(v.string()),
     ...achievementMeta.fields,
   },
   handler: async (ctx, args) => {
-    const { userId, year, text, ...meta } = args;
-    return await ctx.db.insert("yearlyAchievements", {
+    const { userId, year, text, localId, ...meta } = args;
+    return await insertWithLocalId(ctx, "yearlyAchievements", localId, {
       userId,
       year,
       text,
@@ -212,11 +269,12 @@ export const addMonthGoal = mutation({
     year: v.number(),
     month: v.number(),
     text: v.string(),
+    localId: v.optional(v.string()),
     ...goalMeta.fields,
   },
   handler: async (ctx, args) => {
-    const { userId, year, month, text, ...meta } = args;
-    return await ctx.db.insert("yearlyGoals", {
+    const { userId, year, month, text, localId, ...meta } = args;
+    return await insertWithLocalId(ctx, "yearlyGoals", localId, {
       userId,
       year,
       month,
@@ -235,11 +293,12 @@ export const addDayGoal = mutation({
     month: v.number(),
     day: v.number(),
     text: v.string(),
+    localId: v.optional(v.string()),
     ...goalMeta.fields,
   },
   handler: async (ctx, args) => {
-    const { userId, year, month, day, text, ...meta } = args;
-    return await ctx.db.insert("yearlyGoals", {
+    const { userId, year, month, day, text, localId, ...meta } = args;
+    return await insertWithLocalId(ctx, "yearlyGoals", localId, {
       userId,
       year,
       month,
@@ -284,11 +343,12 @@ export const addMonthAchievement = mutation({
     year: v.number(),
     month: v.number(),
     text: v.string(),
+    localId: v.optional(v.string()),
     ...achievementMeta.fields,
   },
   handler: async (ctx, args) => {
-    const { userId, year, month, text, ...meta } = args;
-    return await ctx.db.insert("yearlyAchievements", {
+    const { userId, year, month, text, localId, ...meta } = args;
+    return await insertWithLocalId(ctx, "yearlyAchievements", localId, {
       userId,
       year,
       month,
@@ -307,11 +367,12 @@ export const addDayAchievement = mutation({
     month: v.number(),
     day: v.number(),
     text: v.string(),
+    localId: v.optional(v.string()),
     ...achievementMeta.fields,
   },
   handler: async (ctx, args) => {
-    const { userId, year, month, day, text, ...meta } = args;
-    return await ctx.db.insert("yearlyAchievements", {
+    const { userId, year, month, day, text, localId, ...meta } = args;
+    return await insertWithLocalId(ctx, "yearlyAchievements", localId, {
       userId,
       year,
       month,

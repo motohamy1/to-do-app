@@ -40,6 +40,7 @@ import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { AIChatMessage } from '@/types/voiceNote';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboard } from '@/hooks/useKeyboard';
 
 const NoteHeader = React.memo(({ 
   title, 
@@ -140,23 +141,7 @@ export default function NoteDetailScreen() {
 
   type ActiveMenuType = 'none' | 'typography' | 'fontFamily' | 'fontSize' | 'color';
   const [activeMenu, setActiveMenu] = useState<ActiveMenuType>('none');
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-
-  useEffect(() => {
-    const showSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => setIsKeyboardVisible(true)
-    );
-    const hideSub = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setIsKeyboardVisible(false)
-    );
-
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
+  const { keyboardHeight, isKeyboardVisible } = useKeyboard();
 
   const keepCaretVisible = useCallback((y: number | null) => {
     if (y === null && activeLineYRef.current) y = activeLineYRef.current.y;
@@ -175,9 +160,14 @@ export default function NoteDetailScreen() {
 
   useEffect(() => {
     if (activeLineYRef.current && isKeyboardVisible) {
-      keepCaretVisible(activeLineYRef.current.y);
+      const timer = setTimeout(() => {
+        if (activeLineYRef.current) {
+          keepCaretVisible(activeLineYRef.current.y);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [isKeyboardVisible, keepCaretVisible]);
+  }, [isKeyboardVisible, keyboardHeight, keepCaretVisible]);
 
   // Custom Calendar State
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -736,7 +726,7 @@ export default function NoteDetailScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{ 
             paddingTop: insets.top + 60,
-            paddingBottom: isKeyboardVisible ? 30 : Math.max(insets.bottom + 20, 36),
+            paddingBottom: isKeyboardVisible ? 140 : Math.max(insets.bottom + 20, 80),
             flexGrow: 1,
           }}
           keyboardShouldPersistTaps="handled"

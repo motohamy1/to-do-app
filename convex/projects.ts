@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { insertWithLocalId } from "./idempotency";
 
 // ─── Project Categories ───────────────────────────────────────────────────────
 
@@ -35,16 +36,12 @@ export const addCategory = mutation({
     color: v.string(),
     description: v.optional(v.string()),
     tag: v.optional(v.string()),
+    goalId: v.optional(v.id("yearlyGoals")),
+    localId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("projectCategories", {
-      userId: args.userId,
-      name: args.name,
-      icon: args.icon,
-      color: args.color,
-      description: args.description,
-      tag: args.tag,
-    });
+    const { localId, ...fields } = args;
+    return await insertWithLocalId(ctx, "projectCategories", localId, fields);
   },
 });
 
@@ -56,6 +53,7 @@ export const updateCategory = mutation({
     color: v.optional(v.string()),
     description: v.optional(v.string()),
     tag: v.optional(v.string()),
+    goalId: v.optional(v.id("yearlyGoals")),
   },
   handler: async (ctx, args) => {
     const { id, ...fields } = args;
@@ -126,15 +124,11 @@ export const addSubCategory = mutation({
     name: v.string(),
     icon: v.string(),
     color: v.string(),
+    localId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("projectSubCategories", {
-      userId: args.userId,
-      categoryId: args.categoryId,
-      name: args.name,
-      icon: args.icon,
-      color: args.color,
-    });
+    const { localId, ...fields } = args;
+    return await insertWithLocalId(ctx, "projectSubCategories", localId, fields);
   },
 });
 
@@ -224,17 +218,14 @@ export const addProject = mutation({
     color: v.string(),
     icon: v.string(),
     status: v.optional(v.string()),
+    goalId: v.optional(v.id("yearlyGoals")),
+    localId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("projects", {
-      userId: args.userId,
-      categoryId: args.categoryId,
-      subCategoryId: args.subCategoryId,
-      name: args.name,
-      description: args.description,
-      color: args.color,
-      icon: args.icon,
-      status: args.status || "active",
+    const { localId, ...fields } = args;
+    return await insertWithLocalId(ctx, "projects", localId, {
+      ...fields,
+      status: fields.status || "active",
     });
   },
 });
@@ -247,6 +238,7 @@ export const updateProject = mutation({
     color: v.optional(v.string()),
     icon: v.optional(v.string()),
     status: v.optional(v.string()),
+    goalId: v.optional(v.id("yearlyGoals")),
   },
   handler: async (ctx, args) => {
     const { id, ...fields } = args;
@@ -256,7 +248,48 @@ export const updateProject = mutation({
     if (fields.color !== undefined) patch.color = fields.color;
     if (fields.icon !== undefined) patch.icon = fields.icon;
     if (fields.status !== undefined) patch.status = fields.status;
+    if (fields.goalId !== undefined) patch.goalId = fields.goalId;
     await ctx.db.patch(id, patch);
+  },
+});
+
+export const linkProjectToGoal = mutation({
+  args: {
+    id: v.id("projects"),
+    goalId: v.optional(v.id("yearlyGoals")),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { goalId: args.goalId });
+  },
+});
+
+export const linkCategoryToGoal = mutation({
+  args: {
+    id: v.id("projectCategories"),
+    goalId: v.optional(v.id("yearlyGoals")),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.id, { goalId: args.goalId });
+  },
+});
+
+export const getProjectsByGoal = query({
+  args: { goalId: v.id("yearlyGoals") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("projects")
+      .withIndex("by_goal", (q) => q.eq("goalId", args.goalId))
+      .collect();
+  },
+});
+
+export const getCategoriesByGoal = query({
+  args: { goalId: v.id("yearlyGoals") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("projectCategories")
+      .withIndex("by_goal", (q) => q.eq("goalId", args.goalId))
+      .collect();
   },
 });
 
@@ -315,16 +348,11 @@ export const addResource = mutation({
     title: v.string(),
     url: v.optional(v.string()),
     note: v.optional(v.string()),
+    localId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("projectResources", {
-      userId: args.userId,
-      projectId: args.projectId,
-      type: args.type,
-      title: args.title,
-      url: args.url,
-      note: args.note,
-    });
+    const { localId, ...fields } = args;
+    return await insertWithLocalId(ctx, "projectResources", localId, fields);
   },
 });
 
@@ -351,13 +379,13 @@ export const addChecklistItem = mutation({
   args: { 
     userId: v.union(v.id("users"), v.string()),
     projectId: v.id("projects"), 
-    text: v.string() 
+    text: v.string(),
+    localId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("projectChecklists", {
-      userId: args.userId,
-      projectId: args.projectId,
-      text: args.text,
+    const { localId, ...fields } = args;
+    return await insertWithLocalId(ctx, "projectChecklists", localId, {
+      ...fields,
       isCompleted: false,
     });
   },
@@ -428,15 +456,12 @@ export const addCategoryItem = mutation({
     listType: v.string(),
     text: v.string(),
     content: v.optional(v.string()),
+    localId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("categoryItems", {
-      userId: args.userId,
-      categoryId: args.categoryId,
-      subCategoryId: args.subCategoryId,
-      listType: args.listType,
-      text: args.text,
-      content: args.content,
+    const { localId, ...rest } = args;
+    return await insertWithLocalId(ctx, "categoryItems", localId, {
+      ...rest,
       isCompleted: false,
       isExpanded: args.listType === "toggle" ? false : undefined,
       order: Date.now(),
@@ -496,14 +521,12 @@ export const addPlannerItem = mutation({
     listType: v.string(),
     text: v.string(),
     content: v.optional(v.string()),
+    localId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("categoryItems", {
-      userId: args.userId,
-      date: args.date,
-      listType: args.listType,
-      text: args.text,
-      content: args.content,
+    const { localId, ...rest } = args;
+    return await insertWithLocalId(ctx, "categoryItems", localId, {
+      ...rest,
       isCompleted: false,
       isExpanded: args.listType === "toggle" ? false : undefined,
       order: Date.now(),

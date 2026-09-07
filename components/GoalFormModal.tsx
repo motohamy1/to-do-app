@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
 import LivePress from '@/components/LivePress';
+import { useKeyboard } from '@/hooks/useKeyboard';
+
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
+import { useOfflineQuery } from '@/hooks/useOfflineQuery';
+import { UniversalLinkPickerModal, UniversalLinkSelection } from './UniversalLinkPickerModal';
 
 export interface MilestoneItem {
   id: string;
@@ -32,6 +39,9 @@ export interface GoalFormData {
   milestones?: MilestoneItem[];
   isCompleted?: boolean;
   _type: 'goal' | 'achievement';
+  categoryId?: Id<'projectCategories'>;
+  subCategoryId?: Id<'projectSubCategories'>;
+  projectId?: string;
 }
 
 interface GoalFormModalProps {
@@ -84,6 +94,9 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
   onDelete,
 }) => {
   const { colors, isDarkMode } = useTheme();
+  const { height: screenHeight } = useWindowDimensions();
+  const { keyboardHeight, isKeyboardVisible } = useKeyboard();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const isEdit = mode === 'edit' || (item && item._id);
   const [type, setType] = useState<'goal' | 'achievement'>('goal');
@@ -98,6 +111,15 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
   const [newMilestoneText, setNewMilestoneText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Linked Space / Project State
+  const [linkedCategoryId, setLinkedCategoryId] = useState<Id<'projectCategories'> | undefined>(undefined);
+  const [linkedSubCategoryId, setLinkedSubCategoryId] = useState<Id<'projectSubCategories'> | undefined>(undefined);
+  const [linkedProjectId, setLinkedProjectId] = useState<string | undefined>(undefined);
+  const [isLinkPickerOpen, setIsLinkPickerOpen] = useState(false);
+
+  const linkedProjectMeta = useOfflineQuery<any>('projects.getProjectMetadata', api.projects.getProjectMetadata, linkedProjectId ? { id: linkedProjectId } : 'skip');
+  const linkedCategoryMeta = useOfflineQuery<any>('projects.getCategory', api.projects.getCategory, linkedCategoryId ? { id: linkedCategoryId } : 'skip');
+
   useEffect(() => {
     if (visible) {
       if (item) {
@@ -108,6 +130,9 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
         setColor(item.color || (item._type === 'achievement' ? '#059669' : '#EA580C'));
         setIcon(item.icon || (item._type === 'achievement' ? 'trophy-outline' : 'flag-outline'));
         setMilestones(item.milestones ? [...item.milestones] : []);
+        setLinkedCategoryId(item.categoryId);
+        setLinkedSubCategoryId(item.subCategoryId);
+        setLinkedProjectId(item.projectId);
       } else {
         // Reset for Create Mode
         setType('goal');
@@ -117,10 +142,14 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
         setColor('#EA580C');
         setIcon('flag-outline');
         setMilestones([]);
+        setLinkedCategoryId(undefined);
+        setLinkedSubCategoryId(undefined);
+        setLinkedProjectId(undefined);
       }
       setCustomCategoryInput('');
       setIsAddingCustomCategory(false);
       setNewMilestoneText('');
+      setIsLinkPickerOpen(false);
     }
   }, [item, initialCategory, visible]);
 
@@ -189,6 +218,9 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
         milestones: type === 'goal' ? milestones : undefined,
         isCompleted: item?.isCompleted || false,
         _type: type,
+        categoryId: linkedCategoryId,
+        subCategoryId: linkedSubCategoryId,
+        projectId: linkedProjectId,
       });
       onClose();
     } catch (err) {
@@ -225,11 +257,19 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
 
   return (
     <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.modalOverlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+      <View style={styles.modalOverlay}>
+        <View 
+          style={[
+            styles.modalSheet, 
+            { 
+              backgroundColor: colors.surface,
+              marginBottom: keyboardHeight,
+              maxHeight: isKeyboardVisible 
+                ? Math.max(300, screenHeight - keyboardHeight - (Platform.OS === 'ios' ? 44 : 28)) 
+                : '90%',
+            }
+          ]}
+        >
           {/* Header */}
           <View style={[styles.headerRow, isArabic && styles.rowReverse]}>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -256,6 +296,7 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
           </View>
 
           <ScrollView
+            ref={scrollViewRef}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
@@ -481,6 +522,75 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
               </View>
             </View>
 
+            {/* ─── Link to Space / Project ─── */}
+            <View style={{ marginTop: 20 }}>
+              <Text style={[styles.inputLabel, { color: colors.text, fontWeight: '800', textAlign: isArabic ? 'right' : 'left' }]}>
+                {isArabic ? 'الارتباط بمساحة أو مشروع' : 'Linked Space / Project'}
+              </Text>
+
+              {linkedProjectId || linkedCategoryId ? (
+                <View style={{
+                  flexDirection: isArabic ? 'row-reverse' : 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: color + '15',
+                  borderRadius: 14,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  borderWidth: 1,
+                  borderColor: color + '30',
+                  marginTop: 8,
+                }}>
+                  <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <Ionicons name="folder-open-outline" size={20} color={color} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '600', textAlign: isArabic ? 'right' : 'left' }}>
+                        {isArabic ? 'المساحة أو المشروع المرتبط' : 'Connected Context'}
+                      </Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, textAlign: isArabic ? 'right' : 'left' }} numberOfLines={1}>
+                        {linkedProjectMeta?.name || linkedCategoryMeta?.name || 'Linked Item'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TouchableOpacity onPress={() => setIsLinkPickerOpen(true)} style={{ padding: 4 }}>
+                      <Ionicons name="pencil" size={16} color={color} />
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => {
+                      setLinkedCategoryId(undefined);
+                      setLinkedSubCategoryId(undefined);
+                      setLinkedProjectId(undefined);
+                    }} style={{ padding: 4 }}>
+                      <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => setIsLinkPickerOpen(true)}
+                  style={{
+                    flexDirection: isArabic ? 'row-reverse' : 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    paddingVertical: 12,
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    borderStyle: 'dashed',
+                    backgroundColor: isDarkMode ? '#1E1E28' : '#F9FAFB',
+                    marginTop: 8,
+                  }}
+                >
+                  <Ionicons name="link-outline" size={18} color={colors.textMuted} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: colors.textMuted }}>
+                    {isArabic ? '+ ربط بمساحة أو مشروع' : '+ Connect to Space or Project'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
             {/* Sub-Milestones Checklist (Only for Goals) */}
             {type === 'goal' && (
               <View style={{ marginTop: 20 }}>
@@ -555,6 +665,9 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
                     placeholderTextColor={colors.textMuted}
                     value={newMilestoneText}
                     onChangeText={setNewMilestoneText}
+                    onFocus={() => {
+                      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150);
+                    }}
                     onSubmitEditing={handleAddMilestone}
                   />
                   {newMilestoneText.trim().length > 0 && (
@@ -605,8 +718,34 @@ export const GoalFormModal: React.FC<GoalFormModalProps> = ({
               )}
             </LivePress>
           </View>
+
+          <UniversalLinkPickerModal
+            visible={isLinkPickerOpen}
+            onClose={() => setIsLinkPickerOpen(false)}
+            onSelect={(selection) => {
+              if (selection.type === 'category') {
+                setLinkedCategoryId(selection.categoryId);
+                setLinkedSubCategoryId(undefined);
+                setLinkedProjectId(undefined);
+              } else if (selection.type === 'subCategory') {
+                setLinkedCategoryId(selection.categoryId);
+                setLinkedSubCategoryId(selection.subCategoryId);
+                setLinkedProjectId(undefined);
+              } else if (selection.type === 'project') {
+                setLinkedProjectId(selection.projectId);
+                setLinkedCategoryId(undefined);
+                setLinkedSubCategoryId(undefined);
+              } else if (selection.type === 'none') {
+                setLinkedCategoryId(undefined);
+                setLinkedSubCategoryId(undefined);
+                setLinkedProjectId(undefined);
+              }
+            }}
+            currentCategoryId={linkedCategoryId}
+            currentProjectId={linkedProjectId}
+          />
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };

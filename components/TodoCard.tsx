@@ -5,7 +5,9 @@ import { useOfflineMutation } from '@/hooks/useOfflineMutation';
 import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import useTheme, { ShadowPreset } from '@/hooks/useTheme';
 import { useTranslation } from '@/utils/i18n';
+import { getServerNow } from '@/utils/offlineStorage';
 import { showTaskCompletedNotification } from '@/utils/notifications';
+import { buildPauseUpdates, buildSubtaskPauseUpdates, buildSubtaskStartUpdates, startUpdate } from '@/utils/timerActions';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -50,6 +52,8 @@ interface TodoCardProps {
     priority?: string;
     categoryId?: Id<"projectCategories">;
     subCategoryId?: Id<"projectSubCategories">;
+    goalId?: Id<"yearlyGoals">;
+    hashtags?: string[];
   };
   onSetTimer: (id: Id<"todos">) => void;
   onLongPress?: (id: Id<"todos">) => void;
@@ -116,10 +120,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const { userId, language } = useAuth();
   const { t, isArabic } = useTranslation(language);
   const updateStatus = useOfflineMutation(api.todos.updateStatus, "todos:updateStatus");
-  const startTimer = useOfflineMutation(api.todos.startTimer, "todos:startTimer");
-  const pauseTimer = useOfflineMutation(api.todos.pauseTimer, "todos:pauseTimer");
-  const startSubtaskTimer = useOfflineMutation(api.todos.startSubtaskTimer, "todos:startSubtaskTimer");
-  const pauseSubtaskTimer = useOfflineMutation(api.todos.pauseSubtaskTimer, "todos:pauseSubtaskTimer");
+  const setTimerRunState = useOfflineMutation(api.todos.setTimerRunState, "todos:setTimerRunState");
   const deleteTodo = useOfflineMutation(api.todos.deleteTodo, "todos:deleteTodo");
   const updateTodo = useOfflineMutation(api.todos.updateTodo, "todos:updateTodo");
   const setTimer = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
@@ -128,6 +129,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
   const project = useOfflineQuery<any>('projects.getProjectMetadata', api.projects.getProjectMetadata, todo.projectId ? { id: todo.projectId } : "skip");
   const linkedCategory = useOfflineQuery<any>('projects.getCategory', api.projects.getCategory, todo.categoryId ? { id: todo.categoryId } : "skip");
   const linkedSubCategory = useOfflineQuery<any>('projects.getSubCategory', api.projects.getSubCategory, todo.subCategoryId ? { id: todo.subCategoryId } : "skip");
+  const linkedGoal = useOfflineQuery<any>('yearlyGoals.getGoal', api.yearlyGoals.getGoal, todo.goalId ? { id: todo.goalId } : "skip");
   const subtasks = useOfflineQuery<any[]>('todos.getSubtasks', api.todos.getSubtasks, { parentId: todo._id });
 
   const [timeLeft, setTimeLeft] = useState(todo.timerDuration || 0);
@@ -174,7 +176,7 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     let interval: any;
     if (effectiveStatus === 'in_progress' && todo.timerStartTime) {
       const tick = () => {
-        const elapsed = Math.max(0, Date.now() - todo.timerStartTime!);
+        const elapsed = Math.max(0, getServerNow() - todo.timerStartTime!);
         if (todo.timerDirection === 'up') {
           setTimeLeft(elapsed);
         } else if (todo.timerDuration) {
@@ -290,21 +292,32 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
 
   const handleStartTimer = async () => {
     setOptimisticStatus('in_progress'); // instant UI feedback
-    startTimer({ id: todo._id });
+    setTimerRunState({ updates: [startUpdate(todo)] });
   };
 
   const handlePauseTimer = async () => {
     setOptimisticStatus('paused'); // instant UI feedback
-    pauseTimer({ id: todo._id });
+    const updates = buildPauseUpdates(todo, (subtasks || []) as any[]);
+    if (updates.length === 0) {
+      updateStatus({ id: todo._id, status: 'paused' });
+      return;
+    }
+    setTimerRunState({ updates });
   };
 
   const handleStartSubtask = useCallback((subId: Id<"todos">) => {
-    startSubtaskTimer({ id: subId });
-  }, [startSubtaskTimer]);
+    const sub = (subtasks || []).find((s: any) => s._id === subId);
+    if (!sub) return;
+    setTimerRunState({ updates: buildSubtaskStartUpdates(sub as any, todo as any) });
+  }, [setTimerRunState, subtasks, todo]);
 
   const handlePauseSubtask = useCallback((subId: Id<"todos">) => {
-    pauseSubtaskTimer({ id: subId });
-  }, [pauseSubtaskTimer]);
+    const sub = (subtasks || []).find((s: any) => s._id === subId);
+    if (!sub) return;
+    const updates = buildSubtaskPauseUpdates(sub as any, (subtasks || []) as any[], todo as any);
+    if (updates.length === 0) return;
+    setTimerRunState({ updates });
+  }, [setTimerRunState, subtasks, todo]);
 
   const handleToggleSubComplete = useCallback((subId: Id<"todos">, currentStatus: string) => {
     updateStatus({ id: subId, status: currentStatus === 'done' ? 'not_started' : 'done' });
@@ -566,6 +579,48 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
                   {statusPillLabel}
                 </Text>
               </TouchableOpacity>
+
+              {/* Goal Pill */}
+              {linkedGoal && (
+                <View style={{
+                  backgroundColor: '#8B5CF620',
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: '#8B5CF640',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  maxWidth: 130,
+                }}>
+                  <Ionicons name="flag" size={11} color="#8B5CF6" />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#8B5CF6' }} numberOfLines={1}>
+                    {linkedGoal.title}
+                  </Text>
+                </View>
+              )}
+
+              {/* Space / Project Pill */}
+              {(project || linkedCategory) && (
+                <View style={{
+                  backgroundColor: (project?.color || colors.primary) + '20',
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: (project?.color || colors.primary) + '40',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  maxWidth: 120,
+                }}>
+                  <Ionicons name="folder-outline" size={11} color={project?.color || colors.primary} />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: project?.color || colors.primary }} numberOfLines={1}>
+                    {project?.name || linkedCategory?.name}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Right Info: Subtasks & Progression % */}

@@ -1,8 +1,8 @@
-import { getCacheKey, memoryCache, saveCachedQuery, subscribeToCache } from '@/utils/offlineStorage';
+import { applyOverlay, getCacheKey, getPendingTempTodosForCacheKey, memoryCache, reconcileOverlay, subscribeToCache } from '@/utils/offlineStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useQuery } from 'convex/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 const singleResultQueryKeys = [
   'auth.getUserSettings',
@@ -16,22 +16,49 @@ const singleResultQueryKeys = [
 const isEmptySingleResultCache = (queryKey: string, value: any) =>
   singleResultQueryKeys.includes(queryKey) && Array.isArray(value) && value.length === 0;
 
+// Only client-created temp docs are "offline ids". Real Convex ids must never
+// match, or the live subscription would be silently skipped.
 function hasOfflineId(args: any): boolean {
   if (!args || typeof args !== 'object' || args === 'skip') return false;
   for (const key of Object.keys(args)) {
+    if (key === 'localId') continue;
     const val = args[key];
-    if (typeof val === 'string') {
-      if (val.includes('_')) {
-        const lowerKey = key.toLowerCase();
-        if (lowerKey.endsWith('id') || lowerKey === 'id' || lowerKey === '_id' || lowerKey === 'parentid') {
-           return true;
-        }
-      }
+    if (typeof val === 'string' && val.startsWith('temp_') && /id$/i.test(key)) {
+      return true;
     } else if (typeof val === 'object' && val !== null) {
       if (hasOfflineId(val)) return true;
     }
   }
   return false;
+}
+
+// Re-apply unacknowledged optimistic state to whatever the server (or cache)
+// returned, so a subscription update can no longer wipe a fresh pause/start/
+// create until the server has echoed the same values (or the overlay TTLs).
+function withPendingState(cacheKey: string, data: any): any {
+  if (data === undefined || data === null) return data;
+
+  if (Array.isArray(data)) {
+    const merged = data.map((item: any) => {
+      if (item && typeof item === 'object') {
+        reconcileOverlay(item);
+        return applyOverlay(item);
+      }
+      return item;
+    });
+
+    const seen = new Set(merged.map((i: any) => i?._id));
+    const temps = getPendingTempTodosForCacheKey(cacheKey).filter((t: any) => !seen.has(t._id));
+    if (temps.length > 0) return [...temps, ...merged];
+    return merged;
+  }
+
+  if (typeof data === 'object' && data?._id) {
+    reconcileOverlay(data);
+    return applyOverlay(data);
+  }
+
+  return data;
 }
 
 export function useOfflineQuery<T = any>(queryKey: string, queryFn: any, args?: any): T | undefined {
@@ -95,43 +122,29 @@ export function useOfflineQuery<T = any>(queryKey: string, queryFn: any, args?: 
     return unsub;
   }, [cacheKey]);
 
-  // When live Convex server data arrives, update cache & persistence
+  // When live Convex server data arrives, update cache & persistence. The
+  // render-merged `withPendingState` below keeps un-acknowledged optimistic
+  // state visible, so this snapshot replacement is no longer destructive.
   useEffect(() => {
     if (convexData !== undefined) {
       memoryCache[cacheKey] = convexData;
+      AsyncStorage.setItem(cacheKey, JSON.stringify(convexData)).catch(() => {});
       setOfflineData(convexData);
-      saveCachedQuery(queryKey, args, convexData);
     }
-  }, [convexData, cacheKey, queryKey, args]);
+  }, [convexData, cacheKey]);
 
   // If offline or if live Convex data hasn't arrived yet (e.g. slow connection), serve cached data instantly
-  if (isOffline) {
-    if (offlineData !== undefined) return offlineData;
-    if (args !== 'skip' && !singleResultQueryKeys.includes(queryKey)) {
-      return [] as any;
-    }
-    return offlineData;
-  }
+  const base = isOffline
+    ? offlineData !== undefined
+      ? offlineData
+      : args !== 'skip' && !singleResultQueryKeys.includes(queryKey)
+        ? []
+        : offlineData
+    : convexData !== undefined
+      ? convexData
+      : offlineData;
 
-  if (convexData === undefined && offlineData !== undefined) {
-    return offlineData;
-  }
-
-  if (convexData === undefined && args !== 'skip' && !isOffline) {
-    // If we have an offline ID, the Convex query is skipped, so we will never get remote data.
-    // We must return empty defaults if there is no offline cache.
-    if (hasOfflineId(args)) {
-      if (!singleResultQueryKeys.includes(queryKey)) {
-        return [] as any;
-      }
-      return offlineData; // which might be undefined, that's fine for objects
-    }
-
-    // If waiting on slow network and no cache yet, return offlineData if available
-    if (!singleResultQueryKeys.includes(queryKey)) {
-      return offlineData;
-    }
-  }
-
-  return convexData !== undefined ? convexData : offlineData;
+  // Overlay pending optimistic changes and locally-created docs on every
+  // render; the raw server/cache snapshot above stays untouched.
+  return useMemo(() => withPendingState(cacheKey, base) as T | undefined, [base, cacheKey]);
 }

@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StatusBar, Animated, StyleSheet, BackHandler, KeyboardAvoidingView, Platform, FlatList, Share, TextInput, Dimensions, LayoutAnimation, PanResponder } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, StatusBar, Animated, StyleSheet, BackHandler, KeyboardAvoidingView, Platform, FlatList, Share, TextInput, Dimensions, LayoutAnimation, PanResponder, useWindowDimensions } from 'react-native';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
@@ -140,17 +140,24 @@ const Planner = () => {
   const monthStackRef = useRef<ScrollView>(null);
   const autoReturnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const { width: screenWidth } = useWindowDimensions();
+  const currentYear = new Date().getFullYear();
+  const [activeYear, setActiveYear] = useState(currentYear);
+  const years = useMemo(() => [currentYear - 1, currentYear, currentYear + 1, currentYear + 2], [currentYear]);
   const currentMonth = new Date().getMonth();
-  // Scroll year carousel to current year on mount
+
+  // Scroll year carousel to active/current year whenever viewing the month grid
   useEffect(() => {
-    const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
-    const currentIndex = years.indexOf(currentYear);
-    if (currentIndex !== -1 && yearScrollRef.current) {
-      setTimeout(() => {
-        yearScrollRef.current?.scrollTo({ x: currentIndex * screenWidth, animated: false });
-      }, 100);
+    if (selectedMonth === null) {
+      const targetYear = activeYear || currentYear;
+      const targetIdx = years.indexOf(targetYear);
+      const idx = targetIdx !== -1 ? targetIdx : years.indexOf(currentYear);
+      const timer = setTimeout(() => {
+        yearScrollRef.current?.scrollTo({ x: idx * screenWidth, animated: false });
+      }, 60);
+      return () => clearTimeout(timer);
     }
-  }, []);
+  }, [selectedMonth, activeYear, screenWidth, currentYear, years]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -195,34 +202,32 @@ const Planner = () => {
     })
   ).current;
 
-  // Handle system back button
-  useEffect(() => {
-    const backAction = () => {
-      if (selectedDay !== null) {
-        handleGoBack();
-        return true;
-      }
-      if (selectedMonth !== null) {
-        handleGoBack();
-        return true;
-      }
-      return false; // let default behavior happen
-    };
+  // Handle system back button ONLY when planner screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      const backAction = () => {
+        if (selectedDay !== null) {
+          handleGoBack();
+          return true;
+        }
+        if (selectedMonth !== null) {
+          handleGoBack();
+          return true;
+        }
+        return false; // let default behavior happen
+      };
 
-    const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      backAction
-    );
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        backAction
+      );
 
-    return () => backHandler.remove();
-  }, [selectedMonth, selectedDay, isFromHome]);
+      return () => backHandler.remove();
+    }, [selectedMonth, selectedDay, isFromHome])
+  );
 
   
   const todos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : "skip") || [];
-
-  const { width: screenWidth } = Dimensions.get('window');
-  const currentYear = new Date().getFullYear();
-  const [activeYear, setActiveYear] = useState(currentYear);
 
   const selectedDateTs = selectedDay !== null && selectedMonth !== null
     ? new Date(currentYear, selectedMonth, selectedDay).getTime()
@@ -272,7 +277,8 @@ const Planner = () => {
   };
 
   const renderMonthGrid = () => {
-    const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
+    const activeYearIndex = years.indexOf(activeYear);
+    const initialIndex = activeYearIndex !== -1 ? activeYearIndex : years.indexOf(currentYear);
 
     return (
       <ScrollView
@@ -290,6 +296,7 @@ const Planner = () => {
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: initialIndex * screenWidth, y: 0 }}
           onMomentumScrollEnd={(e) => {
             const pageIndex = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
             if (pageIndex >= 0 && pageIndex < years.length) {
@@ -1539,7 +1546,9 @@ const Planner = () => {
         {selectedMonth === null ? (
             renderMonthGrid()
         ) : selectedDay === null ? (
-            renderDayGrid(selectedMonth)
+            <View style={{ flex: 1 }} {...dayViewPanResponder.panHandlers}>
+              {renderDayGrid(selectedMonth)}
+            </View>
         ) : (
             <View style={{ flex: 1 }} {...dayViewPanResponder.panHandlers}>
               {renderSpecificDayView(selectedDay, selectedMonth, currentYear)}

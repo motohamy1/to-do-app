@@ -11,8 +11,13 @@ interface ProductivityTrendsProps {
 
 export const ProductivityTrends = ({ weekly, monthly, style }: ProductivityTrendsProps) => {
   const { colors } = useTheme();
-  
-  if (!weekly && !monthly) return null;
+
+  // useOfflineQuery returns [] as an offline/empty placeholder for non-single-result
+  // queries — normalize arrays to null so a missing period doesn't render a card.
+  const week = Array.isArray(weekly) ? null : weekly;
+  const month = Array.isArray(monthly) ? null : monthly;
+
+  if (!week && !month) return null;
   
   const formatTrend = (current: number, previous: number) => {
     if (!previous) return { text: 'New', color: colors.primary, icon: 'add' };
@@ -22,8 +27,31 @@ export const ProductivityTrends = ({ weekly, monthly, style }: ProductivityTrend
     return { text: 'Stable', color: colors.textMuted, icon: 'remove' };
   };
 
-  const weeklyTrend = weekly ? formatTrend(weekly.productivityScore, monthly?.productivityScore || 0) : null;
-  const monthlyTrend = monthly ? formatTrend(monthly.productivityScore, 0) : null;
+  const weeklyTrend = week ? formatTrend(week.productivityScore, month?.productivityScore || 0) : null;
+  const monthlyTrend = month ? formatTrend(month.productivityScore, 0) : null;
+
+  // A period with no data yet (weekly/monthly aggregation hasn't run) renders
+  // nothing for that slot — passing a null trend into TrendCard crashed the app
+  // (trend.color of null) as soon as the insights page opened.
+  const renderTrendCard = (
+    period: string,
+    data: any,
+    trend: { text: string; color: string; icon: string } | null,
+    color: string
+  ) => {
+    if (!data || !trend) return null;
+    return (
+      <TrendCard
+        period={period}
+        score={data.productivityScore || 0}
+        trend={trend}
+        velocity={data.completionVelocity || 0}
+        streak={data.consistencyStreak || 0}
+        peakHours={data.peakHours || []}
+        color={color}
+      />
+    );
+  };
 
   return (
     <View style={[styles.card, style]}>
@@ -35,24 +63,8 @@ export const ProductivityTrends = ({ weekly, monthly, style }: ProductivityTrend
       </View>
       
       <View style={styles.trendsGrid}>
-        <TrendCard
-          period="This Week"
-          score={weekly?.productivityScore || 0}
-          trend={weeklyTrend}
-          velocity={weekly?.completionVelocity || 0}
-          streak={weekly?.consistencyStreak || 0}
-          peakHours={weekly?.peakHours || []}
-          color={colors.info}
-        />
-        <TrendCard
-          period="This Month"
-          score={monthly?.productivityScore || 0}
-          trend={monthlyTrend}
-          velocity={monthly?.completionVelocity || 0}
-          streak={monthly?.consistencyStreak || 0}
-          peakHours={monthly?.peakHours || []}
-          color={colors.primary}
-        />
+        {renderTrendCard("This Week", week, weeklyTrend, colors.info)}
+        {renderTrendCard("This Month", month, monthlyTrend, colors.primary)}
       </View>
       
       <View style={styles.comparison}>
@@ -60,27 +72,27 @@ export const ProductivityTrends = ({ weekly, monthly, style }: ProductivityTrend
         <View style={styles.comparisonBars}>
           <ComparisonBar
             label="Productivity"
-            weekly={weekly?.productivityScore || 0}
-            monthly={monthly?.productivityScore || 0}
+            weekly={week?.productivityScore || 0}
+            monthly={month?.productivityScore || 0}
             color={colors.info}
           />
           <ComparisonBar
             label="Velocity"
-            weekly={weekly?.completionVelocity || 0}
-            monthly={monthly?.completionVelocity || 0}
+            weekly={week?.completionVelocity || 0}
+            monthly={month?.completionVelocity || 0}
             color={colors.success}
-            maxValue={Math.max(weekly?.completionVelocity || 0, monthly?.completionVelocity || 0, 10)}
+            maxValue={Math.max(week?.completionVelocity || 0, month?.completionVelocity || 0, 10)}
           />
           <ComparisonBar
             label="Balance"
-            weekly={weekly?.balanceScore || 0}
-            monthly={monthly?.balanceScore || 0}
+            weekly={week?.balanceScore || 0}
+            monthly={month?.balanceScore || 0}
             color={colors.warning}
           />
           <ComparisonBar
             label="Stress"
-            weekly={weekly?.stressLevel || 0}
-            monthly={monthly?.stressLevel || 0}
+            weekly={week?.stressLevel || 0}
+            monthly={month?.stressLevel || 0}
             color={colors.danger}
             invert
           />
@@ -92,13 +104,15 @@ export const ProductivityTrends = ({ weekly, monthly, style }: ProductivityTrend
 
 const TrendCard = ({ period, score, trend, velocity, streak, peakHours, color }: any) => {
   const { colors } = useTheme();
+  const safeTrend = trend || { text: 'N/A', color: colors.textMuted, icon: 'remove' };
+  const safePeakHours = Array.isArray(peakHours) ? peakHours : [];
   return (
   <View style={[styles.trendCard, { borderColor: color }]}>
     <View style={styles.trendHeader}>
       <Text style={styles.periodLabel}>{period}</Text>
-      <View style={[styles.trendBadge, { backgroundColor: `${trend.color}20` }]}>
-        <Ionicons name={trend.icon as any} size={12} color={trend.color} />
-        <Text style={[styles.trendText, { color: trend.color }]}>{trend.text}</Text>
+      <View style={[styles.trendBadge, { backgroundColor: `${safeTrend.color}20` }]}>
+        <Ionicons name={safeTrend.icon as any} size={12} color={safeTrend.color} />
+        <Text style={[styles.trendText, { color: safeTrend.color }]}>{safeTrend.text}</Text>
       </View>
     </View>
     <Text style={[styles.scoreValue, { color }]}>{score}%</Text>
@@ -118,7 +132,7 @@ const TrendCard = ({ period, score, trend, velocity, streak, peakHours, color }:
       />
       <TrendMetric
         icon="time"
-        value={peakHours.length > 0 ? peakHours.map((h: number) => `${h}h`).join(', ') : 'N/A'}
+        value={safePeakHours.length > 0 ? safePeakHours.map((h: number) => `${h}h`).join(', ') : 'N/A'}
         label="Peak Hours"
         color={color}
       />

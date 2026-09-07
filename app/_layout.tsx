@@ -91,6 +91,7 @@ function RootLayoutContent() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="auth" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="goals-detail" options={{ animation: 'slide_from_right', gestureEnabled: true }} />
     </Stack>
   );
 }

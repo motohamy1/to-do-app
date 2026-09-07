@@ -4,11 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { Id } from '../convex/_generated/dataModel';
 import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/utils/i18n';
+import { getServerNow } from '@/utils/offlineStorage';
 import useTheme from '@/hooks/useTheme';
 import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import { api } from '../convex/_generated/api';
 import CircularProgress from './CircularProgress';
 import { InlineTimerPicker } from './InlineTimerPicker';
+import { useOfflineMutation } from '@/hooks/useOfflineMutation';
+import UniversalLinkPickerModal, { UniversalLinkSelection } from './UniversalLinkPickerModal';
 
 // Helper to format ms to HH:MM:SS or MM:SS
 const formatTime = (ms: number) => {
@@ -64,7 +67,20 @@ const localStyles = {
   actionBtnText: {
     fontSize: 12,
     fontWeight: '800' as const,
-  }
+  },
+  linkPill: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  linkPillText: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+  },
 };
 
 export const SubtaskRow = ({
@@ -86,6 +102,70 @@ export const SubtaskRow = ({
   const [editText, setEditText] = useState(sub.text);
   const [showTimerPicker, setShowTimerPicker] = useState(false);
   const [subTimeLeft, setSubTimeLeft] = useState(sub.timerDuration || 0);
+  const [isLinkPickerVisible, setIsLinkPickerVisible] = useState(false);
+
+  const linkTask = useOfflineMutation(api.todos.linkTask, "todos:linkTask");
+
+  // Linked metadata queries for subtask independent links
+  const subProject = useOfflineQuery<any>(
+    'projects.getProjectMetadata',
+    api.projects.getProjectMetadata,
+    sub.projectId ? { id: sub.projectId } : "skip"
+  );
+  const subCategory = useOfflineQuery<any>(
+    'projects.getCategory',
+    api.projects.getCategory,
+    sub.categoryId ? { id: sub.categoryId } : "skip"
+  );
+  const subGoal = useOfflineQuery<any>(
+    'yearlyGoals.getGoal',
+    api.yearlyGoals.getGoal,
+    sub.goalId ? { id: sub.goalId } : "skip"
+  );
+
+  const linkedItemName = subProject?.name || subCategory?.name;
+  const linkedItemColor = subProject?.color || subCategory?.color || colors.primary;
+  const goalItemTitle = subGoal?.text;
+  const goalItemColor = subGoal?.color || colors.warning;
+  const hasLinks = !!linkedItemName || !!goalItemTitle;
+
+  const handleSelectLink = (selection: UniversalLinkSelection) => {
+    if (selection.type === 'none') {
+      linkTask({
+        id: sub._id,
+        categoryId: undefined,
+        subCategoryId: undefined,
+        projectId: undefined,
+        goalId: undefined,
+      });
+    } else if (selection.type === 'goal') {
+      linkTask({
+        id: sub._id,
+        goalId: selection.goalId,
+      });
+    } else if (selection.type === 'category') {
+      linkTask({
+        id: sub._id,
+        categoryId: selection.categoryId,
+        subCategoryId: undefined,
+        projectId: undefined,
+      });
+    } else if (selection.type === 'subCategory') {
+      linkTask({
+        id: sub._id,
+        categoryId: selection.categoryId,
+        subCategoryId: selection.subCategoryId,
+        projectId: undefined,
+      });
+    } else if (selection.type === 'project') {
+      linkTask({
+        id: sub._id,
+        categoryId: undefined,
+        subCategoryId: undefined,
+        projectId: selection.projectId,
+      });
+    }
+  };
 
   // Compute remaining budget for this subtask's timer picker
   const subtasks = useOfflineQuery<any[]>('todos.getSubtasks', api.todos.getSubtasks, sub.parentId ? { parentId: sub.parentId } : "skip");
@@ -103,14 +183,14 @@ export const SubtaskRow = ({
     if (sub.status === 'in_progress' && sub.timerStartTime) {
       if (sub.timerDirection === 'up') {
         const calc = () => {
-          const elapsed = Date.now() - sub.timerStartTime!;
+          const elapsed = getServerNow() - sub.timerStartTime!;
           setSubTimeLeft((prev: number) => prev !== elapsed ? elapsed : prev);
         };
         calc();
         interval = setInterval(calc, 1000);
       } else if (sub.timerDuration) {
         const calc = () => {
-          const elapsed = Date.now() - sub.timerStartTime!;
+          const elapsed = getServerNow() - sub.timerStartTime!;
           const remaining = Math.max(0, sub.timerDuration! - elapsed);
           setSubTimeLeft((prev: number) => prev !== remaining ? remaining : prev);
           if (remaining === 0 && sub.status === 'in_progress') {
@@ -246,6 +326,37 @@ export const SubtaskRow = ({
           >
             {sub.text}
           </Text>
+
+          {/* Subtask Cross-Link Badges */}
+          {(hasLinks || (sub.hashtags && sub.hashtags.length > 0)) && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+              {linkedItemName ? (
+                <View style={[localStyles.linkPill, { backgroundColor: linkedItemColor + '20' }]}>
+                  <Ionicons name="folder-outline" size={10} color={linkedItemColor} />
+                  <Text style={[localStyles.linkPillText, { color: linkedItemColor }]} numberOfLines={1}>
+                    {linkedItemName}
+                  </Text>
+                </View>
+              ) : null}
+
+              {goalItemTitle ? (
+                <View style={[localStyles.linkPill, { backgroundColor: goalItemColor + '20' }]}>
+                  <Ionicons name="flag-outline" size={10} color={goalItemColor} />
+                  <Text style={[localStyles.linkPillText, { color: goalItemColor }]} numberOfLines={1}>
+                    {goalItemTitle}
+                  </Text>
+                </View>
+              ) : null}
+
+              {sub.hashtags?.map((t: string) => (
+                <View key={t} style={[localStyles.linkPill, { backgroundColor: colors.primary + '15' }]}>
+                  <Text style={[localStyles.linkPillText, { color: colors.primary }]}>
+                    #{t}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
         </TouchableOpacity>
 
         {hasTimer && !isDone && (
@@ -300,15 +411,28 @@ export const SubtaskRow = ({
           </View>
         )}
 
-        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 8, marginStart: 8 }]}>
-           <TouchableOpacity onPress={() => (setIsEditing(true), setEditText(sub.text))}>
-            <Ionicons name="create-outline" size={20} color={isBrightBg ? colors.text : colors.primary} />
+        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: 6, marginStart: 8 }]}>
+          <TouchableOpacity onPress={() => setIsLinkPickerVisible(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name={hasLinks ? "link" : "link-outline"} size={19} color={hasLinks ? colors.primary : colors.textMuted} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => onDelete(sub._id)}>
-            <Ionicons name="trash-outline" size={20} color={colors.danger} />
+          <TouchableOpacity onPress={() => (setIsEditing(true), setEditText(sub.text))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="create-outline" size={19} color={isBrightBg ? colors.text : colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onDelete(sub._id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="trash-outline" size={19} color={colors.danger} />
           </TouchableOpacity>
         </View>
       </View>
+
+      <UniversalLinkPickerModal
+        visible={isLinkPickerVisible}
+        onClose={() => setIsLinkPickerVisible(false)}
+        onSelect={handleSelectLink}
+        currentCategoryId={sub.categoryId}
+        currentProjectId={sub.projectId}
+        currentGoalId={sub.goalId}
+        title={isArabic ? `ربط المهمة الفرعية: ${sub.text}` : `Link Subtask: ${sub.text}`}
+      />
     </View>
   );
 };

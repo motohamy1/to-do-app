@@ -3,6 +3,223 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Global in-memory cache shared across the application
 export const memoryCache: Record<string, any> = {};
 
+// ---------------------------------------------------------------------------
+// Server-corrected clock
+// ---------------------------------------------------------------------------
+// Optimistic timer writes used the raw device clock while the server used its
+// own, so any device/server skew made timers jump or appear reset. Every timer
+// mutation returns `serverTime`; we keep the delta and use `getServerNow()` for
+// all timer math so client and server agree.
+let clockOffsetMs = 0;
+
+export const setServerClock = (serverTime: number) => {
+  if (typeof serverTime === 'number' && isFinite(serverTime)) {
+    clockOffsetMs = serverTime - Date.now();
+  }
+};
+
+export const getServerNow = () => Date.now() + clockOffsetMs;
+
+// ---------------------------------------------------------------------------
+// Pending optimistic overlays
+// ---------------------------------------------------------------------------
+// When fresh Convex subscription data lands, `useOfflineQuery` replaces the
+// cache wholesale. Overlays let unacknowledged local mutations survive that
+// replacement until the server echoes the same state (or TTL expires).
+interface OverlayEntry {
+  patch: Record<string, any>;
+  ts: number;
+}
+
+const OVERLAY_TTL_MS = 120000;
+const pendingOverlays: Record<string, OverlayEntry> = {};
+
+export const setPendingOverlay = (id: string, patch: Record<string, any>) => {
+  if (!id || id.startsWith('temp_')) return; // temp docs use pendingTempTodos
+  const prev = pendingOverlays[id];
+  pendingOverlays[id] = { patch: { ...(prev?.patch || {}), ...patch }, ts: Date.now() };
+};
+
+export const clearPendingOverlay = (id: string) => {
+  delete pendingOverlays[id];
+};
+
+const liveOverlay = (id: string): OverlayEntry | undefined => {
+  const o = pendingOverlays[id];
+  if (!o) return undefined;
+  if (Date.now() - o.ts > OVERLAY_TTL_MS) {
+    delete pendingOverlays[id];
+    return undefined;
+  }
+  return o;
+};
+
+// Clear an overlay once the server has echoed the same values for its keys.
+export const reconcileOverlay = (item: any) => {
+  if (!item?._id) return;
+  const o = pendingOverlays[item._id];
+  if (!o) return;
+  const echoKeys = ['status', 'timerStartTime', 'timeLeftAtPause', 'completedAt', 'timerDuration'];
+  const allMatch = echoKeys.every(
+    (k) => o.patch[k] === undefined || item[k] === o.patch[k] ||
+      // normalize undefined vs null vs missing timer fields
+      (o.patch[k] === undefined && (item[k] === undefined || item[k] === null))
+  );
+  if (allMatch) delete pendingOverlays[item._id];
+};
+
+export const applyOverlay = (item: any) => {
+  if (!item?._id) return item;
+  const o = liveOverlay(item._id);
+  return o ? { ...item, ...o.patch } : item;
+};
+
+export const hasOverlay = (id: string) => !!liveOverlay(id);
+
+// ---------------------------------------------------------------------------
+// Pending locally-created (temp) documents
+// ---------------------------------------------------------------------------
+// Optimistic temp docs live in the query cache lists, but any incoming server
+// snapshot would blow them away before the queued add ever reaches the server.
+// This registry re-injects them into merged query results until the temp id is
+// mapped to a real server id.
+interface TempEntry {
+  item: any;
+  ts: number;
+  // exact CACHE_ keys whose list this temp doc was prepended to; used to
+  // re-inject it when a server snapshot replaces those cached arrays.
+  cacheKeys: string[];
+}
+
+const TEMP_TTL_MS = 6 * 60 * 60 * 1000;
+const pendingTempTodos: Map<string, TempEntry> = new Map();
+
+export const registerPendingTemp = (item: any, cacheKeys: string[] = []) => {
+  if (!item?._id) return;
+  const prev = pendingTempTodos.get(item._id);
+  pendingTempTodos.set(item._id, {
+    item: prev ? { ...prev.item, ...item } : item,
+    ts: prev?.ts ?? Date.now(),
+    cacheKeys: Array.from(new Set([...(prev?.cacheKeys ?? []), ...cacheKeys])),
+  });
+};
+
+export const getPendingTempTodos = (): any[] => {
+  const now = Date.now();
+  const alive: any[] = [];
+  for (const [id, entry] of pendingTempTodos.entries()) {
+    if (now - entry.ts > TEMP_TTL_MS) {
+      pendingTempTodos.delete(id);
+      continue;
+    }
+    alive.push(applyOverlay(entry.item));
+  }
+  return alive;
+};
+
+export const getPendingTempTodosForCacheKey = (cacheKey: string): any[] => {
+  const now = Date.now();
+  const alive: any[] = [];
+  for (const [id, entry] of pendingTempTodos.entries()) {
+    if (now - entry.ts > TEMP_TTL_MS) {
+      pendingTempTodos.delete(id);
+      continue;
+    }
+    if (entry.cacheKeys.includes(cacheKey)) alive.push(applyOverlay(entry.item));
+  }
+  return alive;
+};
+
+export const patchTempTodo = (tempId: string, patch: Record<string, any>) => {
+  const entry = pendingTempTodos.get(tempId);
+  if (entry) {
+    entry.item = { ...entry.item, ...patch };
+  }
+  setPendingOverlay(tempId, patch); // no-op for temp ids, guarded inside
+  // keep cache lists in sync
+  Object.keys(memoryCache).forEach((key) => {
+    if (key.startsWith('CACHE_todos')) {
+      const current = memoryCache[key];
+      if (Array.isArray(current)) {
+        const idx = current.findIndex((t: any) => t?._id === tempId);
+        if (idx >= 0) {
+          const next = [...current];
+          next[idx] = { ...next[idx], ...patch };
+          memoryCache[key] = next;
+          AsyncStorage.setItem(key, JSON.stringify(next)).catch(() => {});
+        }
+      }
+    }
+  });
+  notifyCacheChanged();
+};
+
+// Permanently drop a temp doc once its real server id is known.
+export const removeTempEntry = async (tempId: string) => {
+  if (!tempId) return;
+  pendingTempTodos.delete(tempId);
+  delete pendingOverlays[tempId];
+  Object.keys(memoryCache).forEach((key) => {
+    if (key.startsWith('CACHE_todos') || key.startsWith('CACHE_projects') || key.startsWith('CACHE_yearly') || key.startsWith('CACHE_daily') || key.startsWith('CACHE_monthly') || key.startsWith('CACHE_categoryItems') || key.startsWith('CACHE_plannerItems')) {
+      const current = memoryCache[key];
+      if (Array.isArray(current)) {
+        const next = current.filter((t: any) => t?._id !== tempId);
+        if (next.length !== current.length) {
+          memoryCache[key] = next;
+          AsyncStorage.setItem(key, JSON.stringify(next)).catch(() => {});
+        }
+      } else if (current?._id === tempId) {
+        delete memoryCache[key];
+        AsyncStorage.removeItem(key).catch(() => {});
+      }
+    }
+  });
+  notifyCacheChanged();
+};
+
+// ---------------------------------------------------------------------------
+// Persistent tempId -> serverId mappings
+// ---------------------------------------------------------------------------
+// The offline queue lives across app restarts, so id mappings must too; later
+// batches can then remap mutations that reference a previously created doc.
+const ID_MAP_KEY = 'OFFLINE_ID_MAP';
+let idMappings: Record<string, string> = {};
+let idMapPromise: Promise<Record<string, string>> | null = null;
+
+export const getIdMappings = async (): Promise<Record<string, string>> => {
+  if (idMapPromise) return idMapPromise;
+  idMapPromise = AsyncStorage.getItem(ID_MAP_KEY)
+    .then((json) => {
+      idMappings = json ? JSON.parse(json) : {};
+      return idMappings;
+    })
+    .catch(() => {
+      idMappings = {};
+      return idMappings;
+    });
+  return idMapPromise;
+};
+
+export const saveIdMapping = async (tempId: string, realId: string) => {
+  if (!tempId || !realId || tempId === realId) return;
+  const map = await getIdMappings();
+  map[tempId] = realId;
+  await AsyncStorage.setItem(ID_MAP_KEY, JSON.stringify(map)).catch(() => {});
+  await removeTempEntry(tempId);
+};
+
+// ---------------------------------------------------------------------------
+// Queue mutex
+// ---------------------------------------------------------------------------
+// Every queue write is a read-modify-write on AsyncStorage. Without
+// serialization, a push racing with a sync commit loses one of them.
+let queueLock: Promise<any> = Promise.resolve();
+export const withQueueLock = <T,>(fn: () => Promise<T>): Promise<T> => {
+  const next = queueLock.then(fn, fn);
+  queueLock = next.catch(() => {});
+  return next;
+};
+
 // Subscriber listeners for reactive query re-renders
 const listeners = new Set<() => void>();
 
@@ -87,74 +304,194 @@ export interface QueuedMutation {
   args: any;
   timestamp: number;
   retryCount?: number;
+  // temp ids this item must wait on until they are mapped to server ids
+  requiresIds?: string[];
+  // items sharing a family collapse: only the latest desired state survives
+  coalesceKey?: string;
 }
 
-export const pushMutationToQueue = async (
+const QUEUE_KEY = 'OFFLINE_MUTATION_QUEUE';
+
+const readQueueRaw = async (): Promise<QueuedMutation[]> => {
+  const queueJson = await AsyncStorage.getItem(QUEUE_KEY);
+  return queueJson ? JSON.parse(queueJson) : [];
+};
+
+const TEMP_ID_RE = /^temp_/;
+
+const collectTempIds = (value: any, found: Set<string>) => {
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    value.forEach((v) => collectTempIds(v, found));
+    return;
+  }
+  Object.entries(value).forEach(([key, val]) => {
+    // localId is intentionally the temp id (server-side idempotency key), not
+    // a dependency that must be remapped before the item can run.
+    if (key === 'localId') return;
+    if (typeof val === 'string' && TEMP_ID_RE.test(val) && /id$/i.test(key)) {
+      found.add(val);
+    } else {
+      collectTempIds(val, found);
+    }
+  });
+};
+
+// Mutations that express a desired end-state for a doc collapse in the queue:
+// the newest one replaces older ones touching the same ids, so a start->pause
+// ->resume tap sequence syncs exactly once with the final state instead of
+// replaying every intermediate toggle.
+const computeCoalesceKey = (mutationPath: string, args: any): string | undefined => {
+  const targetId = args?.id || args?.todoId;
+  if (mutationPath === 'todos:updateStatus' && targetId) return `status:${targetId}`;
+  if (
+    (mutationPath === 'todos:startTimer' ||
+      mutationPath === 'todos:pauseTimer' ||
+      mutationPath === 'todos:startSubtaskTimer' ||
+      mutationPath === 'todos:pauseSubtaskTimer' ||
+      mutationPath === 'todos:resetTimer') &&
+    targetId
+  ) {
+    return `timerState:${targetId}`;
+  }
+  if (mutationPath === 'todos:setTimerRunState' && Array.isArray(args?.updates) && args.updates.length > 0) {
+    const ids = args.updates.map((u: any) => u?.id).filter(Boolean).sort();
+    return `timerState:${ids.join(',')}`;
+  }
+  return undefined;
+};
+
+const idsOfCoalesceKey = (key?: string): string[] => {
+  if (!key) return [];
+  const idx = key.indexOf(':');
+  return idx >= 0 ? key.slice(idx + 1).split(',') : [];
+};
+
+export const pushMutationToQueue = (
   mutationKey: string,
   mutationPath: string,
   args: any,
   tempId?: string
-) => {
-  try {
-    const queueJson = await AsyncStorage.getItem('OFFLINE_MUTATION_QUEUE');
-    const queue: QueuedMutation[] = queueJson ? JSON.parse(queueJson) : [];
-    
-    // Deduplication check: ignore if identical mutation was queued within the last 4 seconds or same tempId
-    const now = Date.now();
-    const isDuplicate = queue.some((item) => {
-      if (tempId && item.tempId === tempId) return true;
-      if (item.mutationPath === mutationPath && JSON.stringify(item.args) === JSON.stringify(args)) {
-        return now - item.timestamp < 4000;
+): Promise<string | null> =>
+  withQueueLock(async () => {
+    try {
+      const queue = await readQueueRaw();
+
+      const now = Date.now();
+      const dupe = queue.find((item) => {
+        if (tempId && item.tempId === tempId && item.mutationPath === mutationPath) return true;
+        if (item.mutationPath === mutationPath && JSON.stringify(item.args) === JSON.stringify(args)) {
+          return now - item.timestamp < 4000;
+        }
+        return false;
+      });
+
+      if (dupe) {
+        console.log(`Suppressed duplicate queued mutation: ${mutationPath}`);
+        return dupe.id;
       }
-      return false;
-    });
 
-    if (isDuplicate) {
-      console.log(`Suppressed duplicate queued mutation: ${mutationPath}`);
-      return;
+      const coalesceKey = computeCoalesceKey(mutationPath, args);
+      let nextQueue = queue;
+      if (coalesceKey) {
+        const newIds = new Set(idsOfCoalesceKey(coalesceKey));
+        const tempIds = new Set<string>();
+        if (tempId) tempIds.add(tempId);
+        collectTempIds(args, tempIds);
+        // An older item is superseded when it targets the same doc (or an
+        // overlapping set of docs) with a newer desired-state mutation.
+        nextQueue = queue.filter((item) => {
+          if (!item.coalesceKey) return true;
+          const oldIds = new Set(idsOfCoalesceKey(item.coalesceKey));
+          for (const t of tempIds) if (oldIds.has(t)) return false;
+          for (const id of newIds) if (oldIds.has(id)) return false;
+          return true;
+        });
+      }
+
+      const requires = new Set<string>();
+      collectTempIds(args, requires);
+
+      const itemId = Date.now().toString() + Math.random().toString();
+      nextQueue.push({
+        id: itemId,
+        tempId,
+        mutationKey,
+        mutationPath,
+        args,
+        timestamp: now,
+        retryCount: 0,
+        coalesceKey,
+        requiresIds: requires.size > 0 ? Array.from(requires) : undefined,
+      });
+      await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(nextQueue));
+      return itemId;
+    } catch (err) {
+      console.warn('Failed to push to mutation queue', err);
+      return null;
     }
+  });
 
-    queue.push({
-      id: Date.now().toString() + Math.random().toString(),
-      tempId,
-      mutationKey,
-      mutationPath,
-      args,
-      timestamp: Date.now(),
-      retryCount: 0,
-    });
-    await AsyncStorage.setItem('OFFLINE_MUTATION_QUEUE', JSON.stringify(queue));
-  } catch (err) {
-    console.warn('Failed to push to mutation queue', err);
-  }
-};
+// Remove a single item once it has been successfully applied — the queue must
+// never contain mutations the server already processed, even if the app dies
+// mid-batch.
+export const removeQueuedMutation = (id: string): Promise<void> =>
+  withQueueLock(async () => {
+    try {
+      const queue = await readQueueRaw();
+      const next = queue.filter((item) => item.id !== id);
+      if (next.length !== queue.length) {
+        await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(next));
+      }
+    } catch (err) {
+      console.warn('Failed to remove queued mutation', err);
+    }
+  });
 
-export const getMutationQueue = async (): Promise<QueuedMutation[]> => {
-  try {
-    const queueJson = await AsyncStorage.getItem('OFFLINE_MUTATION_QUEUE');
-    return queueJson ? JSON.parse(queueJson) : [];
-  } catch (err) {
-    return [];
-  }
-};
+export const bumpQueuedItemRetry = (id: string, retryCount: number): Promise<void> =>
+  withQueueLock(async () => {
+    try {
+      const queue = await readQueueRaw();
+      const idx = queue.findIndex((item) => item.id === id);
+      if (idx >= 0) {
+        queue[idx] = { ...queue[idx], retryCount };
+        await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+      }
+    } catch (err) {
+      console.warn('Failed to bump queued mutation retry', err);
+    }
+  });
 
-export const clearMutationQueue = async () => {
-  try {
-    await AsyncStorage.removeItem('OFFLINE_MUTATION_QUEUE');
-  } catch (err) {}
-};
+export const getMutationQueue = (): Promise<QueuedMutation[]> =>
+  withQueueLock(async () => {
+    try {
+      return await readQueueRaw();
+    } catch (err) {
+      return [];
+    }
+  });
 
-export const setMutationQueue = async (queue: QueuedMutation[]) => {
-  try {
-    await AsyncStorage.setItem('OFFLINE_MUTATION_QUEUE', JSON.stringify(queue));
-  } catch (err) {
-    console.warn('Failed to set mutation queue', err);
-  }
-};
+export const clearMutationQueue = (): Promise<void> =>
+  withQueueLock(async () => {
+    try {
+      await AsyncStorage.removeItem(QUEUE_KEY);
+    } catch (err) {}
+  });
+
+export const setMutationQueue = (queue: QueuedMutation[]): Promise<void> =>
+  withQueueLock(async () => {
+    try {
+      await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    } catch (err) {
+      console.warn('Failed to set mutation queue', err);
+    }
+  });
 
 // Remove an optimistic temp entry from all caches matching the given prefixes.
 export const rollbackOptimisticEntry = (prefixes: string[], tempId: string) => {
   if (!tempId) return;
+  pendingTempTodos.delete(tempId);
+  delete pendingOverlays[tempId];
   Object.keys(memoryCache).forEach((key) => {
     if (prefixes.some((p) => key.startsWith(p))) {
       const current = memoryCache[key];
@@ -175,10 +512,14 @@ export const rollbackOptimisticEntry = (prefixes: string[], tempId: string) => {
 export const applyOptimisticMutation = (mutationPath: string, args: any): any => {
   const tempId = `temp_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 
-  // Find and update all memoryCache entries matching specific prefixes
-  const updateMatchingCaches = (prefix: string, updater: (val: any) => any) => {
+  // Find and update all memoryCache entries matching specific prefixes.
+  // Returns the exact keys touched so creates can register themselves for
+  // re-injection into those specific query results.
+  const updateMatchingCaches = (prefix: string, updater: (val: any) => any): string[] => {
+    const touched: string[] = [];
     Object.keys(memoryCache).forEach((key) => {
       if (key.startsWith(prefix)) {
+        touched.push(key);
         const current = memoryCache[key];
         if (current !== undefined) {
           const updated = updater(current);
@@ -189,6 +530,7 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         }
       }
     });
+    return touched;
   };
 
   switch (mutationPath) {
@@ -205,7 +547,7 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
       };
 
       // Add to todos query cache
-      updateMatchingCaches('CACHE_todos_', (todosList) => {
+      const touchedTodoKeys = updateMatchingCaches('CACHE_todos_', (todosList) => {
         if (!Array.isArray(todosList)) return [newTodo];
         // If it already exists, replace; otherwise prepend
         return [newTodo, ...todosList.filter((t: any) => t._id !== tempId)];
@@ -213,10 +555,11 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
 
       // If it has a parent, also update getSubtasks cache
       if (args.parentId) {
-        updateMatchingCaches('CACHE_todos.getSubtasks_', (subtasks) => {
+        const touchedSubKeys = updateMatchingCaches('CACHE_todos.getSubtasks_', (subtasks) => {
           if (!Array.isArray(subtasks)) return [newTodo];
           return [...subtasks.filter((s: any) => s._id !== tempId), newTodo];
         });
+        touchedTodoKeys.push(...touchedSubKeys);
       }
 
       // Save getById cache for immediate detail access
@@ -224,8 +567,68 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
       memoryCache[getByIdKey] = newTodo;
       AsyncStorage.setItem(getByIdKey, JSON.stringify(newTodo)).catch(() => {});
 
+      // Keep it re-injectable into query results that arrive from the server
+      // before the queued add is replayed.
+      registerPendingTemp(newTodo, [...touchedTodoKeys, getByIdKey]);
+
       notifyCacheChanged();
       return tempId;
+    }
+
+    case 'todos:setTimerRunState': {
+      const updates = Array.isArray(args?.updates) ? args.updates : [];
+      const applyOne = (update: any) => {
+        const patch: Record<string, any> = { status: update.status };
+        if (update.status === 'in_progress') {
+          patch.timerStartTime =
+            typeof update.timerStartTime === 'number' ? update.timerStartTime : getServerNow();
+          patch.timeLeftAtPause = undefined;
+        } else if (update.status === 'paused') {
+          patch.timerStartTime = undefined;
+          if (typeof update.timeLeftAtPause === 'number') {
+            patch.timeLeftAtPause = update.timeLeftAtPause;
+          }
+        } else {
+          patch.timerStartTime = undefined;
+          if (update.status === 'done') patch.completedAt = getServerNow();
+        }
+        return patch;
+      };
+
+      updates.forEach((update: any) => {
+        if (!update?.id) return;
+        const patch = applyOne(update);
+        if (update.id.startsWith('temp_')) {
+          patchTempTodo(update.id, patch);
+        } else {
+          setPendingOverlay(update.id, patch);
+        }
+      });
+
+      updateMatchingCaches('CACHE_todos_', (list) => {
+        if (!Array.isArray(list)) return list;
+        return list.map((item: any) => {
+          const update = updates.find((u: any) => u?.id === item?._id);
+          return update ? { ...item, ...applyOne(update) } : item;
+        });
+      });
+
+      updateMatchingCaches('CACHE_todos.getSubtasks_', (list) => {
+        if (!Array.isArray(list)) return list;
+        return list.map((item: any) => {
+          const update = updates.find((u: any) => u?.id === item?._id);
+          return update ? { ...item, ...applyOne(update) } : item;
+        });
+      });
+
+      updateMatchingCaches('CACHE_todos.getById_', (single) => {
+        if (!single) return single;
+        const update = updates.find((u: any) => u?.id === single._id);
+        return update ? { ...single, ...applyOne(update) } : single;
+      });
+
+      notifyCacheChanged();
+      return { success: true };
     }
 
     case 'todos:updateTodo':
@@ -242,6 +645,9 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
       const targetId = args.id || args.todoId;
       if (!targetId) break;
 
+      let capturedPatch: Record<string, any> | null = null;
+      const OVERLAY_KEYS = ['status', 'timerStartTime', 'timeLeftAtPause', 'completedAt', 'timerDuration', 'timerDirection'];
+
       const patchTodo = (item: any) => {
         if (item._id !== targetId) return item;
         const updated = { ...item };
@@ -249,18 +655,19 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         if (mutationPath === 'todos:updateStatus') {
           updated.status = args.status;
           if (args.status === 'done') {
-            updated.completedAt = Date.now();
+            updated.completedAt = getServerNow();
           } else {
             updated.completedAt = undefined;
           }
         } else if (mutationPath === 'todos:startTimer' || mutationPath === 'todos:startSubtaskTimer') {
           updated.status = 'in_progress';
-          updated.timerStartTime = Date.now();
-          if (!updated.timerFirstStartTime) updated.timerFirstStartTime = Date.now();
+          updated.timerStartTime = getServerNow();
+          if (!updated.timerFirstStartTime) updated.timerFirstStartTime = getServerNow();
+          updated.timeLeftAtPause = undefined;
         } else if (mutationPath === 'todos:pauseTimer' || mutationPath === 'todos:pauseSubtaskTimer') {
           updated.status = 'paused';
           if (updated.timerStartTime) {
-            const elapsed = Date.now() - updated.timerStartTime;
+            const elapsed = getServerNow() - updated.timerStartTime;
             if (updated.timerDirection === 'up') {
               updated.timeLeftAtPause = (updated.timeLeftAtPause || 0) + elapsed;
             } else if (updated.timerDuration) {
@@ -294,6 +701,15 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
           Object.assign(updated, args);
         }
 
+        if (!capturedPatch) {
+          capturedPatch = {};
+          OVERLAY_KEYS.forEach((k) => {
+            if ((updated as any)[k] !== (item as any)[k]) {
+              capturedPatch![k] = (updated as any)[k];
+            }
+          });
+        }
+
         return updated;
       };
 
@@ -317,6 +733,16 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         if (!single || single._id !== targetId) return single;
         return patchTodo(single);
       });
+
+      // Record the optimistic field changes so they survive a server snapshot
+      // replacement until the server echoes them back.
+      if (capturedPatch && Object.keys(capturedPatch).length > 0) {
+        if (targetId.startsWith('temp_')) {
+          patchTempTodo(targetId, capturedPatch);
+        } else {
+          setPendingOverlay(targetId, capturedPatch);
+        }
+      }
 
       notifyCacheChanged();
       return { success: true };
@@ -367,10 +793,11 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         isCompleted: false,
       };
 
-      updateMatchingCaches('CACHE_todos.getTaskChecklists_', (list) => {
+      const touchedCheckKeys = updateMatchingCaches('CACHE_todos.getTaskChecklists_', (list) => {
         if (!Array.isArray(list)) return [newCheck];
         return [...list.filter((i: any) => i._id !== tempId), newCheck];
       });
+      registerPendingTemp(newCheck, touchedCheckKeys);
 
       notifyCacheChanged();
       return tempId;
@@ -404,7 +831,7 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         ...args,
       };
 
-      updateMatchingCaches('CACHE_projects.getCategories', (list) => {
+      const touchedCatKeys = updateMatchingCaches('CACHE_projects.getCategories', (list) => {
         if (!Array.isArray(list)) return [newCat];
         return [...list.filter((c: any) => c._id !== tempId), newCat];
       });
@@ -412,6 +839,8 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
       const getCatKey = getCacheKey('projects.getCategory', { id: tempId });
       memoryCache[getCatKey] = newCat;
       AsyncStorage.setItem(getCatKey, JSON.stringify(newCat)).catch(() => {});
+
+      registerPendingTemp(newCat, [...touchedCatKeys, getCatKey]);
 
       notifyCacheChanged();
       return tempId;
@@ -451,10 +880,11 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         ...args,
       };
 
-      updateMatchingCaches('CACHE_projects.getSubCategories', (list) => {
+      const touchedSubKeys = updateMatchingCaches('CACHE_projects.getSubCategories', (list) => {
         if (!Array.isArray(list)) return [newSub];
         return [...list.filter((s: any) => s._id !== tempId), newSub];
       });
+      registerPendingTemp(newSub, touchedSubKeys);
 
       notifyCacheChanged();
       return tempId;
@@ -490,7 +920,7 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         ...args,
       };
 
-      updateMatchingCaches('CACHE_projects.getProjects', (list) => {
+      const touchedProjKeys = updateMatchingCaches('CACHE_projects.getProjects', (list) => {
         if (!Array.isArray(list)) return [newProj];
         return [...list.filter((p: any) => p._id !== tempId), newProj];
       });
@@ -498,6 +928,8 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
       const metaKey = getCacheKey('projects.getProjectMetadata', { id: tempId });
       memoryCache[metaKey] = newProj;
       AsyncStorage.setItem(metaKey, JSON.stringify(newProj)).catch(() => {});
+
+      registerPendingTemp(newProj, [...touchedProjKeys, metaKey]);
 
       notifyCacheChanged();
       return tempId;
@@ -540,10 +972,11 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         ...args,
       };
 
-      updateMatchingCaches('CACHE_categoryItems', (list) => {
+      const touchedItemKeys = updateMatchingCaches('CACHE_categoryItems', (list) => {
         if (!Array.isArray(list)) return [newItem];
         return [...list.filter((i: any) => i._id !== tempId), newItem];
       });
+      registerPendingTemp(newItem, touchedItemKeys);
 
       notifyCacheChanged();
       return tempId;
@@ -579,10 +1012,11 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         ...args,
       };
 
-      updateMatchingCaches('CACHE_plannerItems', (list) => {
+      const touchedPlannerKeys = updateMatchingCaches('CACHE_plannerItems', (list) => {
         if (!Array.isArray(list)) return [newPlanner];
         return [...list.filter((i: any) => i._id !== tempId), newPlanner];
       });
+      registerPendingTemp(newPlanner, touchedPlannerKeys);
 
       notifyCacheChanged();
       return tempId;
@@ -620,10 +1054,11 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         isCompleted: false,
       };
 
-      updateMatchingCaches('CACHE_projects.getProjectChecklists', (list) => {
+      const touchedProjCheckKeys = updateMatchingCaches('CACHE_projects.getProjectChecklists', (list) => {
         if (!Array.isArray(list)) return [newCheck];
         return [...list.filter((i: any) => i._id !== tempId), newCheck];
       });
+      registerPendingTemp(newCheck, touchedProjCheckKeys);
 
       notifyCacheChanged();
       return tempId;
@@ -658,10 +1093,11 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         ...args,
       };
 
-      updateMatchingCaches('CACHE_projects.getProjectResources', (list) => {
+      const touchedResKeys = updateMatchingCaches('CACHE_projects.getProjectResources', (list) => {
         if (!Array.isArray(list)) return [newRes];
         return [...list.filter((r: any) => r._id !== tempId), newRes];
       });
+      registerPendingTemp(newRes, touchedResKeys);
 
       notifyCacheChanged();
       return tempId;
@@ -692,9 +1128,12 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
 
       const prependGoal = (list: any) =>
         Array.isArray(list) ? [...list.filter((g: any) => g._id !== tempId), newGoal] : [newGoal];
-      updateMatchingCaches('CACHE_yearlyGoals', prependGoal);
-      updateMatchingCaches('CACHE_monthlyGoals', prependGoal);
-      updateMatchingCaches('CACHE_dailyGoals', prependGoal);
+      const touchedGoalKeys = [
+        ...updateMatchingCaches('CACHE_yearlyGoals', prependGoal),
+        ...updateMatchingCaches('CACHE_monthlyGoals', prependGoal),
+        ...updateMatchingCaches('CACHE_dailyGoals', prependGoal),
+      ];
+      registerPendingTemp(newGoal, touchedGoalKeys);
 
       notifyCacheChanged();
       return tempId;
@@ -735,9 +1174,12 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
 
       const prependAch = (list: any) =>
         Array.isArray(list) ? [...list.filter((a: any) => a._id !== tempId), newAch] : [newAch];
-      updateMatchingCaches('CACHE_yearlyAchievements', prependAch);
-      updateMatchingCaches('CACHE_monthlyAchievements', prependAch);
-      updateMatchingCaches('CACHE_dailyAchievements', prependAch);
+      const touchedAchKeys = [
+        ...updateMatchingCaches('CACHE_yearlyAchievements', prependAch),
+        ...updateMatchingCaches('CACHE_monthlyAchievements', prependAch),
+        ...updateMatchingCaches('CACHE_dailyAchievements', prependAch),
+      ];
+      registerPendingTemp(newAch, touchedAchKeys);
 
       notifyCacheChanged();
       return tempId;

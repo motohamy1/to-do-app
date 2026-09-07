@@ -12,11 +12,13 @@ import {
   Platform,
   Clipboard,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
 import { useTranslation } from '@/utils/i18n';
 import { AIChatMessage } from '@/types/voiceNote';
+import { useKeyboard } from '@/hooks/useKeyboard';
 
 interface NoteAIChatSheetProps {
   visible: boolean;
@@ -314,6 +316,8 @@ export const NoteAIChatSheet: React.FC<NoteAIChatSheetProps> = ({
   const { colors, isDarkMode } = useTheme();
   const isDark = isDarkMode;
   const { t } = useTranslation(isArabic ? 'ar' : 'en');
+  const { height: screenHeight } = useWindowDimensions();
+  const { keyboardHeight, isKeyboardVisible } = useKeyboard();
   const [inputMessage, setInputMessage] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -324,6 +328,14 @@ export const NoteAIChatSheet: React.FC<NoteAIChatSheetProps> = ({
       }, 200);
     }
   }, [visible, chatHistory, isLoading]);
+
+  useEffect(() => {
+    if (isKeyboardVisible) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 150);
+    }
+  }, [isKeyboardVisible, keyboardHeight]);
 
   const handleSend = async () => {
     if (!inputMessage.trim() || isLoading) return;
@@ -342,10 +354,7 @@ export const NoteAIChatSheet: React.FC<NoteAIChatSheetProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent={true}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.overlay}
-      >
+      <View style={styles.overlay}>
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
         <View
@@ -354,6 +363,11 @@ export const NoteAIChatSheet: React.FC<NoteAIChatSheetProps> = ({
             {
               backgroundColor: isDark ? '#0F172A' : '#FFFFFF',
               borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)',
+              marginBottom: keyboardHeight,
+              height: isKeyboardVisible 
+                ? Math.max(300, screenHeight - keyboardHeight - (Platform.OS === 'ios' ? 44 : 24)) 
+                : '75%',
+              maxHeight: screenHeight - (Platform.OS === 'ios' ? 44 : 24),
             },
           ]}
         >
@@ -592,7 +606,7 @@ export const NoteAIChatSheet: React.FC<NoteAIChatSheetProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };

@@ -21,6 +21,7 @@ import { useOfflineQuery } from "@/hooks/useOfflineQuery";
 import useTheme from "@/hooks/useTheme";
 import { useAuth } from "@/hooks/useAuth";
 import { useTranslation } from "@/utils/i18n";
+import { getServerNow } from "@/utils/offlineStorage";
 import { useDailyReminders } from "@/hooks/useDailyReminders";
 import { useScreenGuide } from "@/hooks/useScreenGuide";
 import { useTaskTimers } from "@/hooks/useTaskTimers";
@@ -76,6 +77,7 @@ const Index = () => {
   const addTodoMutation = useOfflineMutation(api.todos.addTodo, "todos:addTodo");
   const updateTodoMutation = useOfflineMutation(api.todos.updateTodo, "todos:updateTodo");
   const setTimerMutation = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
+  const setTimerRunState = useOfflineMutation(api.todos.setTimerRunState, "todos:setTimerRunState");
 
   // Yearly goals for monthly card
     const currentYear = new Date().getFullYear();
@@ -435,18 +437,24 @@ const Index = () => {
     setFocusTimerModalVisible(true);
   };
 
-  const handleSaveFocusTimer = (durationInMs: number, dueDate?: number, date?: number) => {
+  const handleSaveFocusTimer = async (durationInMs: number, dueDate?: number, date?: number) => {
     // Find top active task or set generic focus timer
     const topTask = activeBoardTasks[0];
-    if (topTask) {
-      setTimerMutation({
+    if (!topTask) return;
+    try {
+      // Sequential on purpose: the run state must apply after the duration is
+      // stored (both keep their relative order in the offline queue as well).
+      await setTimerMutation({
         id: topTask._id,
-        timerDuration: durationInMs,
-        timerStartTime: Date.now(),
-        dueDate,
-        date,
+        duration: durationInMs,
+        ...(dueDate !== undefined ? { dueDate } : {}),
+        ...(date !== undefined ? { date } : {}),
       });
-      updateStatus({ id: topTask._id, status: 'in_progress' });
+      await setTimerRunState({
+        updates: [{ id: topTask._id, status: 'in_progress', timerStartTime: getServerNow() }],
+      });
+    } catch (err) {
+      console.warn('Failed to start focus timer', err);
     }
   };
 

@@ -21,12 +21,18 @@ export default function InsightsScreen() {
   const { colors, isDarkMode } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
   
-  const daily = useOfflineQuery('insights.daily', api.insights.getLatestInsights,
+  const rawDaily = useOfflineQuery('insights.daily', api.insights.getLatestInsights,
     userId ? { userId, period: "day" } : 'skip');
-  const weekly = useOfflineQuery('insights.weekly', api.insights.getLatestInsights,
+  const rawWeekly = useOfflineQuery('insights.weekly', api.insights.getLatestInsights,
     userId ? { userId, period: "week" } : 'skip');
-  const monthly = useOfflineQuery('insights.monthly', api.insights.getLatestInsights,
+  const rawMonthly = useOfflineQuery('insights.monthly', api.insights.getLatestInsights,
     userId ? { userId, period: "month" } : 'skip');
+
+  // useOfflineQuery returns [] as an offline/empty placeholder for these queries —
+  // normalize to undefined so guards and child cards treat "no data" correctly.
+  const daily = Array.isArray(rawDaily) ? undefined : rawDaily;
+  const weekly = Array.isArray(rawWeekly) ? undefined : rawWeekly;
+  const monthly = Array.isArray(rawMonthly) ? undefined : rawMonthly;
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -99,7 +105,8 @@ export default function InsightsScreen() {
   );
 }
 
-function formatTimeAgo(timestamp: number): string {
+function formatTimeAgo(timestamp?: number): string {
+  if (!timestamp || typeof timestamp !== 'number') return 'never';
   const diff = Date.now() - timestamp;
   const hours = Math.floor(diff / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);

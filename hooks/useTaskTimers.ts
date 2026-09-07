@@ -1,6 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { scheduleTimerCompletion, cancelTaskNotification } from '../utils/notifications';
+import { isDayPastCutoff, startOfDay } from '../utils/taskDateUtils';
+import { getServerNow, patchTempTodo } from '../utils/offlineStorage';
+
+const isTempId = (id: any) => typeof id === 'string' && id.startsWith('temp_');
 
 export function useTaskTimers(todos: any[] | undefined, updateStatus: any) {
   const appState = useRef(AppState.currentState);
@@ -17,7 +21,7 @@ export function useTaskTimers(todos: any[] | undefined, updateStatus: any) {
     todos.forEach((todo) => {
       activeTaskIds.add(todo._id);
       if (todo.status === 'in_progress' && todo.timerStartTime && todo.timerDuration && todo.timerDirection !== 'up') {
-        const elapsed = Date.now() - todo.timerStartTime;
+        const elapsed = getServerNow() - todo.timerStartTime;
         const remaining = Math.max(0, todo.timerDuration - elapsed);
         
         if (remaining > 0) {
@@ -48,34 +52,69 @@ export function useTaskTimers(todos: any[] | undefined, updateStatus: any) {
   }, [todos]);
 
   useEffect(() => {
+    // Guard against the 1s sweeper re-dispatching the same auto-status change
+    // on every tick while the server echo is still in flight.
+    const autoDispatched = new Set<string>();
+
+    const dispatchAutoStatus = (id: string, status: string) => {
+      const key = `${id}:${status}`;
+      if (autoDispatched.has(key)) return;
+      autoDispatched.add(key);
+      Promise.resolve(updateStatus({ id, status })).catch(() => {
+        autoDispatched.delete(key);
+      });
+    };
+
     const checkTasks = (currentTodos: any[]) => {
       if (!currentTodos || !Array.isArray(currentTodos)) return;
 
+      const now = Date.now();
+      const serverTime = getServerNow();
       currentTodos.forEach((todo) => {
-        // 1. Timer expiry → done (count-down only)
-        if (todo.status === 'in_progress' && todo.timerStartTime && todo.timerDuration) {
-          if (todo.timerDirection === 'up') return;
-
-          const elapsed = Date.now() - todo.timerStartTime;
-          const remaining = Math.max(0, todo.timerDuration - elapsed);
-
-          if (remaining === 0) {
-            updateStatus({ id: todo._id, status: 'done' });
-            return;
+        try {
+          if (todo.status === 'done' && autoDispatched.has(`${todo._id}:done`)) {
+            autoDispatched.delete(`${todo._id}:done`); // re-arm if reopened later
           }
-        }
-
-        // 2. Deadline passed without completion → not_done
-        // Only trigger based on dueDate (deadline), never on creation/scheduled date.
-        if (
-          (todo.status === 'not_started' || todo.status === 'in_progress' || todo.status === 'paused') &&
-          todo.dueDate
-        ) {
-          const dueDateEndOfDay = new Date(todo.dueDate);
-          dueDateEndOfDay.setHours(23, 59, 59, 999);
-          if (dueDateEndOfDay.getTime() < Date.now()) {
-            updateStatus({ id: todo._id, status: 'not_done' });
+          if ((todo.status === 'not_done' || todo.status === 'done') && autoDispatched.has(`${todo._id}:not_done`)) {
+            autoDispatched.delete(`${todo._id}:not_done`);
           }
+
+          // 1. Timer expiry → done (count-down only)
+          if (todo.status === 'in_progress' && todo.timerStartTime && todo.timerDuration) {
+            if (todo.timerDirection !== 'up') {
+              const elapsed = serverTime - todo.timerStartTime;
+              const remaining = Math.max(0, todo.timerDuration - elapsed);
+
+              if (remaining === 0) {
+                if (isTempId(todo._id)) {
+                  patchTempTodo(todo._id, { status: 'done', completedAt: now, timerStartTime: undefined });
+                } else {
+                  dispatchAutoStatus(todo._id, 'done');
+                }
+                return;
+              }
+            }
+          }
+
+          // 2. Deadline passed without completion → not_done.
+          // Honors the 7:00 AM extended-day cutoff: a task from "today" stays
+          // alive until 7 AM of the next day, so a timer that crosses midnight
+          // is never force-reset to not_done.
+          if (
+            (todo.status === 'not_started' || todo.status === 'in_progress' || todo.status === 'paused') &&
+            todo.dueDate
+          ) {
+            if (isDayPastCutoff(startOfDay(todo.dueDate), now)) {
+              if (isTempId(todo._id)) {
+                patchTempTodo(todo._id, { status: 'not_done', timerStartTime: undefined });
+              } else {
+                dispatchAutoStatus(todo._id, 'not_done');
+              }
+            }
+          }
+        } catch (err) {
+          // One failing task must never abort the sweep for the rest.
+          console.warn('checkTasks failed for todo', todo?._id, err);
         }
       });
     };
@@ -84,6 +123,14 @@ export function useTaskTimers(todos: any[] | undefined, updateStatus: any) {
     if (todosRef.current) {
       checkTasks(todosRef.current);
     }
+
+    // Periodic check: the countdown must complete (status → done) even while
+    // the app sits open in the foreground, not only on resume/mount.
+    const interval = setInterval(() => {
+      if (todosRef.current) {
+        checkTasks(todosRef.current);
+      }
+    }, 1000);
 
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
@@ -95,6 +142,7 @@ export function useTaskTimers(todos: any[] | undefined, updateStatus: any) {
     });
 
     return () => {
+      clearInterval(interval);
       subscription.remove();
     };
   }, [updateStatus]);

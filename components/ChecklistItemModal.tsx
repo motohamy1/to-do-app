@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -22,6 +23,7 @@ import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import { useTranslation } from '@/utils/i18n';
 import { createScrollStackStyles, CARD_ACCENTS, createCardFrame } from '@/assets/styles/scrollStack.styles';
 import ProjectPickerModal from '@/components/ProjectPickerModal';
+import { useKeyboard } from '@/hooks/useKeyboard';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 
@@ -71,6 +73,9 @@ const ChecklistItemForm: React.FC<{
   const { t, isArabic } = useTranslation(language);
   const styles = createScrollStackStyles(colors, isArabic, isDarkMode);
   const frame = createCardFrame(CARD_ACCENTS.rose, isDarkMode, colors.secondaryText);
+  const { height: screenHeight } = useWindowDimensions();
+  const { keyboardHeight, isKeyboardVisible } = useKeyboard();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const isEditing = item !== null;
   const itemId: Id<'todos'> | null = item?._id ?? null;
@@ -234,9 +239,16 @@ const ChecklistItemForm: React.FC<{
     : (isArabic ? 'عنصر قائمة جديد' : 'New Checklist Item');
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.modalContent}
+    <View
+      style={[
+        styles.modalContent,
+        {
+          marginBottom: keyboardHeight,
+          maxHeight: isKeyboardVisible 
+            ? Math.max(300, screenHeight - keyboardHeight - (Platform.OS === 'ios' ? 44 : 28)) 
+            : '90%',
+        }
+      ]}
     >
       <View style={styles.modalDragHandle} />
 
@@ -252,7 +264,7 @@ const ChecklistItemForm: React.FC<{
         </TouchableOpacity>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.modalForm}>
           {/* Title */}
           <View style={styles.modalInputGroup}>
@@ -329,6 +341,9 @@ const ChecklistItemForm: React.FC<{
                 placeholderTextColor={colors.textMuted}
                 value={newHashtag}
                 onChangeText={setNewHashtag}
+                onFocus={() => {
+                  setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150);
+                }}
                 onSubmitEditing={() => addHashtag(newHashtag)}
                 returnKeyType="done"
               />
@@ -481,7 +496,7 @@ const ChecklistItemForm: React.FC<{
           }
         }}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 

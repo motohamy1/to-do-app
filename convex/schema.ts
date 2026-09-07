@@ -40,6 +40,7 @@ export default defineSchema({
     projectId: v.optional(v.string()), 
     categoryId: v.optional(v.id("projectCategories")),
     subCategoryId: v.optional(v.id("projectSubCategories")),
+    goalId: v.optional(v.id("yearlyGoals")),
     description: v.optional(v.string()),
     location: v.optional(v.string()),
     meetingLink: v.optional(v.string()),
@@ -67,6 +68,10 @@ export default defineSchema({
       )
     ),
     transcriptError: v.optional(v.string()),
+    // Client-generated idempotency key for offline-created docs. Replays of a
+    // queued addTodo with the same localId return the existing doc instead of
+    // creating a duplicate.
+    localId: v.optional(v.string()),
     // AI Note Intelligence fields
     aiSummary: v.optional(v.string()),
     aiActionItems: v.optional(v.array(v.string())),
@@ -81,7 +86,11 @@ export default defineSchema({
       )
     ),
   }).index("by_user", ["userId"])
-    .index("by_parent", ["parentId"]),
+    .index("by_parent", ["parentId"])
+    .index("by_goal", ["goalId"])
+    .index("by_category", ["categoryId"])
+    .index("by_project", ["projectId"])
+    .index("by_local_id", ["localId"]),
 
   projectCategories: defineTable({
     userId: v.optional(v.union(v.id("users"), v.string())),
@@ -90,7 +99,12 @@ export default defineSchema({
     color: v.string(),      
     description: v.optional(v.string()),
     tag: v.optional(v.string()),
-  }).index("by_user", ["userId"]),
+    goalId: v.optional(v.id("yearlyGoals")),
+    localId: v.optional(v.string()),
+  }).index("by_user", ["userId"])
+    .index("by_goal", ["goalId"])
+    .index("by_tag", ["tag"])
+    .index("by_local_id", ["localId"]),
 
   projectSubCategories: defineTable({
     userId: v.optional(v.union(v.id("users"), v.string())),
@@ -98,8 +112,10 @@ export default defineSchema({
     name: v.string(),
     icon: v.string(),
     color: v.string(),
+    localId: v.optional(v.string()),
   }).index("by_user", ["userId"])
-    .index("by_category", ["categoryId"]),
+    .index("by_category", ["categoryId"])
+    .index("by_local_id", ["localId"]),
 
   projects: defineTable({
     userId: v.optional(v.union(v.id("users"), v.string())),
@@ -110,9 +126,13 @@ export default defineSchema({
     color: v.string(),      
     icon: v.string(),       
     status: v.optional(v.string()), 
+    goalId: v.optional(v.id("yearlyGoals")),
+    localId: v.optional(v.string()),
   }).index("by_user", ["userId"])
     .index("by_category", ["categoryId"])
-    .index("by_subCategory", ["subCategoryId"]),
+    .index("by_subCategory", ["subCategoryId"])
+    .index("by_goal", ["goalId"])
+    .index("by_local_id", ["localId"]),
 
   projectResources: defineTable({
     userId: v.optional(v.union(v.id("users"), v.string())),
@@ -121,22 +141,28 @@ export default defineSchema({
     title: v.string(),
     url: v.optional(v.string()),
     note: v.optional(v.string()),
+    localId: v.optional(v.string()),
   }).index("by_user", ["userId"])
-    .index("by_project", ["projectId"]),
+    .index("by_project", ["projectId"])
+    .index("by_local_id", ["localId"]),
 
   projectChecklists: defineTable({
     userId: v.optional(v.union(v.id("users"), v.string())),
     projectId: v.id("projects"),
     text: v.string(),
     isCompleted: v.boolean(),
-  }).index("by_user", ["userId"]),
+    localId: v.optional(v.string()),
+  }).index("by_user", ["userId"])
+    .index("by_local_id", ["localId"]),
 
   taskChecklists: defineTable({
     userId: v.optional(v.union(v.id("users"), v.string())),
     todoId: v.id("todos"),
     text: v.string(),
     isCompleted: v.boolean(),
-  }).index("by_todo", ["todoId"]),
+    localId: v.optional(v.string()),
+  }).index("by_todo", ["todoId"])
+    .index("by_local_id", ["localId"]),
 
   yearlyGoals: defineTable({
     userId: v.union(v.id("users"), v.string()),
@@ -161,10 +187,19 @@ export default defineSchema({
     order: v.optional(v.number()),
     isCompleted: v.optional(v.boolean()),
     createdAt: v.optional(v.number()),
+    categoryId: v.optional(v.id("projectCategories")),
+    subCategoryId: v.optional(v.id("projectSubCategories")),
+    projectId: v.optional(v.string()),
+    tag: v.optional(v.string()),
+    hashtags: v.optional(v.array(v.string())),
+    localId: v.optional(v.string()),
   })
     .index("by_user_year", ["userId", "year"])
     .index("by_user_year_month", ["userId", "year", "month"])
-    .index("by_user_year_month_day", ["userId", "year", "month", "day"]),
+    .index("by_user_year_month_day", ["userId", "year", "month", "day"])
+    .index("by_category", ["categoryId"])
+    .index("by_project", ["projectId"])
+    .index("by_local_id", ["localId"]),
 
   yearlyAchievements: defineTable({
     userId: v.union(v.id("users"), v.string()),
@@ -179,10 +214,12 @@ export default defineSchema({
     templateId: v.optional(v.string()),
     isCompleted: v.optional(v.boolean()),
     createdAt: v.optional(v.number()),
+    localId: v.optional(v.string()),
   })
     .index("by_user_year", ["userId", "year"])
     .index("by_user_year_month", ["userId", "year", "month"])
-    .index("by_user_year_month_day", ["userId", "year", "month", "day"]),
+    .index("by_user_year_month_day", ["userId", "year", "month", "day"])
+    .index("by_local_id", ["localId"]),
 
   goalTemplates: defineTable({
     templateId: v.string(),
@@ -235,9 +272,11 @@ export default defineSchema({
     isCompleted: v.optional(v.boolean()),
     isExpanded: v.optional(v.boolean()),
     order: v.optional(v.number()),
+    localId: v.optional(v.string()),
   }).index("by_category_type", ["categoryId", "listType"])
     .index("by_subCategory_type", ["subCategoryId", "listType"])
-    .index("by_date_type", ["date", "listType"]),
+    .index("by_date_type", ["date", "listType"])
+    .index("by_local_id", ["localId"]),
 
       // ─── Topic Intelligence ─────────────────────────────────────────────────────
   

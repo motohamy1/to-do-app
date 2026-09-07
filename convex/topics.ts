@@ -331,3 +331,139 @@ export const createInferredTopic = internalMutation({
     });
   },
 });
+
+// ─── Query: Match Hashtag to Existing Spaces, Projects, or Goals ──────────────
+export const matchHashtag = query({
+  args: {
+    userId: v.union(v.id("users"), v.string()),
+    tag: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const rawTag = args.tag.trim();
+    const clean = rawTag.replace(/^#/, "").toLowerCase().trim();
+    if (!clean) return null;
+
+    // 1. Check Spaces (projectCategories) by tag or name
+    const categories = await ctx.db
+      .query("projectCategories")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    for (const cat of categories) {
+      const catTag = cat.tag ? cat.tag.replace(/^#/, "").toLowerCase().trim() : "";
+      const catName = cat.name.toLowerCase().trim();
+      if (catTag === clean || catName === clean) {
+        return {
+          match: true,
+          entityType: "space" as const,
+          id: cat._id,
+          name: cat.name,
+          color: cat.color,
+          icon: cat.icon,
+          tag: cat.tag || `#${cat.name.toLowerCase().replace(/\s+/g, "")}`,
+        };
+      }
+    }
+
+    // 2. Check Projects by name
+    const projects = await ctx.db
+      .query("projects")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+
+    for (const proj of projects) {
+      const projName = proj.name.toLowerCase().trim();
+      if (projName === clean) {
+        return {
+          match: true,
+          entityType: "project" as const,
+          id: proj._id,
+          name: proj.name,
+          color: proj.color,
+          icon: proj.icon,
+          categoryId: proj.categoryId,
+        };
+      }
+    }
+
+    // 3. Check Goals by tag, category, or title keyword
+    const goals = await ctx.db
+      .query("yearlyGoals")
+      .withIndex("by_user_year", (q) => q.eq("userId", args.userId))
+      .take(100);
+
+    for (const g of goals) {
+      const gTag = g.tag ? g.tag.replace(/^#/, "").toLowerCase().trim() : "";
+      const gCat = g.category ? g.category.toLowerCase().trim() : "";
+      if (gTag === clean || gCat === clean) {
+        return {
+          match: true,
+          entityType: "goal" as const,
+          id: g._id,
+          name: g.text,
+          color: g.color,
+          icon: g.icon,
+        };
+      }
+    }
+
+    return null;
+  },
+});
+
+// ─── Query: Get All Cross-Link Entities ──────────────────────────────────────
+export const getAllCrossLinkEntities = query({
+  args: {
+    userId: v.union(v.id("users"), v.string()),
+  },
+  handler: async (ctx, args) => {
+    const [spaces, projects, goals] = await Promise.all([
+      ctx.db
+        .query("projectCategories")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect(),
+      ctx.db
+        .query("projects")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect(),
+      ctx.db
+        .query("yearlyGoals")
+        .withIndex("by_user_year", (q) => q.eq("userId", args.userId))
+        .order("desc")
+        .take(200),
+    ]);
+
+    return {
+      spaces: spaces.map((s) => ({
+        id: s._id,
+        name: s.name,
+        color: s.color,
+        icon: s.icon,
+        tag: s.tag,
+        goalId: s.goalId,
+      })),
+      projects: projects.map((p) => ({
+        id: p._id,
+        name: p.name,
+        color: p.color,
+        icon: p.icon,
+        categoryId: p.categoryId,
+        subCategoryId: p.subCategoryId,
+        goalId: p.goalId,
+      })),
+      goals: goals.map((g) => ({
+        id: g._id,
+        year: g.year,
+        month: g.month,
+        day: g.day,
+        text: g.text,
+        color: g.color,
+        icon: g.icon,
+        category: g.category,
+        categoryId: g.categoryId,
+        projectId: g.projectId,
+        isCompleted: g.isCompleted,
+      })),
+    };
+  },
+});

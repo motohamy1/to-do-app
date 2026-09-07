@@ -5,14 +5,19 @@ import { useOfflineMutation } from '@/hooks/useOfflineMutation';
 import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import useTheme from '@/hooks/useTheme';
 import { useTranslation } from '@/utils/i18n';
+import { getServerNow } from '@/utils/offlineStorage';
+import { buildPauseUpdates, buildSubtaskPauseUpdates, buildSubtaskStartUpdates, startUpdate } from '@/utils/timerActions';
 import { scheduleReminderNotification, showTaskCompletedNotification } from '@/utils/notifications';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, LayoutAnimation, Modal, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
+import { useKeyboard } from '@/hooks/useKeyboard';
 import { InlineTimerPicker } from './InlineTimerPicker';
-import ProjectPickerModal from './ProjectPickerModal';
+import UniversalLinkPickerModal, { UniversalLinkSelection } from './UniversalLinkPickerModal';
+import SmartHashtagModal, { MatchedEntity } from './SmartHashtagModal';
+import { useConvex } from 'convex/react';
 import { SubtaskRow } from './SubtaskRow';
 
 
@@ -32,6 +37,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const { colors, isDarkMode } = useTheme();
   const { userId, language } = useAuth();
   const { t, isArabic } = useTranslation(language);
+  const { height: screenHeight } = useWindowDimensions();
+  const { keyboardHeight, isKeyboardVisible } = useKeyboard();
+  const convex = useConvex();
 
   // --- Task Nesting (Back Stack) ---
   const [taskStack, setTaskStack] = useState<Id<"todos">[]>([]);
@@ -39,24 +47,28 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const todo = useOfflineQuery<any>('todos.getById', api.todos.getById, currentTodoId ? { id: currentTodoId } : "skip");
   const subtasks = useOfflineQuery<any[]>('todos.getSubtasks', api.todos.getSubtasks, currentTodoId ? { parentId: currentTodoId } : "skip");
   const checklistItems = useOfflineQuery<any[]>('todos.getTaskChecklists', api.todos.getTaskChecklists, currentTodoId ? { todoId: currentTodoId } : "skip");
-  const [draftLink, setDraftLink] = useState<{ type: string; categoryId?: string; subCategoryId?: string; projectId?: string } | null>(null);
+  const [draftLink, setDraftLink] = useState<{ type?: string; categoryId?: string; subCategoryId?: string; projectId?: string; goalId?: string } | null>(null);
 
   const resolvedProjectId = currentTodoId ? todo?.projectId : (draftLink?.projectId || projectId);
   const resolvedCategoryId = currentTodoId ? todo?.categoryId : draftLink?.categoryId;
   const resolvedSubCategoryId = currentTodoId ? todo?.subCategoryId : draftLink?.subCategoryId;
+  const resolvedGoalId = currentTodoId ? todo?.goalId : draftLink?.goalId;
 
   const project = useOfflineQuery<any>('projects.getProjectMetadata', api.projects.getProjectMetadata, resolvedProjectId ? { id: resolvedProjectId } : "skip");
   const linkedCategory = useOfflineQuery<any>('projects.getCategory', api.projects.getCategory, resolvedCategoryId ? { id: resolvedCategoryId } : "skip");
   const linkedSubCategory = useOfflineQuery<any>('projects.getSubCategory', api.projects.getSubCategory, resolvedSubCategoryId ? { id: resolvedSubCategoryId } : "skip");
+  const linkedGoal = useOfflineQuery<any>('yearlyGoals.getGoal', api.yearlyGoals.getGoal, resolvedGoalId ? { id: resolvedGoalId } : "skip");
+
+  // Smart hashtag matching state
+  const [smartTagMatch, setSmartTagMatch] = useState<MatchedEntity | null>(null);
+  const [isSmartModalVisible, setIsSmartModalVisible] = useState(false);
+  const [pendingTagToResolve, setPendingTagToResolve] = useState('');
 
   const updateTodo = useOfflineMutation(api.todos.updateTodo, "todos:updateTodo");
   const linkTask = useOfflineMutation(api.todos.linkTask, "todos:linkTask");
   const updateStatus = useOfflineMutation(api.todos.updateStatus, "todos:updateStatus");
   const setTimer = useOfflineMutation(api.todos.setTimer, "todos:setTimer");
-  const startTimer = useOfflineMutation(api.todos.startTimer, "todos:startTimer");
-  const startSubtaskTimer = useOfflineMutation(api.todos.startSubtaskTimer, "todos:startSubtaskTimer");
-  const pauseTimer = useOfflineMutation(api.todos.pauseTimer, "todos:pauseTimer");
-  const pauseSubtaskTimer = useOfflineMutation(api.todos.pauseSubtaskTimer, "todos:pauseSubtaskTimer");
+  const setTimerRunState = useOfflineMutation(api.todos.setTimerRunState, "todos:setTimerRunState");
   const resetTimer = useOfflineMutation(api.todos.resetTimer, "todos:resetTimer");
   const removeTimer = useOfflineMutation(api.todos.removeTimer, "todos:removeTimer");
   const addTodo = useOfflineMutation(api.todos.addTodo, "todos:addTodo");
@@ -86,7 +98,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
     let interval: any;
     if (todo?.status === 'in_progress' && todo?.timerStartTime) {
       const tick = () => {
-        const elapsed = Math.max(0, Date.now() - todo.timerStartTime!);
+        const elapsed = Math.max(0, getServerNow() - todo.timerStartTime!);
         if (todo.timerDirection === 'up') {
           setTimeLeft(elapsed);
         } else if (todo.timerDuration) {
@@ -207,6 +219,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
         ...(draftLink?.categoryId ? { categoryId: draftLink.categoryId as any } : {}),
         ...(draftLink?.subCategoryId ? { subCategoryId: draftLink.subCategoryId as any } : {}),
         ...(draftLink?.projectId ? { projectId: draftLink.projectId } : projectId ? { projectId } : {}),
+        ...(draftLink?.goalId ? { goalId: draftLink.goalId as any } : {}),
         ...(hashtags.length > 0 ? { hashtags } : {}),
         ...(timerDirection === 'up' ? { timerDirection: 'up' } : ms > 0 ? { timerDuration: ms, timerDirection: 'down' } : {}),
       }).then((parentIdResult: any) => {
@@ -248,19 +261,78 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
     }
   };
 
-  const handleSelectProject = (selection: { type: string; categoryId?: string; subCategoryId?: string; projectId?: string }) => {
+  const handleSelectLink = (selection: UniversalLinkSelection) => {
     if (!currentTodoId) {
-      setDraftLink(selection.type === 'none' ? null : selection);
+      if (selection.type === 'none') {
+        setDraftLink(null);
+      } else if (selection.type === 'goal') {
+        setDraftLink(prev => ({ ...prev, goalId: selection.goalId }));
+      } else if (selection.type === 'category') {
+        setDraftLink(prev => ({ ...prev, categoryId: selection.categoryId, subCategoryId: undefined, projectId: undefined }));
+      } else if (selection.type === 'subCategory') {
+        setDraftLink(prev => ({ ...prev, categoryId: selection.categoryId, subCategoryId: selection.subCategoryId, projectId: undefined }));
+      } else if (selection.type === 'project') {
+        setDraftLink(prev => ({ ...prev, projectId: selection.projectId, categoryId: undefined, subCategoryId: undefined }));
+      }
       return;
     }
     if (selection.type === 'none') {
-      linkTask({ id: currentTodoId, categoryId: undefined, subCategoryId: undefined, projectId: undefined });
+      linkTask({ id: currentTodoId, categoryId: undefined, subCategoryId: undefined, projectId: undefined, goalId: undefined });
+    } else if (selection.type === 'goal') {
+      linkTask({ id: currentTodoId, goalId: selection.goalId, categoryId: todo?.categoryId, subCategoryId: todo?.subCategoryId, projectId: todo?.projectId });
     } else if (selection.type === 'category') {
-      linkTask({ id: currentTodoId, categoryId: selection.categoryId as any, subCategoryId: undefined, projectId: undefined });
+      linkTask({ id: currentTodoId, categoryId: selection.categoryId, subCategoryId: undefined, projectId: undefined, goalId: todo?.goalId });
     } else if (selection.type === 'subCategory') {
-      linkTask({ id: currentTodoId, categoryId: selection.categoryId as any, subCategoryId: selection.subCategoryId as any, projectId: undefined });
+      linkTask({ id: currentTodoId, categoryId: selection.categoryId, subCategoryId: selection.subCategoryId, projectId: undefined, goalId: todo?.goalId });
     } else if (selection.type === 'project') {
-      linkTask({ id: currentTodoId, categoryId: undefined, subCategoryId: undefined, projectId: selection.projectId });
+      linkTask({ id: currentTodoId, categoryId: undefined, subCategoryId: undefined, projectId: selection.projectId, goalId: todo?.goalId });
+    }
+  };
+
+  // Smart hashtag resolution
+  const checkAndAddHashtag = async (tagText: string) => {
+    const cleaned = tagText.trim().replace(/^#/, '').toLowerCase();
+    if (!cleaned) return;
+    if (hashtags.includes(cleaned)) {
+      setNewHashtag('');
+      return;
+    }
+
+    if (userId) {
+      try {
+        const match = await convex.query(api.topics.matchHashtag, { userId, tag: cleaned });
+        if (match && match.match) {
+          setPendingTagToResolve(cleaned);
+          setSmartTagMatch(match as any);
+          setIsSmartModalVisible(true);
+          return;
+        }
+      } catch (err) {
+        console.warn('Error matching hashtag:', err);
+      }
+    }
+
+    // Default: add directly as plain tag
+    addTagDirectly(cleaned);
+  };
+
+  const addTagDirectly = (tagText: string) => {
+    if (!hashtags.includes(tagText)) {
+      const newTags = [...hashtags, tagText];
+      setHashtags(newTags);
+      if (currentTodoId) updateTodo({ id: currentTodoId, hashtags: newTags });
+    }
+    setNewHashtag('');
+  };
+
+  const handleSmartLinkDirectly = (entity: MatchedEntity, tagText: string) => {
+    addTagDirectly(tagText);
+    if (entity.type === 'space') {
+      handleSelectLink({ type: 'category', categoryId: entity.id as any });
+    } else if (entity.type === 'project') {
+      handleSelectLink({ type: 'project', projectId: entity.id });
+    } else if (entity.type === 'goal') {
+      handleSelectLink({ type: 'goal', goalId: entity.id as any });
     }
   };
 
@@ -323,8 +395,17 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   }, [todo?.timerDuration, subtasks]);
 
   // Subtask handlers for SubtaskRow
-  const handleStartSubtask = (id: Id<"todos">) => startSubtaskTimer({ id });
-  const handlePauseSubtask = (id: Id<"todos">) => pauseSubtaskTimer({ id });
+  const handleStartSubtask = (id: Id<"todos">) => {
+    const sub = (subtasks || []).find((s: any) => s._id === id);
+    if (!sub) return;
+    setTimerRunState({ updates: buildSubtaskStartUpdates(sub, todo) });
+  };
+  const handlePauseSubtask = (id: Id<"todos">) => {
+    const sub = (subtasks || []).find((s: any) => s._id === id);
+    if (!sub) return;
+    const updates = buildSubtaskPauseUpdates(sub, subtasks || [], todo);
+    if (updates.length > 0) setTimerRunState({ updates });
+  };
   const handleToggleSubComplete = (id: Id<"todos">, currentStatus: string) => 
     updateStatus({ id, status: currentStatus === 'done' ? 'not_started' : 'done' });
   const handleDeleteSub = (id: Id<"todos">) => deleteTodo({ id });
@@ -454,9 +535,17 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
         <TouchableWithoutFeedback onPress={handleBack}>
           <View style={StyleSheet.absoluteFill} />
         </TouchableWithoutFeedback>
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
-          style={[styles.container, { backgroundColor: colors.bg }]}
+        <View 
+          style={[
+            styles.container, 
+            { 
+              backgroundColor: colors.bg,
+              marginBottom: keyboardHeight,
+              maxHeight: isKeyboardVisible 
+                ? Math.max(300, screenHeight - keyboardHeight - (Platform.OS === 'ios' ? 44 : 28)) 
+                : '92%',
+            }
+          ]}
         >
             {/* Header */}
            <View style={[styles.header, { borderBottomColor: colors.border + '40' }]}>
@@ -745,9 +834,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                         if (!currentTodoId) {
                           handleClose();
                         } else if (todo?.status === 'in_progress') {
-                          pauseTimer({ id: currentTodoId! });
-                        } else {
-                          startTimer({ id: currentTodoId! });
+                          const updates = buildPauseUpdates(todo as any, (subtasks || []) as any[]);
+                          if (updates.length > 0) setTimerRunState({ updates });
+                          else setTimerRunState({ updates: [{ id: currentTodoId, status: 'paused' }] });
+                        } else if (todo) {
+                          setTimerRunState({ updates: [startUpdate(todo as any)] });
                         }
                       }}
                     >
@@ -827,7 +918,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       setStatus('in_progress');
                       if (currentTodoId) {
                         if ((todo?.timerDuration && todo.timerDuration > 0) || todo?.timerDirection === 'up') {
-                          startTimer({ id: currentTodoId });
+                          setTimerRunState({ updates: [startUpdate(todo as any)] });
                         } else {
                           updateStatus({ id: currentTodoId, status: 'in_progress' });
                         }
@@ -933,25 +1024,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     placeholderTextColor={colors.textMuted}
                     value={newHashtag}
                     onChangeText={setNewHashtag}
+                    onFocus={() => { setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150); }}
                     onSubmitEditing={() => {
-                      const cleaned = newHashtag.trim().replace(/^#/, '').toLowerCase();
-                      if (cleaned && !hashtags.includes(cleaned)) {
-                        const newTags = [...hashtags, cleaned];
-                        setHashtags(newTags);
-                        if (currentTodoId) updateTodo({ id: currentTodoId, hashtags: newTags });
-                      }
-                      setNewHashtag('');
+                      checkAndAddHashtag(newHashtag);
                     }}
                     returnKeyType="done"
                   />
                   <TouchableOpacity onPress={() => {
-                      const cleaned = newHashtag.trim().replace(/^#/, '').toLowerCase();
-                      if (cleaned && !hashtags.includes(cleaned)) {
-                        const newTags = [...hashtags, cleaned];
-                        setHashtags(newTags);
-                        if (currentTodoId) updateTodo({ id: currentTodoId, hashtags: newTags });
-                      }
-                      setNewHashtag('');
+                    checkAndAddHashtag(newHashtag);
                   }}>
                     <Ionicons name="add-circle" size={24} color={newHashtag.trim() ? projectColor : colors.textMuted} />
                   </TouchableOpacity>
@@ -963,9 +1043,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                     if (hashtags.includes(preset)) return null;
                     return (
                       <TouchableOpacity key={preset} onPress={() => {
-                        const newTags = [...hashtags, preset];
-                        setHashtags(newTags);
-                        if (currentTodoId) updateTodo({ id: currentTodoId, hashtags: newTags });
+                        checkAndAddHashtag(preset);
                       }} style={{ paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}>
                         <Text style={{ fontSize: 12, color: colors.textMuted, fontWeight: '600' }}>+{preset}</Text>
                       </TouchableOpacity>
@@ -976,17 +1054,73 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
 
               {/* Link Section */}
               <View style={[styles.section]}>
-                <Text style={[styles.sectionLabel, { color: colors.surfaceText }]}>{isArabic ? "الارتباط" : "Link"}</Text>
-                <TouchableOpacity
-                  style={[styles.deadlineButton, { borderColor: linkedItem ? projectColor : colors.border, backgroundColor: linkedItem ? projectColor + '10' : 'transparent' }]}
-                  onPress={() => setProjectModalVisible(true)}
-                >
-                  <Ionicons name="link-outline" size={20} color={linkedItem ? projectColor : colors.textMuted} />
-                  <Text style={[styles.deadlineButtonText, { color: linkedItem ? colors.text : colors.textMuted }]}>
-                    {linkedItemName || (isArabic ? 'ربط بمشروع / فئة' : 'Link to Project / Category')}
-                  </Text>
-                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={[styles.sectionLabel, { color: colors.surfaceText, marginBottom: 0 }]}>{isArabic ? "الارتباطات" : "Links & Context"}</Text>
+                  <TouchableOpacity onPress={() => setProjectModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Ionicons name="add-circle-outline" size={16} color={projectColor} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: projectColor }}>{isArabic ? "تعديل" : "Edit Links"}</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ gap: 8 }}>
+                  {/* Space / Project Badge */}
+                  {linkedItem ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: projectColor + '15', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: projectColor + '30' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <Ionicons name="folder-outline" size={18} color={projectColor} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '600' }}>{isArabic ? "المساحة / المشروع" : "Space / Project"}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>{linkedItemName}</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity onPress={() => {
+                        if (!currentTodoId) {
+                          setDraftLink(prev => ({ ...prev, categoryId: undefined, subCategoryId: undefined, projectId: undefined }));
+                        } else {
+                          linkTask({ id: currentTodoId, categoryId: undefined, subCategoryId: undefined, projectId: undefined, goalId: todo?.goalId });
+                        }
+                      }}>
+                        <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  {/* Goal Badge */}
+                  {linkedGoal ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#8B5CF615', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#8B5CF630' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <Ionicons name="flag-outline" size={18} color="#8B5CF6" />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '600' }}>{isArabic ? "الهدف المرتبط" : "Linked Goal"}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>{linkedGoal.title}</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity onPress={() => {
+                        if (!currentTodoId) {
+                          setDraftLink(prev => ({ ...prev, goalId: undefined }));
+                        } else {
+                          linkTask({ id: currentTodoId, goalId: undefined, categoryId: todo?.categoryId, subCategoryId: todo?.subCategoryId, projectId: todo?.projectId });
+                        }
+                      }}>
+                        <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  {/* Empty state button if neither linked */}
+                  {!linkedItem && !linkedGoal && (
+                    <TouchableOpacity
+                      style={[styles.deadlineButton, { borderColor: colors.border, backgroundColor: 'transparent' }]}
+                      onPress={() => setProjectModalVisible(true)}
+                    >
+                      <Ionicons name="link-outline" size={20} color={colors.textMuted} />
+                      <Text style={[styles.deadlineButtonText, { color: colors.textMuted }]}>
+                        {isArabic ? 'ربط بمساحة، مشروع أو هدف' : 'Link to Space, Project, or Goal'}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  )}
+                </View>
               </View>
 
               {/* Checklist Section */}
@@ -1026,6 +1160,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                           onChangeText={setNewCheckItem}
                           onSubmitEditing={handleAddCheckItem}
                           autoFocus
+                          onFocus={() => { setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150); }}
                           onBlur={() => { if (!newCheckItem.trim()) setIsAddingCheck(false); }}
                         />
                         <TouchableOpacity onPress={handleAddCheckItem}>
@@ -1104,6 +1239,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                         ref={subtaskInputRef}
                       value={newSubtaskText}
                         onChangeText={setNewSubtaskText}
+                        onFocus={() => { setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150); }}
                         onSubmitEditing={() => {
                           if (newSubtaskText.trim()) {
                             if (newSubDuration || newSubDirection === 'up') handleAddSubtask();
@@ -1162,12 +1298,27 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
             </TouchableOpacity>
           </View>
 
-          <ProjectPickerModal
+          <UniversalLinkPickerModal
             visible={isProjectModalVisible}
             onClose={() => setProjectModalVisible(false)}
-            onSelect={handleSelectProject}
+            onSelect={handleSelectLink}
+            currentCategoryId={resolvedCategoryId}
+            currentProjectId={resolvedProjectId}
+            currentGoalId={resolvedGoalId}
           />
-        </KeyboardAvoidingView>
+
+          <SmartHashtagModal
+            visible={isSmartModalVisible}
+            tag={pendingTagToResolve}
+            matchedEntity={smartTagMatch}
+            onClose={() => setIsSmartModalVisible(false)}
+            onLinkDirectly={handleSmartLinkDirectly}
+            onKeepSeparate={(tag) => {
+              addTagDirectly(tag);
+              setIsSmartModalVisible(false);
+            }}
+          />
+        </View>
       </View>
     </Modal>
   );
@@ -1216,7 +1367,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 24,
-    paddingBottom: 60,
+    paddingBottom: 100,
   },
   timerPresets: {
     flexDirection: 'row',

@@ -14,7 +14,7 @@ interface WellbeingCardProps {
 export const WellbeingCard = ({ daily, weekly, monthly, compact = false, style }: WellbeingCardProps) => {
   const { colors } = useTheme();
   
-  if (!daily) return null;
+  if (!daily || Array.isArray(daily)) return null;
   
   const getScoreColor = (score: number) => {
     if (score >= 80) return colors.success;

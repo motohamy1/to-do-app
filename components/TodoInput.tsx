@@ -3,6 +3,7 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useAuth } from "@/hooks/useAuth";
 import { useOfflineMutation } from "@/hooks/useOfflineMutation";
+import { getServerNow } from "@/utils/offlineStorage";
 import useTheme from "@/hooks/useTheme";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -73,7 +74,11 @@ const TodoInput: React.FC<TodoInputProps> = ({ initialDate, projectId, onFocus }
         date: selectedDate,
           status: status,
           ...(timerDuration && { timerDuration }),
-          ...(autoStart && timerDuration && status !== 'done' ? { status: 'in_progress', timerStartTime: Date.now() } : {}),
+          // Auto-start state is captured at creation time in server-corrected
+          // time; the server stores these values verbatim (no second clock).
+          ...(autoStart && timerDuration && status !== 'done'
+            ? { status: 'in_progress', timerStartTime: getServerNow() }
+            : {}),
           ...(projectId ? { projectId } : {}),
         });
         const createdId = typeof todoIdResult === 'string' ? todoIdResult : (todoIdResult as any)?._id;

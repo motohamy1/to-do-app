@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,10 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -24,6 +25,8 @@ import AnimatedWavyHeader from '@/components/AnimatedWavyHeader';
 import LivePress from '@/components/LivePress';
 import { AIGoalGeneratorModal } from '@/components/AIGoalGeneratorModal';
 import { GoalFormModal, GoalFormData } from '@/components/GoalFormModal';
+import { GoalLinkedTasks } from '@/components/GoalLinkedTasks';
+import TaskDetailModal from '@/components/TaskDetailModal';
 import { SEED_TEMPLATES } from '@/convex/aiGoals';
 
 const months_en = [
@@ -133,6 +136,28 @@ export default function GoalsDetailScreen() {
   const [formModalMode, setFormModalMode] = useState<'create' | 'edit'>('create');
   const [formInitialCategory, setFormInitialCategory] = useState('');
   const [editingItem, setEditingItem] = useState<any | null>(null);
+  const [selectedTaskDetailId, setSelectedTaskDetailId] = useState<any | null>(null);
+
+  // Handle hardware back press on Android to dismiss open modals first
+  useFocusEffect(
+    useCallback(() => {
+      const onBackPress = () => {
+        if (formModalVisible) {
+          setFormModalVisible(false);
+          setEditingItem(null);
+          return true;
+        }
+        if (aiModalVisible) {
+          setAiModalVisible(false);
+          return true;
+        }
+        return false; // Allow stack navigator to pop the screen immediately
+      };
+
+      const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => sub.remove();
+    }, [formModalVisible, aiModalVisible])
+  );
 
   // Toggle expansion states
   const [expandedSectionIds, setExpandedSectionIds] = useState<Record<string, boolean>>({});
@@ -229,6 +254,9 @@ export default function GoalsDetailScreen() {
           color: formData.color,
           icon: formData.icon,
           milestones: formData.milestones,
+          categoryId: formData.categoryId,
+          subCategoryId: formData.subCategoryId,
+          projectId: formData.projectId,
         });
       } else {
         await updateAchievementMut({
@@ -251,6 +279,9 @@ export default function GoalsDetailScreen() {
         color: formData.color,
         icon: formData.icon,
         milestones: formData.milestones,
+        categoryId: formData.categoryId,
+        subCategoryId: formData.subCategoryId,
+        projectId: formData.projectId,
       };
       if (isMonth) args.month = month;
       if (isDay) {
@@ -962,6 +993,14 @@ export default function GoalsDetailScreen() {
                                   </View>
                                 </View>
                               )}
+
+                              {/* ─── Level 4: Linked Tasks (Cross-connected from Todos) ─── */}
+                              <GoalLinkedTasks
+                                goalId={goal._id}
+                                goalTitle={goal.text}
+                                goalColor={goal.color || '#8B5CF6'}
+                                onOpenTaskDetail={(tId) => setSelectedTaskDetailId(tId)}
+                              />
                             </View>
                           );
                         })}
@@ -1080,6 +1119,13 @@ export default function GoalsDetailScreen() {
           isArabic={isArabic}
           onSave={handleSaveGoalForm}
           onDelete={handleDeleteItem}
+        />
+
+        {/* ─── Task Detail Modal for Linked Tasks ─── */}
+        <TaskDetailModal
+          visible={!!selectedTaskDetailId}
+          onClose={() => setSelectedTaskDetailId(null)}
+          todoId={selectedTaskDetailId}
         />
       </SafeAreaView>
     </KeyboardAvoidingView>

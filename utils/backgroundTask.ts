@@ -30,6 +30,15 @@ TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => 
 
     try {
       const taskId = actionData.taskId as Id<"todos">;
+
+      // A temp id means the task was created offline and never synced; there
+      // is nothing to act on server-side.
+      if (typeof taskId !== 'string' || taskId.startsWith('temp_')) {
+        if (Notifications && notificationData.notification?.request?.identifier) {
+          await Notifications.dismissNotificationAsync(notificationData.notification.request.identifier);
+        }
+        return;
+      }
       
       // Verify if task still exists
       const task = await convex.query(api.todos.getById, { id: taskId });

@@ -9,6 +9,8 @@ import { useOfflineMutation } from '@/hooks/useOfflineMutation';
 import { useOfflineQuery } from '@/hooks/useOfflineQuery';
 import useTheme from '@/hooks/useTheme';
 import { useTranslation } from '@/utils/i18n';
+import { getServerNow } from '@/utils/offlineStorage';
+import { pauseUpdate, startUpdate } from '@/utils/timerActions';
 import CircularProgress from './CircularProgress';
 import LivePress from './LivePress';
 
@@ -73,8 +75,7 @@ const KanbanCard: React.FC<{
   const { colors, isDarkMode } = useTheme();
   const { t } = useTranslation(isArabic ? 'ar' : 'en');
   const updateStatus = useOfflineMutation(api.todos.updateStatus, 'todos:updateStatus');
-  const startTimer = useOfflineMutation(api.todos.startTimer, 'todos:startTimer');
-  const pauseTimer = useOfflineMutation(api.todos.pauseTimer, 'todos:pauseTimer');
+  const setTimerRunState = useOfflineMutation(api.todos.setTimerRunState, 'todos:setTimerRunState');
 
   // Subtasks & Project Queries
   const subtasks = useOfflineQuery<any[]>('todos.getSubtasks', api.todos.getSubtasks, { parentId: task._id });
@@ -91,7 +92,7 @@ const KanbanCard: React.FC<{
     let interval: any;
     if (task.status === 'in_progress' && task.timerStartTime) {
       const tick = () => {
-        const elapsed = Math.max(0, Date.now() - task.timerStartTime!);
+        const elapsed = Math.max(0, getServerNow() - task.timerStartTime!);
         if (task.timerDirection === 'up') {
           setTimeLeft(elapsed);
         } else if (task.timerDuration) {
@@ -158,16 +159,21 @@ const KanbanCard: React.FC<{
     e?.stopPropagation?.();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (isTimerSet) {
-      startTimer({ id: task._id });
+      setTimerRunState({ updates: [startUpdate(task)] });
+    } else {
+      updateStatus({ id: task._id, status: 'in_progress' });
     }
-    updateStatus({ id: task._id, status: 'in_progress' });
   };
 
   const handlePause = (e?: any) => {
     e?.stopPropagation?.();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isTimerSet) {
-      pauseTimer({ id: task._id });
+      const update = pauseUpdate(task);
+      if (update) {
+        setTimerRunState({ updates: [update] });
+        return;
+      }
     }
     updateStatus({ id: task._id, status: 'paused' });
   };
