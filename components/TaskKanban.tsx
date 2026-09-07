@@ -130,9 +130,9 @@ const KanbanCard: React.FC<{
 
   const circularProgressColor = task.status === 'done' ? colors.success
     : (task.status === 'not_done' || isPastDue) ? colors.danger
-    : task.status === 'in_progress' ? colors.warning
+    : task.status === 'in_progress' ? '#e5f19d'
     : task.status === 'paused' ? colors.textMuted
-    : colors.primary;
+    : '#F9A8D4';
 
   const timerDisplayLabel = useMemo(() => {
     if (task.status === 'done') return '✓';
@@ -508,14 +508,14 @@ const KanbanCard: React.FC<{
                     flexDirection: isArabic ? 'row-reverse' : 'row',
                     alignItems: 'center',
                     gap: 4,
-                    backgroundColor: colors.primary,
+                    backgroundColor: task.status === 'not_started' ? '#F9A8D4' : colors.primary,
                     paddingHorizontal: 10,
                     paddingVertical: 4.5,
                     borderRadius: 10,
                   }}
                 >
-                  <Ionicons name="play" size={11} color={isDarkMode ? '#0E0F14' : '#FFFFFF'} />
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: isDarkMode ? '#0E0F14' : '#FFFFFF' }}>
+                  <Ionicons name="play" size={11} color={task.status === 'not_started' ? '#0E0F14' : (isDarkMode ? '#0E0F14' : '#FFFFFF')} />
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: task.status === 'not_started' ? '#0E0F14' : (isDarkMode ? '#0E0F14' : '#FFFFFF') }}>
                     {isArabic ? 'بدء' : 'Start'}
                   </Text>
                 </TouchableOpacity>

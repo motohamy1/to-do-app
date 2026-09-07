@@ -241,7 +241,7 @@ export const SubtaskRow = ({
             />
           </TouchableOpacity>
           <TextInput
-            style={[{ flex: 1, color: contentColor, fontSize: 16, backgroundColor: isBrightBg ? colors.text + '08' : colors.bg, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: isBrightBg ? colors.text + '40' : colors.primary, fontWeight: '600' }, isArabic && { textAlign: 'right' }]}
+            style={[{ flex: 1, color: contentColor, fontSize: 16, backgroundColor: isBrightBg ? colors.text + '08' : colors.bg, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: isBrightBg ? colors.text + '40' : '#e5f19d', fontWeight: '600' }, isArabic && { textAlign: 'right' }]}
             value={editText}
             onChangeText={setEditText}
             autoFocus
@@ -273,6 +273,7 @@ export const SubtaskRow = ({
             colors={colors}
             t={t}
             isArabic={isArabic}
+            accentColor="#e5f19d"
             onSave={(ms, direction) => {
               onSetTimer(sub._id, ms, direction);
               setShowTimerPicker(false);
@@ -283,10 +284,10 @@ export const SubtaskRow = ({
 
         <View style={[{ flexDirection: 'row', gap: 10 }]}>
            <TouchableOpacity
-            style={{ flex: 1, backgroundColor: sub.status === 'in_progress' ? colors.warning : colors.primary, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
+            style={{ flex: 1, backgroundColor: sub.status === 'in_progress' ? colors.warning : '#e5f19d', paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
             onPress={handleSaveEdit}
           >
-            <Text style={{ color: sub.status === 'in_progress' ? colors.surfaceText : colors.primaryText, fontWeight: '800', fontSize: 14 }}>{t.save}</Text>
+            <Text style={{ color: sub.status === 'in_progress' ? colors.surfaceText : '#101116', fontWeight: '800', fontSize: 14 }}>{t.save}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={{ flex: 1, backgroundColor: isBrightBg ? colors.text + '15' : colors.border, paddingVertical: 10, borderRadius: 10, alignItems: 'center' }}
@@ -416,7 +417,7 @@ export const SubtaskRow = ({
             <Ionicons name={hasLinks ? "link" : "link-outline"} size={19} color={hasLinks ? colors.primary : colors.textMuted} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => (setIsEditing(true), setEditText(sub.text))} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="create-outline" size={19} color={isBrightBg ? colors.text : colors.primary} />
+            <Ionicons name="create-outline" size={19} color={isBrightBg ? colors.text : '#e5f19d'} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => onDelete(sub._id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="trash-outline" size={19} color={colors.danger} />

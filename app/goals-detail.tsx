@@ -499,21 +499,21 @@ export default function GoalsDetailScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.aiInviteTitle, { color: colors.text, textAlign: isArabic ? 'right' : 'left' }]}>
                         {isArabic
-                          ? isMonth
+                          ? isDay
+                            ? `ابنِ أهداف يوم ${day} بالذكاء الاصطناعي`
+                            : isMonth
                             ? 'ابنِ خطة الشهر بالذكاء الاصطناعي'
                             : `ابنِ خطة عام ${year} بالذكاء الاصطناعي`
+                          : isDay
+                          ? `Build Day ${day} Goals with AI`
                           : isMonth
                           ? 'Build Monthly Blueprint with AI'
                           : `Build ${year} Annual Blueprint with AI`}
                       </Text>
                       <Text style={[styles.aiInviteDesc, { color: colors.textMuted, textAlign: isArabic ? 'right' : 'left' }]}>
                         {isArabic
-                          ? isMonth
-                            ? 'تحدث أو اكتب أهدافك وسيقوم الذكاء الاصطناعي بتنظيمها في قوالب هندسية راقية.'
-                            : 'تحدث أو اكتب رؤيتك وأهدافك الكبرى وسيقوم الذكاء الاصطناعي بتنظيمها في إطار استراتيجي راقٍ.'
-                          : isMonth
-                          ? 'Speak or type your goals. AI crafts custom milestones & categories.'
-                          : 'Speak or type your annual vision. AI crafts strategic milestones & categories.'}
+                          ? 'تحدث أو اكتب ما تريد إنجازه بلغتك الطبيعية وسيقوم مهندس الذكاء الاصطناعي بصياغة المهام والقالب الأنسب.'
+                          : 'Speak or type what you wish to achieve. AI structures milestones & recommends UI templates.'}
                       </Text>
                     </View>
                     <Ionicons
@@ -817,6 +817,7 @@ export default function GoalsDetailScreen() {
                           const milestones: any[] = goal.milestones || [];
                           const completedMilestones = milestones.filter((m) => m.isCompleted).length;
                           const isGoalExpanded = expandedGoalIds[goal._id] ?? (milestones.length > 0);
+                          const isPillar = goal.templateId === 'pillar';
 
                           return (
                             <View
@@ -827,7 +828,17 @@ export default function GoalsDetailScreen() {
                                   backgroundColor: isDarkMode ? '#1E1E28' : '#F9FAFB',
                                   borderColor: goal.isCompleted
                                     ? colors.success + '40'
+                                    : goal.templateId === 'sprint'
+                                    ? '#EF444450'
+                                    : goal.templateId === 'metric'
+                                    ? '#F59E0B40'
+                                    : goal.templateId === 'roadmap'
+                                    ? '#3B82F640'
                                     : isDarkMode ? '#2D2D3E' : '#EEF2F6',
+                                  borderLeftWidth: isPillar ? (isArabic ? 1 : 4) : 1,
+                                  borderRightWidth: isPillar ? (isArabic ? 4 : 1) : 1,
+                                  borderLeftColor: isPillar ? (isArabic ? (isDarkMode ? '#2D2D3E' : '#EEF2F6') : '#8B5CF6') : undefined,
+                                  borderRightColor: isPillar ? (isArabic ? '#8B5CF6' : (isDarkMode ? '#2D2D3E' : '#EEF2F6')) : undefined,
                                 },
                               ]}
                             >
@@ -876,13 +887,61 @@ export default function GoalsDetailScreen() {
                                     </Text>
                                   ) : null}
 
+                                  {/* Metric Template Progress Bar */}
+                                  {goal.templateId === 'metric' && milestones.length > 0 && (
+                                    <View style={{ height: 4, borderRadius: 2, backgroundColor: isDarkMode ? '#2D2D3E' : '#E2E8F0', marginTop: 6, overflow: 'hidden' }}>
+                                      <View
+                                        style={{
+                                          width: `${Math.max((completedMilestones / milestones.length) * 100, 4)}%`,
+                                          height: '100%',
+                                          backgroundColor: '#F59E0B',
+                                          borderRadius: 2,
+                                        }}
+                                      />
+                                    </View>
+                                  )}
+
                                   {/* Sub-Milestones Toggle Pill or Completed Trophy Badge */}
-                                  <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, marginTop: 7 }}>
+                                  <View style={{ flexDirection: isArabic ? 'row-reverse' : 'row', alignItems: 'center', gap: 6, marginTop: 7, flexWrap: 'wrap' }}>
                                     {goal.isCompleted && (
                                       <View style={[styles.achievedBadge, isArabic && styles.rowReverse]}>
                                         <Ionicons name="trophy" size={11} color="#059669" />
                                         <Text style={styles.achievedBadgeText}>
                                           {isArabic ? 'إنجاز محقق' : 'Completed Win'}
+                                        </Text>
+                                      </View>
+                                    )}
+
+                                    {/* Template Specific Badges */}
+                                    {goal.templateId === 'roadmap' && (
+                                      <View style={[styles.templateTagBadge, { backgroundColor: '#3B82F618' }, isArabic && styles.rowReverse]}>
+                                        <Ionicons name="git-commit-outline" size={11} color="#3B82F6" />
+                                        <Text style={[styles.templateTagText, { color: '#3B82F6' }]}>
+                                          {isArabic ? 'خارطة طريق' : 'Roadmap'}
+                                        </Text>
+                                      </View>
+                                    )}
+                                    {goal.templateId === 'metric' && (
+                                      <View style={[styles.templateTagBadge, { backgroundColor: '#F59E0B18' }, isArabic && styles.rowReverse]}>
+                                        <Ionicons name="analytics-outline" size={11} color="#F59E0B" />
+                                        <Text style={[styles.templateTagText, { color: '#F59E0B' }]}>
+                                          {Math.round(milestones.length > 0 ? (completedMilestones / milestones.length) * 100 : (goal.isCompleted ? 100 : 0))}%
+                                        </Text>
+                                      </View>
+                                    )}
+                                    {goal.templateId === 'sprint' && (
+                                      <View style={[styles.templateTagBadge, { backgroundColor: '#EF444418' }, isArabic && styles.rowReverse]}>
+                                        <Ionicons name="flash" size={11} color="#EF4444" />
+                                        <Text style={[styles.templateTagText, { color: '#EF4444' }]}>
+                                          {isArabic ? 'سبرنت' : 'Sprint'}
+                                        </Text>
+                                      </View>
+                                    )}
+                                    {goal.templateId === 'pillar' && (
+                                      <View style={[styles.templateTagBadge, { backgroundColor: '#8B5CF618' }, isArabic && styles.rowReverse]}>
+                                        <Ionicons name="shield-checkmark" size={11} color="#8B5CF6" />
+                                        <Text style={[styles.templateTagText, { color: '#8B5CF6' }]}>
+                                          {isArabic ? 'ركيزة' : 'Pillar'}
                                         </Text>
                                       </View>
                                     )}
@@ -939,7 +998,7 @@ export default function GoalsDetailScreen() {
                                     { borderTopColor: isDarkMode ? '#2D2D3E' : '#E5E7EB' },
                                   ]}
                                 >
-                                  {milestones.map((ms) => (
+                                  {milestones.map((ms, idx) => (
                                     <TouchableOpacity
                                       key={ms.id}
                                       style={[styles.milestoneCheckRow, isArabic && styles.rowReverse]}
@@ -951,6 +1010,13 @@ export default function GoalsDetailScreen() {
                                         size={17}
                                         color={ms.isCompleted ? colors.success : colors.textMuted}
                                       />
+                                      {goal.templateId === 'roadmap' && (
+                                        <View style={[styles.roadmapStepIndexBadge, { backgroundColor: (goal.color || '#3B82F6') + '20' }]}>
+                                          <Text style={[styles.roadmapStepIndexText, { color: goal.color || '#3B82F6' }]}>
+                                            {idx + 1}
+                                          </Text>
+                                        </View>
+                                      )}
                                       <Text
                                         style={[
                                           styles.milestoneCheckText,
@@ -1098,8 +1164,10 @@ export default function GoalsDetailScreen() {
           onClose={() => setAiModalVisible(false)}
           year={year}
           month={month}
+          day={day}
           userId={userId || ''}
           isArabic={isArabic}
+          existingCategories={categoriesList}
           onPlanApplied={() => {
             // Refreshes when blueprint is applied
           }}
@@ -1535,5 +1603,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.28,
     shadowRadius: 10,
     elevation: 8,
+  },
+  templateTagBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  templateTagText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  roadmapStepIndexBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  roadmapStepIndexText: {
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

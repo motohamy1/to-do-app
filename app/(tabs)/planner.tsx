@@ -341,11 +341,11 @@ const Planner = () => {
             const iconBtnColor = isCurrent ? currentMonthPalette.ink : colors.primary;
             const capsuleBg = isCurrent ? currentMonthPalette.ink + '0E' : (isDarkMode ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)');
             const capsuleBorder = isCurrent ? currentMonthPalette.ink + '18' : colors.border;
-            const flagIconColor = isCurrent ? currentMonthPalette.ink : (isDarkMode ? '#D4FF00' : colors.primary);
+            const flagIconColor = isCurrent ? currentMonthPalette.ink : (isDarkMode ? '#e5f19d' : colors.primary);
             const trophyIconColor = isCurrent ? currentMonthPalette.ink : '#FBBF24';
             const progressTrackBg = isCurrent ? currentMonthPalette.ink + '1A' : (isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)');
-            const progressFillBg = isCurrent ? currentMonthPalette.accent : (isDarkMode ? '#D4FF00' : colors.primary);
-            const progressTextColor = isCurrent ? currentMonthPalette.ink : (isDarkMode ? '#D4FF00' : colors.primary);
+            const progressFillBg = isCurrent ? currentMonthPalette.accent : (isDarkMode ? '#e5f19d' : colors.primary);
+            const progressTextColor = isCurrent ? currentMonthPalette.ink : (isDarkMode ? '#e5f19d' : colors.primary);
 
             return (
               <View key={year} style={{ width: screenWidth, paddingHorizontal: 16 }}>

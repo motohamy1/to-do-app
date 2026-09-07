@@ -300,9 +300,9 @@ const Index = () => {
         ].sort(byPriority);
 
     const columns: KanbanColumn[] = [
-      { key: 'todo', title: t.toDoColumn, color: colors.primary, tasks: todoCol },
-      { key: 'in_progress', title: t.inProgressColumn, color: colors.warning, tasks: inProgressCol },
-      { key: 'done', title: t.doneColumn, color: colors.success, tasks: doneCol },
+      { key: 'todo', title: t.toDoColumn, color: '#F9A8D4', tasks: todoCol },
+      { key: 'in_progress', title: t.inProgressColumn, color: '#e5f19d', tasks: inProgressCol },
+      { key: 'done', title: t.doneColumn, color: '#10B981', tasks: doneCol },
       { key: 'not_done', title: t.notDoneColumn, color: colors.danger, tasks: notDoneCol },
     ];
 

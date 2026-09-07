@@ -104,7 +104,7 @@ export const ProductivityTrends = ({ weekly, monthly, style }: ProductivityTrend
 
 const TrendCard = ({ period, score, trend, velocity, streak, peakHours, color }: any) => {
   const { colors } = useTheme();
-  const safeTrend = trend || { text: 'N/A', color: colors.textMuted, icon: 'remove' };
+  const safeTrend = trend ?? { text: 'N/A', color: colors.textMuted, icon: 'remove' };
   const safePeakHours = Array.isArray(peakHours) ? peakHours : [];
   return (
   <View style={[styles.trendCard, { borderColor: color }]}>
