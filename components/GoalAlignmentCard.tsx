@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import useTheme from '@/hooks/useTheme';
 
@@ -29,13 +29,13 @@ export const GoalAlignmentCard = ({ goals, style }: GoalAlignmentCardProps) => {
         </View>
       </View>
       
-      <FlatList
-        data={goals}
-        keyExtractor={item => item.goalId}
-        renderItem={({ item }) => {
+      <View style={styles.listContent}>
+        {goals.map((item, index) => {
           const progressColor = getProgressColor(item.progressPercent);
           return (
-            <View style={styles.goalRow}>
+            <React.Fragment key={item.goalId}>
+              {index > 0 && <View style={styles.separator} />}
+              <View style={styles.goalRow}>
               <View style={[styles.goalContent, { flex: 1 }]}>
                 <Text style={styles.goalText}>{item.goalText}</Text>
                 <View style={styles.progressContainer}>
@@ -59,13 +59,11 @@ export const GoalAlignmentCard = ({ goals, style }: GoalAlignmentCardProps) => {
                   </Text>
                 </View>
               )}
-            </View>
+              </View>
+            </React.Fragment>
           );
-        }}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
+        })}
+      </View>
     </View>
   );
 };
