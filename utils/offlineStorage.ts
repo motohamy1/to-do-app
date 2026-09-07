@@ -836,6 +836,16 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
         return [...list.filter((c: any) => c._id !== tempId), newCat];
       });
 
+      // Ensure default user query cache key is also seeded if touchedCatKeys was empty
+      const defaultUserCatKey = args.userId ? getCacheKey('projects.getCategories', { userId: args.userId }) : 'CACHE_projects.getCategories_{}';
+      if (!touchedCatKeys.includes(defaultUserCatKey)) {
+        const currentList = memoryCache[defaultUserCatKey];
+        const nextList = Array.isArray(currentList) ? [...currentList.filter((c: any) => c._id !== tempId), newCat] : [newCat];
+        memoryCache[defaultUserCatKey] = nextList;
+        AsyncStorage.setItem(defaultUserCatKey, JSON.stringify(nextList)).catch(() => {});
+        touchedCatKeys.push(defaultUserCatKey);
+      }
+
       const getCatKey = getCacheKey('projects.getCategory', { id: tempId });
       memoryCache[getCatKey] = newCat;
       AsyncStorage.setItem(getCatKey, JSON.stringify(newCat)).catch(() => {});

@@ -27,7 +27,7 @@ import { AIGoalGeneratorModal } from '@/components/AIGoalGeneratorModal';
 import { GoalFormModal, GoalFormData } from '@/components/GoalFormModal';
 import { GoalLinkedTasks } from '@/components/GoalLinkedTasks';
 import TaskDetailModal from '@/components/TaskDetailModal';
-import { SEED_TEMPLATES } from '@/convex/aiGoals';
+import { SEED_TEMPLATES } from '@/constants/goalTemplates';
 
 const months_en = [
   'January', 'February', 'March', 'April', 'May', 'June',

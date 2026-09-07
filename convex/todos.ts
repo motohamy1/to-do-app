@@ -142,15 +142,17 @@ export const addTodo = mutation({
     });
 
     // Process hashtags for topic intelligence
-    await ctx.runMutation(internal.topics.processTodoHashtags, {
-      userId: args.userId,
-      todoId,
-      hashtags: args.hashtags,
-      projectId: args.projectId,
-      categoryId: args.categoryId,
-      subCategoryId: args.subCategoryId,
-      isNew: true,
-    });
+    if (args.hashtags && args.hashtags.length > 0) {
+      await ctx.runMutation(internal.topics.processTodoHashtags, {
+        userId: args.userId,
+        todoId,
+        hashtags: args.hashtags,
+        projectId: args.projectId,
+        categoryId: args.categoryId,
+        subCategoryId: args.subCategoryId,
+        isNew: true,
+      });
+    }
 
     if (args.parentId) {
       const parent = await ctx.db.get(args.parentId);

@@ -1,0 +1,43 @@
+node_modules
+.expo
+dist
+web-build
+expo-env.d.ts
+
+# native folders
+/ios
+/android
+.kotlin
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# debug & temp
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+.env*.local
+.env
+*.tsbuildinfo
+app-example
+
+# agent & AI cache
+.agent
+.agents
+.claude
+.junie
+.gemini
+.cursor
+.copilot
+.commandcode
+.idea
+.playwright-mcp
+.impeccable
+specs
+graphify-out
+graphify

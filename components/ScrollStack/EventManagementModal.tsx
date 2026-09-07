@@ -19,6 +19,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTranslation } from '@/utils/i18n';
 import { createScrollStackStyles } from '@/assets/styles/scrollStack.styles';
 import { Id } from '@/convex/_generated/dataModel';
+import { useKeyboard } from '@/hooks/useKeyboard';
+import { useWindowDimensions } from 'react-native';
 
 export type ManagedItemType = 'reminder' | 'meeting' | 'appointment';
 
@@ -56,6 +58,8 @@ export const EventManagementModal: React.FC<EventManagementModalProps> = ({
   const { language } = useAuth();
   const { t, isArabic } = useTranslation(language);
   const styles = createScrollStackStyles(colors, isArabic, isDarkMode);
+  const { height: screenHeight } = useWindowDimensions();
+  const { keyboardHeight, isKeyboardVisible } = useKeyboard();
 
   const [title, setTitle] = useState('');
   const [itemType, setItemType] = useState<ManagedItemType>('reminder');
@@ -184,7 +188,15 @@ export const EventManagementModal: React.FC<EventManagementModalProps> = ({
           <TouchableWithoutFeedback>
             <KeyboardAvoidingView
               behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              style={styles.modalContent}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+              style={[
+                styles.modalContent,
+                {
+                  maxHeight: isKeyboardVisible
+                    ? Math.max(320, screenHeight - keyboardHeight - (Platform.OS === 'ios' ? 44 : 28))
+                    : '90%',
+                },
+              ]}
             >
               {/* Drag Handle */}
               <View style={styles.modalDragHandle} />
@@ -199,7 +211,11 @@ export const EventManagementModal: React.FC<EventManagementModalProps> = ({
                 </TouchableOpacity>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingBottom: isKeyboardVisible ? 140 : 40 }}
+              >
                 <View style={styles.modalForm}>
                   {/* Type Selector: Reminder / Meeting / Appointment */}
                   <View style={styles.modalInputGroup}>

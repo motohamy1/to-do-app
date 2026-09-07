@@ -14,7 +14,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { FileSystemUploadType } from 'expo-file-system/legacy';
 import { useAction, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -22,7 +22,7 @@ import useTheme from '@/hooks/useTheme';
 import { useTranslation } from '@/utils/i18n';
 import LivePress from '@/components/LivePress';
 import { VoiceRecordModal } from '@/components/VoiceRecordModal';
-import { GOAL_UI_TEMPLATES } from '@/convex/aiGoals';
+import { GOAL_UI_TEMPLATES } from '@/constants/goalTemplates';
 
 export interface MilestoneItem {
   id: string;

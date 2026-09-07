@@ -105,7 +105,7 @@ export const processTodoHashtags = internalMutation({
     projectId: v.optional(v.string()),
     categoryId: v.optional(v.id("projectCategories")),
     subCategoryId: v.optional(v.id("projectSubCategories")),
-    isNew: v.boolean(),
+    isNew: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     if (!args.hashtags || args.hashtags.length === 0) return;

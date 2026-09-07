@@ -52,6 +52,16 @@ export const getEffectiveTaskDay = (
   },
   defaultDay: number = startOfDay(Date.now())
 ): number => {
+  // If task has an explicit scheduled date, that date is always its primary calendar day anchor
+  if (task.date !== undefined) {
+    return startOfDay(task.date);
+  }
+
+  // If task has a due date but no explicit date, use due date
+  if (task.dueDate !== undefined) {
+    return startOfDay(task.dueDate);
+  }
+
   const isDone = task.status === 'done' || task.isCompleted;
 
   if (isDone && task.completedAt) {
@@ -60,12 +70,10 @@ export const getEffectiveTaskDay = (
 
     if (compDate.getHours() < DAY_CUTOFF_HOUR) {
       // Completed before 7:00 AM -> belongs to the previous day
-      const scheduledDay = task.date !== undefined ? startOfDay(task.date) : undefined;
       const creationDay = task._creationTime ? startOfDay(task._creationTime) : undefined;
-      const originDay = scheduledDay ?? creationDay;
 
-      if (originDay !== undefined && originDay < compDayStart) {
-        return originDay;
+      if (creationDay !== undefined && creationDay < compDayStart) {
+        return creationDay;
       }
       return compDayStart - 86400000;
     }
@@ -73,11 +81,7 @@ export const getEffectiveTaskDay = (
     return compDayStart;
   }
 
-  // Active / pending task
-  if (task.date !== undefined) {
-    return startOfDay(task.date);
-  }
-
+  // Active / pending task without date
   if (task._creationTime) {
     return startOfDay(task._creationTime);
   }

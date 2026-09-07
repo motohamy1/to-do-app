@@ -387,6 +387,8 @@ const TodoCard: React.FC<TodoCardProps> = ({ todo, onSetTimer, onLongPress, onLi
     || project?.name 
     || linkedSubCategory?.name 
     || linkedCategory?.name 
+    || linkedGoal?.text
+    || linkedGoal?.title
     || (todo.dueDate ? `${isArabic ? 'الموعد: ' : 'Due: '}${new Date(todo.dueDate).toLocaleDateString(isArabic ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric' })}` : '');
 
   // Status configuration matching the 4-color palette
