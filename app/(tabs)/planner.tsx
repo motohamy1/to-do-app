@@ -1417,14 +1417,15 @@ const Planner = () => {
           onClose={() => { setProjectModalVisible(false); setSelectedTodoId(null); }}
           onSelect={(selection) => { 
             if (!selectedTodoId) return;
+            const currentTodo = todos.find(t => t._id === selectedTodoId);
             if (selection.type === 'none') {
-              linkTaskMutation({ id: selectedTodoId, categoryId: undefined, subCategoryId: undefined, projectId: undefined });
+              linkTaskMutation({ id: selectedTodoId, categoryId: undefined, subCategoryId: undefined, projectId: undefined, goalId: currentTodo?.goalId });
             } else if (selection.type === 'category') {
-              linkTaskMutation({ id: selectedTodoId, categoryId: selection.categoryId, subCategoryId: undefined, projectId: undefined });
+              linkTaskMutation({ id: selectedTodoId, categoryId: selection.categoryId, subCategoryId: undefined, projectId: undefined, goalId: currentTodo?.goalId });
             } else if (selection.type === 'subCategory') {
-              linkTaskMutation({ id: selectedTodoId, categoryId: selection.categoryId, subCategoryId: selection.subCategoryId, projectId: undefined });
+              linkTaskMutation({ id: selectedTodoId, categoryId: selection.categoryId, subCategoryId: selection.subCategoryId, projectId: undefined, goalId: currentTodo?.goalId });
             } else if (selection.type === 'project') {
-              linkTaskMutation({ id: selectedTodoId, categoryId: undefined, subCategoryId: undefined, projectId: selection.projectId });
+              linkTaskMutation({ id: selectedTodoId, categoryId: undefined, subCategoryId: undefined, projectId: selection.projectId, goalId: currentTodo?.goalId });
             }
           }}
         />

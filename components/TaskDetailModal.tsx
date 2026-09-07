@@ -377,6 +377,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const [isAddingCheck, setIsAddingCheck] = useState(false);
   const [checklistOpen, setChecklistOpen] = useState(true);
   const [isProjectModalVisible, setProjectModalVisible] = useState(false);
+  const [projectModalTab, setProjectModalTab] = useState<'spaces' | 'goals'>('spaces');
 
   const computedTimerMs = useMemo(() => {
     const h = parseInt(hours) || 0;
@@ -1058,7 +1059,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
               <View style={[styles.section]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Text style={[styles.sectionLabel, { color: colors.surfaceText, marginBottom: 0 }]}>{isArabic ? "الارتباطات" : "Links & Context"}</Text>
-                  <TouchableOpacity onPress={() => setProjectModalVisible(true)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setProjectModalTab('spaces');
+                      setProjectModalVisible(true);
+                    }} 
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  >
                     <Ionicons name="add-circle-outline" size={16} color={projectColor} />
                     <Text style={{ fontSize: 12, fontWeight: '700', color: projectColor }}>{isArabic ? "تعديل" : "Edit Links"}</Text>
                   </TouchableOpacity>
@@ -1068,13 +1075,19 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                   {/* Space / Project Badge */}
                   {linkedItem ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: projectColor + '15', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: projectColor + '30' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                      <TouchableOpacity 
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}
+                        onPress={() => {
+                          setProjectModalTab('spaces');
+                          setProjectModalVisible(true);
+                        }}
+                      >
                         <Ionicons name="folder-outline" size={18} color={projectColor} />
                         <View style={{ flex: 1 }}>
                           <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '600' }}>{isArabic ? "المساحة / المشروع" : "Space / Project"}</Text>
                           <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>{linkedItemName}</Text>
                         </View>
-                      </View>
+                      </TouchableOpacity>
                       <TouchableOpacity onPress={() => {
                         if (!currentTodoId) {
                           setDraftLink(prev => ({ ...prev, categoryId: undefined, subCategoryId: undefined, projectId: undefined }));
@@ -1085,18 +1098,38 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                         <Ionicons name="close-circle" size={18} color={colors.textMuted} />
                       </TouchableOpacity>
                     </View>
-                  ) : null}
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.deadlineButton, { borderColor: colors.border, backgroundColor: 'transparent' }]}
+                      onPress={() => {
+                        setProjectModalTab('spaces');
+                        setProjectModalVisible(true);
+                      }}
+                    >
+                      <Ionicons name="folder-open-outline" size={18} color={colors.textMuted} />
+                      <Text style={[styles.deadlineButtonText, { color: colors.textMuted, fontSize: 13 }]}>
+                        {isArabic ? '+ ربط بمساحة أو مشروع' : '+ Link Space or Project'}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
+                    </TouchableOpacity>
+                  )}
 
                   {/* Goal Badge */}
                   {linkedGoal ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#8B5CF615', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#8B5CF630' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                      <TouchableOpacity 
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}
+                        onPress={() => {
+                          setProjectModalTab('goals');
+                          setProjectModalVisible(true);
+                        }}
+                      >
                         <Ionicons name="flag-outline" size={18} color="#8B5CF6" />
                         <View style={{ flex: 1 }}>
                           <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '600' }}>{isArabic ? "الهدف المرتبط" : "Linked Goal"}</Text>
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>{linkedGoal.title}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: colors.text }} numberOfLines={1}>{linkedGoal.text || linkedGoal.title}</Text>
                         </View>
-                      </View>
+                      </TouchableOpacity>
                       <TouchableOpacity onPress={() => {
                         if (!currentTodoId) {
                           setDraftLink(prev => ({ ...prev, goalId: undefined }));
@@ -1107,19 +1140,19 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                         <Ionicons name="close-circle" size={18} color={colors.textMuted} />
                       </TouchableOpacity>
                     </View>
-                  ) : null}
-
-                  {/* Empty state button if neither linked */}
-                  {!linkedItem && !linkedGoal && (
+                  ) : (
                     <TouchableOpacity
                       style={[styles.deadlineButton, { borderColor: colors.border, backgroundColor: 'transparent' }]}
-                      onPress={() => setProjectModalVisible(true)}
+                      onPress={() => {
+                        setProjectModalTab('goals');
+                        setProjectModalVisible(true);
+                      }}
                     >
-                      <Ionicons name="link-outline" size={20} color={colors.textMuted} />
-                      <Text style={[styles.deadlineButtonText, { color: colors.textMuted }]}>
-                        {isArabic ? 'ربط بمساحة، مشروع أو هدف' : 'Link to Space, Project, or Goal'}
+                      <Ionicons name="flag-outline" size={18} color="#8B5CF6" />
+                      <Text style={[styles.deadlineButtonText, { color: colors.textMuted, fontSize: 13 }]}>
+                        {isArabic ? '+ ربط بهدف' : '+ Link Goal'}
                       </Text>
-                      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                      <Ionicons name="chevron-forward" size={15} color={colors.textMuted} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -1308,6 +1341,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
             currentCategoryId={resolvedCategoryId}
             currentProjectId={resolvedProjectId}
             currentGoalId={resolvedGoalId}
+            initialTab={projectModalTab}
           />
 
           <SmartHashtagModal

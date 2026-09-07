@@ -692,10 +692,13 @@ export const applyOptimisticMutation = (mutationPath: string, args: any): any =>
           if (args.timerStartTime !== undefined) updated.timerStartTime = args.timerStartTime;
           if (args.dueDate !== undefined) updated.dueDate = args.dueDate;
           if (args.date !== undefined) updated.date = args.date;
-        } else if (mutationPath === 'todos:linkTask' || mutationPath === 'todos:linkProject') {
-          updated.categoryId = args.categoryId;
-          updated.subCategoryId = args.subCategoryId;
-          updated.projectId = args.projectId;
+        } else if (mutationPath === 'todos:linkTask') {
+          if ('categoryId' in args) updated.categoryId = args.categoryId;
+          if ('subCategoryId' in args) updated.subCategoryId = args.subCategoryId;
+          if ('projectId' in args) updated.projectId = args.projectId;
+          if ('goalId' in args) updated.goalId = args.goalId;
+        } else if (mutationPath === 'todos:linkProject') {
+          if ('projectId' in args) updated.projectId = args.projectId;
         } else {
           // General updateTodo
           Object.assign(updated, args);

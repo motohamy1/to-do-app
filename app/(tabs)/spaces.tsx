@@ -2048,16 +2048,41 @@ const ProjectDetailView = ({ styles, colors, projectId, onDeleteProject, userId,
         onClose={() => { setProjectModalVisible(false); setSelectedTodoId(null); }}
         onSelect={(selection) => { 
           if (!selectedTodoId) return;
+          const currentTodo = todos.find(t => t._id === selectedTodoId);
           if (selection.type === 'none') {
             linkTodoProjectMutation({ id: selectedTodoId, categoryId: undefined, subCategoryId: undefined, projectId: undefined, goalId: undefined });
           } else if (selection.type === 'goal') {
-            linkTodoProjectMutation({ id: selectedTodoId, goalId: selection.goalId });
+            linkTodoProjectMutation({
+              id: selectedTodoId,
+              goalId: selection.goalId,
+              categoryId: currentTodo?.categoryId,
+              subCategoryId: currentTodo?.subCategoryId,
+              projectId: currentTodo?.projectId,
+            });
           } else if (selection.type === 'category') {
-            linkTodoProjectMutation({ id: selectedTodoId, categoryId: selection.categoryId, subCategoryId: undefined, projectId: undefined });
+            linkTodoProjectMutation({
+              id: selectedTodoId,
+              categoryId: selection.categoryId,
+              subCategoryId: undefined,
+              projectId: undefined,
+              goalId: currentTodo?.goalId,
+            });
           } else if (selection.type === 'subCategory') {
-            linkTodoProjectMutation({ id: selectedTodoId, categoryId: selection.categoryId, subCategoryId: selection.subCategoryId, projectId: undefined });
+            linkTodoProjectMutation({
+              id: selectedTodoId,
+              categoryId: selection.categoryId,
+              subCategoryId: selection.subCategoryId,
+              projectId: undefined,
+              goalId: currentTodo?.goalId,
+            });
           } else if (selection.type === 'project') {
-            linkTodoProjectMutation({ id: selectedTodoId, categoryId: undefined, subCategoryId: undefined, projectId: selection.projectId });
+            linkTodoProjectMutation({
+              id: selectedTodoId,
+              categoryId: undefined,
+              subCategoryId: undefined,
+              projectId: selection.projectId,
+              goalId: currentTodo?.goalId,
+            });
           }
         }}
       />

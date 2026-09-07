@@ -125,7 +125,7 @@ export const SubtaskRow = ({
 
   const linkedItemName = subProject?.name || subCategory?.name;
   const linkedItemColor = subProject?.color || subCategory?.color || colors.primary;
-  const goalItemTitle = subGoal?.text;
+  const goalItemTitle = subGoal?.text || subGoal?.title;
   const goalItemColor = subGoal?.color || colors.warning;
   const hasLinks = !!linkedItemName || !!goalItemTitle;
 
@@ -142,6 +142,9 @@ export const SubtaskRow = ({
       linkTask({
         id: sub._id,
         goalId: selection.goalId,
+        categoryId: sub.categoryId,
+        subCategoryId: sub.subCategoryId,
+        projectId: sub.projectId,
       });
     } else if (selection.type === 'category') {
       linkTask({
@@ -149,6 +152,7 @@ export const SubtaskRow = ({
         categoryId: selection.categoryId,
         subCategoryId: undefined,
         projectId: undefined,
+        goalId: sub.goalId,
       });
     } else if (selection.type === 'subCategory') {
       linkTask({
@@ -156,6 +160,7 @@ export const SubtaskRow = ({
         categoryId: selection.categoryId,
         subCategoryId: selection.subCategoryId,
         projectId: undefined,
+        goalId: sub.goalId,
       });
     } else if (selection.type === 'project') {
       linkTask({
@@ -163,6 +168,7 @@ export const SubtaskRow = ({
         categoryId: undefined,
         subCategoryId: undefined,
         projectId: selection.projectId,
+        goalId: sub.goalId,
       });
     }
   };

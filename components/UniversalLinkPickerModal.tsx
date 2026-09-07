@@ -36,6 +36,7 @@ interface UniversalLinkPickerModalProps {
   currentCategoryId?: string;
   currentProjectId?: string;
   currentGoalId?: string;
+  initialTab?: 'spaces' | 'goals';
   title?: string;
 }
 
@@ -56,21 +57,29 @@ export const UniversalLinkPickerModal: React.FC<UniversalLinkPickerModalProps> =
   currentCategoryId,
   currentProjectId,
   currentGoalId,
+  initialTab = 'spaces',
   title,
 }) => {
   const { colors, isDarkMode } = useTheme();
   const { userId, language } = useAuth();
   const { isArabic } = useTranslation(language);
 
-  const [activeTab, setActiveTab] = useState<'spaces' | 'goals'>('spaces');
+  const [activeTab, setActiveTab] = useState<'spaces' | 'goals'>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
   const [goalFilter, setGoalFilter] = useState<'all' | 'yearly' | 'monthly' | 'daily'>('all');
+
+  React.useEffect(() => {
+    if (visible) {
+      setActiveTab(initialTab);
+    }
+  }, [visible, initialTab]);
 
   // Navigation inside spaces tab
   const [currentLevel, setCurrentLevel] = useState<'categories' | 'categoryDetail' | 'subCategoryProjects'>('categories');
   const [selectedCatId, setSelectedCatId] = useState<Id<'projectCategories'> | null>(null);
   const [selectedCatName, setSelectedCatName] = useState('');
   const [selectedSubId, setSelectedSubId] = useState<Id<'projectSubCategories'> | null>(null);
+  const [selectedSubName, setSelectedSubName] = useState('');
 
   // Queries
   const categories = useOfflineQuery<any[]>('projects.getCategories', api.projects.getCategories, userId ? { userId } : 'skip') || [];
@@ -84,7 +93,9 @@ export const UniversalLinkPickerModal: React.FC<UniversalLinkPickerModalProps> =
   const handleClose = () => {
     setCurrentLevel('categories');
     setSelectedCatId(null);
+    setSelectedCatName('');
     setSelectedSubId(null);
+    setSelectedSubName('');
     setSearchQuery('');
     onClose();
   };
@@ -93,9 +104,11 @@ export const UniversalLinkPickerModal: React.FC<UniversalLinkPickerModalProps> =
     if (currentLevel === 'subCategoryProjects') {
       setCurrentLevel('categoryDetail');
       setSelectedSubId(null);
+      setSelectedSubName('');
     } else if (currentLevel === 'categoryDetail') {
       setCurrentLevel('categories');
       setSelectedCatId(null);
+      setSelectedCatName('');
     }
   };
 
@@ -169,18 +182,33 @@ export const UniversalLinkPickerModal: React.FC<UniversalLinkPickerModalProps> =
             </TouchableOpacity>
           </View>
 
-          {/* Unlink Button if something is already linked */}
-          {(currentCategoryId || currentProjectId || currentGoalId) && (
+          {/* Context-sensitive Unlink Actions */}
+          {activeTab === 'spaces' && (currentCategoryId || currentProjectId) && (
             <TouchableOpacity
               style={[styles.unlinkBanner, { backgroundColor: colors.danger + '15', borderColor: colors.danger + '30' }]}
               onPress={() => {
-                onSelect({ type: 'none' });
+                onSelect({ type: 'category', categoryId: undefined, subCategoryId: undefined, projectId: undefined });
                 handleClose();
               }}
             >
-              <Ionicons name="link-outline" size={16} color={colors.danger} />
+              <Ionicons name="trash-outline" size={16} color={colors.danger} />
               <Text style={[styles.unlinkText, { color: colors.danger }]}>
-                {isArabic ? 'إزالة الارتباط الحالي' : 'Unlink Current Item'}
+                {isArabic ? 'إزالة ارتباط المساحة / المشروع' : 'Unlink Space / Project'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {activeTab === 'goals' && currentGoalId && (
+            <TouchableOpacity
+              style={[styles.unlinkBanner, { backgroundColor: colors.danger + '15', borderColor: colors.danger + '30' }]}
+              onPress={() => {
+                onSelect({ type: 'goal', goalId: undefined });
+                handleClose();
+              }}
+            >
+              <Ionicons name="trash-outline" size={16} color={colors.danger} />
+              <Text style={[styles.unlinkText, { color: colors.danger }]}>
+                {isArabic ? 'إزالة ارتباط الهدف' : 'Unlink Goal'}
               </Text>
             </TouchableOpacity>
           )}
@@ -362,7 +390,7 @@ export const UniversalLinkPickerModal: React.FC<UniversalLinkPickerModalProps> =
                     </View>
                   }
                 />
-              ) : (
+              ) : currentLevel === 'categoryDetail' ? (
                 // Category Detail (Subcategories & Direct Projects)
                 <ScrollView showsVerticalScrollIndicator={false}>
                   {/* Category Link Row */}
@@ -398,6 +426,7 @@ export const UniversalLinkPickerModal: React.FC<UniversalLinkPickerModalProps> =
                             style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
                             onPress={() => {
                               setSelectedSubId(sub._id);
+                              setSelectedSubName(sub.name);
                               setCurrentLevel('subCategoryProjects');
                             }}
                           >
@@ -465,6 +494,69 @@ export const UniversalLinkPickerModal: React.FC<UniversalLinkPickerModalProps> =
                       ))}
                     </View>
                   )}
+                </ScrollView>
+              ) : (
+                // SubCategory Projects View
+                <ScrollView showsVerticalScrollIndicator={false}>
+                  {/* Link Subcategory Entirely Header */}
+                  <TouchableOpacity
+                    style={[styles.selectedHeaderRow, { backgroundColor: colors.primary + '15' }]}
+                    onPress={() => {
+                      onSelect({
+                        type: 'subCategory',
+                        categoryId: selectedCatId!,
+                        subCategoryId: selectedSubId!,
+                        entityName: selectedSubName,
+                      });
+                      handleClose();
+                    }}
+                  >
+                    <Ionicons name="link" size={18} color={colors.primary} />
+                    <Text style={[styles.selectedHeaderText, { color: colors.primary }]}>
+                      {isArabic ? `ربط بالقسم الفرعي: ${selectedSubName}` : `Link entire Sub-Category: ${selectedSubName}`}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Projects in SubCategory */}
+                  <View style={{ marginTop: 16 }}>
+                    <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+                      {isArabic ? 'مشاريع القسم الفرعي' : 'Sub-Category Projects'}
+                    </Text>
+                    {subProjects.length === 0 ? (
+                      <View style={styles.emptyState}>
+                        <Ionicons name="rocket-outline" size={32} color={colors.textMuted} />
+                        <Text style={[styles.emptyStateText, { color: colors.textMuted }]}>
+                          {isArabic ? 'لا توجد مشاريع في هذا القسم' : 'No projects in this sub-category'}
+                        </Text>
+                      </View>
+                    ) : (
+                      subProjects.map((proj: any) => (
+                        <TouchableOpacity
+                          key={proj._id}
+                          style={[styles.listItem, { borderBottomColor: colors.border + '20' }]}
+                          onPress={() => {
+                            onSelect({
+                              type: 'project',
+                              categoryId: selectedCatId!,
+                              subCategoryId: selectedSubId!,
+                              projectId: proj._id,
+                              entityName: proj.name,
+                              color: proj.color,
+                            });
+                            handleClose();
+                          }}
+                        >
+                          <View style={[styles.itemIcon, { backgroundColor: proj.color + '20' }]}>
+                            <Ionicons name={(proj.icon || 'rocket-outline') as any} size={18} color={proj.color} />
+                          </View>
+                          <Text style={[styles.itemTitle, { color: colors.text, marginHorizontal: 12, flex: 1 }]}>
+                            {proj.name}
+                          </Text>
+                          <Ionicons name="link-outline" size={20} color={proj.color} />
+                        </TouchableOpacity>
+                      ))
+                    )}
+                  </View>
                 </ScrollView>
               )
             ) : (
