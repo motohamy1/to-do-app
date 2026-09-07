@@ -443,7 +443,9 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
   const hasDeadlineTime = dueDate ? new Date(dueDate).getSeconds() !== 59 : false;
 
   const linkedItem = project || linkedSubCategory || linkedCategory;
-  const projectColor = linkedItem?.color || colors.primary;
+  const projectColor = linkedItem?.color || '#e5f19d';
+  const isLightAccent = projectColor === '#e5f19d' || projectColor === '#F9A8D4';
+  const projectTextColor = isLightAccent ? '#101116' : colors.primaryText;
   const linkedItemName = project?.name || linkedSubCategory?.name || linkedCategory?.name;
 
   if (!visible) return null;
@@ -612,7 +614,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       style={[styles.customTimerSaveButton, { backgroundColor: projectColor }]}
                       onPress={handleSaveCustomTimer}
                     >
-                      <Ionicons name="checkmark" size={20} color={colors.primaryText} />
+                      <Ionicons name="checkmark" size={20} color={projectTextColor} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -751,8 +753,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                         }
                       }}
                     >
-                      <Ionicons name={!currentTodoId ? "save-outline" : todo?.status === 'in_progress' ? "pause" : "play"} size={22} color={colors.primaryText} />
-                      <Text style={[styles.mainControlButtonText, { color: colors.primaryText }]}>
+                      <Ionicons name={!currentTodoId ? "save-outline" : todo?.status === 'in_progress' ? "pause" : "play"} size={22} color={projectTextColor} />
+                      <Text style={[styles.mainControlButtonText, { color: projectTextColor }]}>
                         {!currentTodoId ? (isArabic ? 'احفظ للبدء' : 'Save to Start') : todo?.status === 'in_progress' ? (isArabic ? 'إيقاف' : 'Pause Task') : todo?.status === 'paused' ? (isArabic ? 'استئناف المهمة' : 'Resume Task') : (isArabic ? 'ابدأ المهمة' : 'Start Task')}
                       </Text>
                     </TouchableOpacity>
@@ -875,12 +877,12 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                       key={p} 
                       style={[
                         styles.priorityPill, 
-                        { backgroundColor: priority === p ? (p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : colors.primary) + '20' : colors.surface },
-                        priority === p && { borderColor: p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : colors.primary }
+                        { backgroundColor: priority === p ? (p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : projectColor) + '20' : colors.surface },
+                        priority === p && { borderColor: p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : projectColor }
                       ]}
                       onPress={() => handleUpdatePriority(p)}
                     >
-                      <Text style={[styles.priorityText, { color: priority === p ? (isDarkMode ? colors.surfaceText : (p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : colors.primary)) : colors.textMuted }]}>
+                      <Text style={[styles.priorityText, { color: priority === p ? (isDarkMode ? colors.surfaceText : (p === 'High' ? colors.danger : p === 'Medium' ? colors.warning : projectColor)) : colors.textMuted }]}>
                         {p === 'Low' ? (isArabic ? 'منخفضة' : 'Low') : p === 'Medium' ? (isArabic ? 'متوسطة' : 'Med') : (isArabic ? 'عالية' : 'High')}
                       </Text>
                     </TouchableOpacity>
@@ -1135,6 +1137,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
                           colors={colors}
                           t={t}
                           isArabic={isArabic}
+                          accentColor={projectColor}
                           onSave={(ms: number, direction: string) => {
                             setNewSubDuration(ms);
                             setNewSubDirection(direction);
@@ -1158,7 +1161,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({ visible, onClose, tod
           {/* Bottom Action */}
           <View style={[styles.footer, { borderTopColor: colors.border + '40', backgroundColor: colors.bg }]}>
             <TouchableOpacity style={[styles.doneButton, { backgroundColor: projectColor }]} onPress={handleClose}>
-              <Text style={[styles.doneButtonText, { color: isDarkMode ? '#000' : '#FFF' }]}>{isArabic ? "تم" : "Done"}</Text>
+              <Text style={[styles.doneButtonText, { color: projectTextColor }]}>{isArabic ? "تم" : "Done"}</Text>
             </TouchableOpacity>
           </View>
 

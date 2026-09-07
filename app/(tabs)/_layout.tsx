@@ -21,7 +21,7 @@ import ScreenBackground from '@/components/ScreenBackground';
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 // Colors & Dimensions matching reference
-const ACTIVE_ACCENT = '#d4ff00';
+const ACTIVE_ACCENT = '#e5f19d';
 const ACTIVE_INK = '#101116';
 const DOCK_HEIGHT = 60;
 const DOCK_CORNER = 26;

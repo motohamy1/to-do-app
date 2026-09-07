@@ -35,6 +35,7 @@ export const ProductivityTrends = ({ weekly, monthly, style }: ProductivityTrend
       </View>
       
       <View style={styles.trendsGrid}>
+        {weekly && (
         <TrendCard
           period="This Week"
           score={weekly?.productivityScore || 0}
@@ -44,6 +45,8 @@ export const ProductivityTrends = ({ weekly, monthly, style }: ProductivityTrend
           peakHours={weekly?.peakHours || []}
           color={colors.info}
         />
+        )}
+        {monthly && (
         <TrendCard
           period="This Month"
           score={monthly?.productivityScore || 0}
@@ -53,6 +56,7 @@ export const ProductivityTrends = ({ weekly, monthly, style }: ProductivityTrend
           peakHours={monthly?.peakHours || []}
           color={colors.primary}
         />
+        )}
       </View>
       
       <View style={styles.comparison}>
@@ -92,13 +96,14 @@ export const ProductivityTrends = ({ weekly, monthly, style }: ProductivityTrend
 
 const TrendCard = ({ period, score, trend, velocity, streak, peakHours, color }: any) => {
   const { colors } = useTheme();
+  const safeTrend = trend ?? { text: 'N/A', color, icon: 'remove' };
   return (
   <View style={[styles.trendCard, { borderColor: color }]}>
     <View style={styles.trendHeader}>
       <Text style={styles.periodLabel}>{period}</Text>
-      <View style={[styles.trendBadge, { backgroundColor: `${trend.color}20` }]}>
-        <Ionicons name={trend.icon as any} size={12} color={trend.color} />
-        <Text style={[styles.trendText, { color: trend.color }]}>{trend.text}</Text>
+      <View style={[styles.trendBadge, { backgroundColor: `${safeTrend.color}20` }]}>
+        <Ionicons name={safeTrend.icon as any} size={12} color={safeTrend.color} />
+        <Text style={[styles.trendText, { color: safeTrend.color }]}>{safeTrend.text}</Text>
       </View>
     </View>
     <Text style={[styles.scoreValue, { color }]}>{score}%</Text>

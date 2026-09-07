@@ -51,13 +51,13 @@ export default function FloatingActionButton({ onPress, style, label }: Floating
   }));
 
   return (
-    <Animated.View style={[styles.wrapper, { ...colors.shadows.glow, shadowColor: '#D4FF00' }, animatedStyle, style]}>
+    <Animated.View style={[styles.wrapper, { ...colors.shadows.glow, shadowColor: '#e5f19d' }, animatedStyle, style]}>
       <TouchableWithoutFeedback
         onPress={onPress}
         onPressIn={() => { press.value = withSpring(0.96, PRESS_SPRING); }}
         onPressOut={() => { press.value = withSpring(1, PRESS_SPRING); }}
       >
-        <View style={[styles.fab, { backgroundColor: '#D4FF00' }]}>
+        <View style={[styles.fab, { backgroundColor: '#e5f19d' }]}>
           <Text style={[styles.text, { color: '#16270E', fontWeight: '800' }]}>
             {label || (isArabic ? 'إضافة مهمة' : 'Add Task')}
           </Text>

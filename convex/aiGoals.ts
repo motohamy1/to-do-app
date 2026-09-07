@@ -859,3 +859,445 @@ export const saveMonthlyBlueprint = mutation({
     };
   },
 });
+
+/**
+ * UI Design Templates for Goal Cards
+ */
+export const GOAL_UI_TEMPLATES = [
+  {
+    id: "roadmap",
+    name: "Milestone Roadmap",
+    nameAr: "خارطة طريق مرحلية",
+    description: "Step-by-step progress roadmap with connected milestones track.",
+    descriptionAr: "مسار تصاعدي متسلسل ممتاز للكورسات والمشاريع التدريجية.",
+    icon: "git-commit-outline",
+    badge: "Sequential",
+    badgeAr: "مرحلي",
+    color: "#3B82F6",
+  },
+  {
+    id: "checklist",
+    name: "Clean Checklist",
+    nameAr: "قائمة إنجاز أنيقة",
+    description: "Modern, focused checklist layout with quick status toggles.",
+    descriptionAr: "تصميم أنيق وسريع للمهام المباشرة والأهداف التنفيذية.",
+    icon: "checkmark-circle-outline",
+    badge: "Actionable",
+    badgeAr: "تنفيذي",
+    color: "#10B981",
+  },
+  {
+    id: "metric",
+    name: "Target Metric & Counter",
+    nameAr: "مقياس رقمي وإحصائي",
+    description: "Progress gauge with target stats, percentage counters, and numerical goals.",
+    descriptionAr: "شريط نسبة مئوية ومؤشرات رقمية للأهداف المقاسة بالأرقام أو الكميات.",
+    icon: "analytics-outline",
+    badge: "Quantifiable",
+    badgeAr: "رقمي",
+    color: "#F59E0B",
+  },
+  {
+    id: "sprint",
+    name: "Sprint Capsule",
+    nameAr: "كبسولة السبرنت السريعة",
+    description: "High-intensity agile card with sprint phase badges and high focus.",
+    descriptionAr: "بطاقة رشيقة ومحفزة للأهداف المحددة بوقت وتحديات الأسبوع واليوم.",
+    icon: "flash-outline",
+    badge: "High Energy",
+    badgeAr: "رشيق",
+    color: "#EF4444",
+  },
+  {
+    id: "pillar",
+    name: "Deep Focus Pillar",
+    nameAr: "ركيزة التركيز الاستراتيجي",
+    description: "Strategic pillar card with colored focus spine and foundational sub-habits.",
+    descriptionAr: "بطاقة استراتيجية راقية للأهداف المحورية والعادات التأسيسية الكبرى.",
+    icon: "shield-checkmark-outline",
+    badge: "Strategic",
+    badgeAr: "استراتيجي",
+    color: "#8B5CF6",
+  },
+];
+
+/**
+ * Intelligent Conversational Goal Architect Action.
+ * Transforms user natural language (voice/text) into a tailored goal, sub-goals, header section suggestion, and UI template recommendation.
+ */
+export const architectGoalIntent = action({
+  args: {
+    userMessage: v.string(),
+    timeframe: v.string(), // "day" | "month" | "year"
+    year: v.number(),
+    month: v.optional(v.number()),
+    day: v.optional(v.number()),
+    existingSections: v.optional(v.array(v.string())),
+    previousGoalsInSession: v.optional(
+      v.array(
+        v.object({
+          text: v.string(),
+          category: v.string(),
+          templateId: v.optional(v.string()),
+        })
+      )
+    ),
+    language: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const isArabic = args.language === "ar";
+    const timeframe = args.timeframe || (args.day !== undefined ? "day" : args.month !== undefined ? "month" : "year");
+
+    const timeframeContext =
+      timeframe === "day"
+        ? `Day ${args.day}, Month ${(args.month ?? 0) + 1}, Year ${args.year} (Daily execution focus - immediate today goals and steps)`
+        : timeframe === "month"
+        ? `Month ${(args.month ?? 0) + 1}, Year ${args.year} (Monthly objective - 2-4 week milestone breakdown)`
+        : `Full Year ${args.year} (Annual vision - quarterly or macro milestones)`;
+
+    const existingSecsStr =
+      args.existingSections && args.existingSections.length > 0
+        ? `Existing Header Categories in this view: [${args.existingSections.map((s) => `"${s}"`).join(", ")}]`
+        : "No existing header categories yet.";
+
+    const prevGoalsStr =
+      args.previousGoalsInSession && args.previousGoalsInSession.length > 0
+        ? `Previous goals created in this architect session:\n${args.previousGoalsInSession
+            .map((g) => `- "${g.text}" (Section: "${g.category}")`)
+            .join("\n")}`
+        : "No previous goals created yet in this session.";
+
+    const systemPrompt = `You are an elite AI Goal Architect and executive productivity coach.
+Your mission is to understand the user's natural language goal intent (in Arabic or English) and convert it into a precise, beautifully structured goal blueprint.
+
+======================================================================
+CRITICAL PRINCIPLES:
+1. USER INTENT IS THE SOLE SOURCE OF TRUTH:
+   - Base the goal STRICTLY and EXCLUSIVELY on what the user stated.
+   - NEVER invent, hallucinate, or add unrelated domains (e.g., if user mentions a programming course, DO NOT invent health, diet, gym, or financial goals).
+2. STRICT SUB-GOALS POLICY (NO AUTOMATIC SUB-GOALS):
+   - DO NOT generate sub-goals or milestones automatically.
+   - ALWAYS return "suggestedMilestones": [] (empty array).
+   - The user will choose on demand whether to create sub-goals and talk to the AI about them.
+   - EXCEPTION: Only include milestones if the user explicitly dictated numbered steps or specific milestone breakdowns in their initial message.
+3. SECTION / HEADER TITLE INTELLIGENCE:
+   - Analyze ${existingSecsStr}.
+   - Determine whether this new goal logically fits into one of the existing sections or deserves a fresh, relevant new section header.
+   - Provide a recommended "suggestedHeader", and "headerOptions":
+     * Include matching or relevant existing sections as { "title": "...", "isExisting": true }.
+     * Include a new suggested section as { "title": "...", "isExisting": false }.
+4. UI TEMPLATE RECOMMENDATION:
+   - Choose the best matching UI design template for this specific goal from:
+     * "roadmap" -> for courses, sequential learning, phased projects, book chapters.
+     * "checklist" -> for standard deliverables, actionable tasks, check-off items.
+     * "metric" -> for quantifiable metrics (e.g. read 100 pages, save $500, run 30km, finish 15 lessons).
+     * "sprint" -> for urgent, high-energy sprints, time-boxed weekly challenges.
+     * "pillar" -> for daily foundational habits, identity goals, core focus.
+5. LANGUAGE FIDELITY:
+   - Respond strictly in the user's requested language (${isArabic ? "العربية الفصحى الواضحة والراقية" : "English"}).
+   - Provide a motivating, brief 1-2 sentence "aiResponseText" explaining what you crafted.
+======================================================================
+
+Strict JSON Output Schema:
+{
+  "goalTitle": "Concise, punchy outcome title matching user intent",
+  "description": "1 sentence definition of done or target clarity",
+  "suggestedHeader": "Recommended section/category name",
+  "suggestedHeaderIsExisting": false,
+  "headerOptions": [
+    { "title": "Section Name", "isExisting": true },
+    { "title": "New Section Name", "isExisting": false }
+  ],
+  "suggestedMilestones": [],
+  "suggestedTemplateId": "roadmap | checklist | metric | sprint | pillar",
+  "color": "#2563EB",
+  "icon": "school-outline",
+  "aiResponseText": "${isArabic ? "رسالة ودية موجزة تشرح ما صممه الذكاء الاصطناعي ولماذا اختار هذا القالب" : "Brief friendly explanation of how the goal was architected"}"
+}`;
+
+    const userPrompt = `User Prompt / Voice Transcription:
+"""
+${args.userMessage.trim()}
+"""
+
+${existingSecsStr}
+${prevGoalsStr}
+
+Architect this goal into valid JSON now.`;
+
+    const rawJson = await callLLMForGoals(systemPrompt, userPrompt);
+    const parsed = JSON.parse(rawJson);
+
+    return {
+      goalTitle: parsed.goalTitle || (isArabic ? "هدف جديد" : "New Goal"),
+      description: parsed.description || "",
+      suggestedHeader: parsed.suggestedHeader || (isArabic ? "أهداف عامة" : "General Goals"),
+      suggestedHeaderIsExisting: Boolean(parsed.suggestedHeaderIsExisting),
+      headerOptions:
+        Array.isArray(parsed.headerOptions) && parsed.headerOptions.length > 0
+          ? parsed.headerOptions
+          : [
+              {
+                title: parsed.suggestedHeader || (isArabic ? "أهداف عامة" : "General Goals"),
+                isExisting: false,
+              },
+            ],
+      suggestedMilestones: Array.isArray(parsed.suggestedMilestones)
+        ? parsed.suggestedMilestones.map((m: any, idx: number) => ({
+            id: m.id || `m_${Date.now()}_${idx}`,
+            text: typeof m === "string" ? m : m.text || "",
+            isCompleted: false,
+          }))
+        : [],
+      suggestedTemplateId: parsed.suggestedTemplateId || "roadmap",
+      color: parsed.color || "#EA580C",
+      icon: parsed.icon || "flag-outline",
+      aiResponseText: parsed.aiResponseText || "",
+    };
+  },
+});
+
+/**
+ * Conversational Refinement of the active goal draft.
+ */
+export const refineGoalIntent = action({
+  args: {
+    currentDraft: v.object({
+      goalTitle: v.string(),
+      description: v.optional(v.string()),
+      category: v.string(),
+      templateId: v.string(),
+      color: v.optional(v.string()),
+      icon: v.optional(v.string()),
+      milestones: v.array(
+        v.object({
+          id: v.string(),
+          text: v.string(),
+          isCompleted: v.boolean(),
+        })
+      ),
+    }),
+    instruction: v.string(),
+    existingSections: v.optional(v.array(v.string())),
+    language: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const isArabic = args.language === "ar";
+    const systemPrompt = `You are an elite AI Goal Architect.
+The user wants to tweak or refine their current goal draft via natural language instruction.
+
+Current Draft JSON:
+${JSON.stringify(args.currentDraft, null, 2)}
+
+Existing Sections: ${JSON.stringify(args.existingSections || [])}
+Language: ${isArabic ? "Arabic (العربية)" : "English"}
+
+Apply the user's requested refinements directly (e.g. adjusting milestones, sub-goals, title, description, category, or UI template).
+Return the updated goal in identical JSON schema:
+{
+  "goalTitle": "...",
+  "description": "...",
+  "category": "...",
+  "templateId": "roadmap | checklist | metric | sprint | pillar",
+  "color": "...",
+  "icon": "...",
+  "milestones": [
+    { "id": "...", "text": "...", "isCompleted": false }
+  ],
+  "aiResponseText": "${isArabic ? "رسالة توضيحية قصيرة بالتعديل الذي تم" : "Brief sentence explaining the refinement"}"
+}`;
+
+    const userPrompt = `Refinement Instruction:
+"""
+${args.instruction}
+"""
+
+Return the refined JSON now.`;
+
+    const rawJson = await callLLMForGoals(systemPrompt, userPrompt);
+    const parsed = JSON.parse(rawJson);
+
+    return {
+      goalTitle: parsed.goalTitle || args.currentDraft.goalTitle,
+      description:
+        parsed.description !== undefined ? parsed.description : args.currentDraft.description,
+      category: parsed.category || args.currentDraft.category,
+      templateId: parsed.templateId || args.currentDraft.templateId,
+      color: parsed.color || args.currentDraft.color || "#EA580C",
+      icon: parsed.icon || args.currentDraft.icon || "flag-outline",
+      milestones: Array.isArray(parsed.milestones)
+        ? parsed.milestones.map((m: any, idx: number) => ({
+            id: m.id || `m_${Date.now()}_${idx}`,
+            text: typeof m === "string" ? m : m.text || "",
+            isCompleted: Boolean(m.isCompleted),
+          }))
+        : args.currentDraft.milestones,
+      aiResponseText:
+        parsed.aiResponseText ||
+        (isArabic ? "تم تحديث الهدف وفقاً لطلبك." : "Goal updated according to your instruction."),
+    };
+  },
+});
+
+/**
+ * On-Demand Sub-Goals Generation.
+ * Only called when the user explicitly chooses to create sub-goals and instructs the AI about them.
+ */
+export const generateSubGoalsAction = action({
+  args: {
+    goalTitle: v.string(),
+    description: v.optional(v.string()),
+    category: v.string(),
+    timeframe: v.string(), // "day" | "month" | "year"
+    userInstructions: v.string(), // user's voice or text guidance
+    language: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const isArabic = args.language === "ar";
+    const systemPrompt = `You are an elite productivity coach and goal architect.
+The user wants to break down a specific goal into concrete, high-impact sub-goals / milestones.
+The user has provided their SPECIFIC instructions for this breakdown.
+
+Goal Details:
+- Goal: "${args.goalTitle}"
+- Description: "${args.description || ""}"
+- Category: "${args.category}"
+- Timeframe: ${args.timeframe}
+- Language: ${isArabic ? "Arabic (العربية الفصحى)" : "English"}
+
+CRITICAL RULES:
+1. Base all sub-goals STRICTLY on the user's instructions regarding how they want this goal broken down.
+2. DO NOT generate generic boilerplate, filler tasks, or unrelated advice.
+3. Make each sub-goal a clear, concrete, outcome-oriented step (between 2 to 5 items).
+4. All text MUST be in ${isArabic ? "Arabic" : "English"}.
+
+Strict JSON Output Schema:
+{
+  "milestones": [
+    { "id": "m1", "text": "Specific, actionable milestone 1" },
+    { "id": "m2", "text": "Specific, actionable milestone 2" }
+  ],
+  "aiExplanation": "${isArabic ? "رسالة موجزة توضح ما تم صياغته وفقاً لتعليمات المستخدم" : "Short confirmation of how milestones were created"}"
+}`;
+
+    const userPrompt = `User's Specific Instructions for Sub-Goals:
+"""
+${args.userInstructions.trim()}
+"""
+
+Generate the tailored sub-goals JSON now.`;
+
+    const rawJson = await callLLMForGoals(systemPrompt, userPrompt);
+    const parsed = JSON.parse(rawJson);
+
+    return {
+      milestones: Array.isArray(parsed.milestones)
+        ? parsed.milestones.map((m: any, idx: number) => ({
+            id: m.id || `ms_${Date.now()}_${idx}`,
+            text: typeof m === "string" ? m : m.text || "",
+            isCompleted: false,
+          }))
+        : [],
+      aiExplanation: parsed.aiExplanation || "",
+    };
+  },
+});
+
+/**
+ * Save Architect Goals directly to database in batch.
+ */
+export const saveArchitectGoals = mutation({
+  args: {
+    userId: v.union(v.id("users"), v.string()),
+    year: v.number(),
+    month: v.optional(v.number()),
+    day: v.optional(v.number()),
+    goals: v.array(
+      v.object({
+        text: v.string(),
+        description: v.optional(v.string()),
+        category: v.string(),
+        color: v.optional(v.string()),
+        icon: v.optional(v.string()),
+        templateId: v.optional(v.string()),
+        milestones: v.optional(
+          v.array(
+            v.object({
+              id: v.string(),
+              text: v.string(),
+              isCompleted: v.boolean(),
+            })
+          )
+        ),
+      })
+    ),
+    themeTitle: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const createdIds: string[] = [];
+
+    for (let i = 0; i < args.goals.length; i++) {
+      const g = args.goals[i];
+      const id = await ctx.db.insert("yearlyGoals", {
+        userId: args.userId,
+        year: args.year,
+        month: args.month,
+        day: args.day,
+        text: g.text,
+        description: g.description,
+        category: g.category,
+        color: g.color || "#EA580C",
+        icon: g.icon || "flag-outline",
+        templateId: g.templateId || "roadmap",
+        milestones: g.milestones,
+        order: i,
+        isCompleted: false,
+        createdAt: now + i,
+      });
+      createdIds.push(id);
+    }
+
+    if (args.themeTitle && args.day === undefined) {
+      let existingBlueprint = null;
+      if (args.month !== undefined) {
+        existingBlueprint = await ctx.db
+          .query("monthlyBlueprints")
+          .withIndex("by_user_year_month", (q) =>
+            q.eq("userId", args.userId).eq("year", args.year).eq("month", args.month)
+          )
+          .first();
+      } else {
+        const allForYear = await ctx.db
+          .query("monthlyBlueprints")
+          .withIndex("by_user_year", (q) =>
+            q.eq("userId", args.userId).eq("year", args.year)
+          )
+          .collect();
+        existingBlueprint = allForYear.find((b) => b.month === undefined) || null;
+      }
+
+      if (existingBlueprint) {
+        await ctx.db.patch(existingBlueprint._id, {
+          themeTitle: args.themeTitle,
+          updatedAt: now,
+        });
+      } else {
+        await ctx.db.insert("monthlyBlueprints", {
+          userId: args.userId,
+          year: args.year,
+          month: args.month,
+          templateId: args.goals[0]?.templateId || "roadmap",
+          themeTitle: args.themeTitle,
+          updatedAt: now,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      addedGoals: createdIds.length,
+    };
+  },
+});
+

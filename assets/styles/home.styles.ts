@@ -131,7 +131,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
     dateBarResetText: {
       fontSize: 12,
       fontWeight: '700',
-      color: colors.statusBarStyle === 'light-content' ? '#D4FF00' : '#456000',
+      color: colors.statusBarStyle === 'light-content' ? '#e5f19d' : '#5E6D0F',
     },
     dateBarStrip: {
       paddingHorizontal: 16,
@@ -149,9 +149,9 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       gap: 4,
     },
     dateBarDayActive: {
-      backgroundColor: '#D4FF00',
-      borderColor: '#D4FF00',
-      shadowColor: '#D4FF00',
+      backgroundColor: '#e5f19d',
+      borderColor: '#e5f19d',
+      shadowColor: '#e5f19d',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.35,
       shadowRadius: 10,
@@ -181,7 +181,7 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       width: 4,
       height: 4,
       borderRadius: 2,
-      backgroundColor: '#D4FF00',
+      backgroundColor: '#e5f19d',
     },
 
     // Kanban Board
@@ -456,11 +456,11 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
     },
     emptyAction: {
       marginTop: 16,
-      backgroundColor: '#D4FF00',
+      backgroundColor: '#e5f19d',
       paddingHorizontal: 18,
       paddingVertical: 10,
       borderRadius: colors.radii.md,
-      shadowColor: '#D4FF00',
+      shadowColor: '#e5f19d',
       shadowOffset: { width: 0, height: 3 },
       shadowOpacity: 0.35,
       shadowRadius: 8,
@@ -509,10 +509,10 @@ export const createHomeStyles = (colors: ColorScheme, isArabic: boolean = false)
       height: 44,
       paddingHorizontal: 10,
       borderRadius: colors.radii.lg,
-      backgroundColor: '#D4FF00',
+      backgroundColor: '#e5f19d',
       justifyContent: 'center',
       alignItems: 'center',
-      shadowColor: '#D4FF00',
+      shadowColor: '#e5f19d',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.35,
       shadowRadius: 10,
