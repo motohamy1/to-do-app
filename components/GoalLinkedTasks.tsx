@@ -33,7 +33,7 @@ export const GoalLinkedTasks: React.FC<GoalLinkedTasksProps> = ({
   const linkedTasks = useOfflineQuery<any[]>(
     'todos.getTasksByGoal',
     api.todos.getTasksByGoal,
-    userId ? { userId, goalId } : 'skip'
+    userId ? { goalId } : 'skip'
   ) || [];
 
   const updateStatus = useOfflineMutation(api.todos.updateStatus, 'todos:updateStatus');

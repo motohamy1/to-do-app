@@ -1,4 +1,4 @@
-import { applyOverlay, getCacheKey, getPendingTempTodosForCacheKey, memoryCache, reconcileOverlay, subscribeToCache } from '@/utils/offlineStorage';
+import { applyOverlay, getCacheKey, getPendingTempTodosForCacheKey, hasPendingTemp, memoryCache, reconcileOverlay, removeTempEntry, subscribeToCache } from '@/utils/offlineStorage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { useQuery } from 'convex/react';
@@ -39,7 +39,14 @@ function withPendingState(cacheKey: string, data: any): any {
   if (data === undefined || data === null) return data;
 
   if (Array.isArray(data)) {
-    const merged = data.map((item: any) => {
+    // Drop unregistered temp docs baked into a persisted snapshot (stale after
+    // a restart) — only temps still tracked by the pending registry may render.
+    const fresh = data.filter((item: any) => {
+      const id = item?._id;
+      return !(typeof id === 'string' && id.startsWith('temp_') && !hasPendingTemp(id));
+    });
+
+    const merged = fresh.map((item: any) => {
       if (item && typeof item === 'object') {
         reconcileOverlay(item);
         return applyOverlay(item);
@@ -48,7 +55,19 @@ function withPendingState(cacheKey: string, data: any): any {
     });
 
     const seen = new Set(merged.map((i: any) => i?._id));
-    const temps = getPendingTempTodosForCacheKey(cacheKey).filter((t: any) => !seen.has(t._id));
+    // A server doc carrying localId === tempId IS this temp doc, already
+    // synced. Retire the temp immediately instead of rendering a duplicate.
+    const serverLocalIds = new Set(
+      merged.map((i: any) => i?.localId).filter((l: any) => typeof l === 'string' && l.startsWith('temp_'))
+    );
+    const temps = getPendingTempTodosForCacheKey(cacheKey).filter((t: any) => {
+      if (seen.has(t._id)) return false;
+      if (serverLocalIds.has(t._id)) {
+        removeTempEntry(t._id).catch(() => {});
+        return false;
+      }
+      return true;
+    });
     if (temps.length > 0) return [...temps, ...merged];
     return merged;
   }

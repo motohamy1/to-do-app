@@ -6,6 +6,7 @@ import {
   removeQueuedMutation,
   bumpQueuedItemRetry,
   setServerClock,
+  subscribeToQueue,
 } from '@/utils/offlineStorage';
 import NetInfo from '@react-native-community/netinfo';
 import { useConvex } from 'convex/react';
@@ -118,24 +119,40 @@ const remainingTempIds = (args: any, found: Set<string> = new Set()): Set<string
 export function useSyncManager() {
   const convex = useConvex();
   const isSyncing = useRef(false);
+  const rerunRequested = useRef(false);
 
   useEffect(() => {
-    const unsub = NetInfo.addEventListener((state) => {
+    const run = () => {
+      NetInfo.fetch().then((state) => {
+        if (state.isConnected) processQueue();
+      });
+    };
+
+    const unsubNet = NetInfo.addEventListener((state) => {
       if (state.isConnected && !isSyncing.current) {
         processQueue();
       }
     });
 
-    // Check on initial mount
-    NetInfo.fetch().then((state) => {
-      if (state.isConnected && !isSyncing.current) processQueue();
-    });
+    // A mutation can end up queued while the device still reports "connected"
+    // (client-side timeout fallback, unresolved temp ids). NetInfo never fires
+    // for those, so enqueue itself must also trigger a sync pass.
+    const unsubQueue = subscribeToQueue(run);
 
-    return unsub;
+    // Check on initial mount
+    run();
+
+    return () => {
+      unsubNet();
+      unsubQueue();
+    };
   }, [convex]);
 
   const processQueue = async () => {
-    if (isSyncing.current) return;
+    if (isSyncing.current) {
+      rerunRequested.current = true;
+      return;
+    }
     isSyncing.current = true;
 
     try {
@@ -218,6 +235,12 @@ export function useSyncManager() {
       console.error('Error during offline sync processing', err);
     } finally {
       isSyncing.current = false;
+      if (rerunRequested.current) {
+        rerunRequested.current = false;
+        // Items were enqueued (or retried) mid-batch; run another pass once
+        // the current one has fully committed.
+        setTimeout(() => processQueue(), 250);
+      }
     }
   };
 }

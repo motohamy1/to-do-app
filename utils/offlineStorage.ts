@@ -130,6 +130,19 @@ export const getPendingTempTodosForCacheKey = (cacheKey: string): any[] => {
   return alive;
 };
 
+// True while a temp doc is still registered as un-synced. Used to tell a live
+// optimistic temp apart from an old temp baked into a persisted cache snapshot.
+export const hasPendingTemp = (id: any): boolean => {
+  if (typeof id !== 'string' || !id.startsWith('temp_')) return false;
+  const entry = pendingTempTodos.get(id);
+  if (!entry) return false;
+  if (Date.now() - entry.ts > TEMP_TTL_MS) {
+    pendingTempTodos.delete(id);
+    return false;
+  }
+  return true;
+};
+
 export const patchTempTodo = (tempId: string, patch: Record<string, any>) => {
   const entry = pendingTempTodos.get(tempId);
   if (entry) {
@@ -228,6 +241,28 @@ export const subscribeToCache = (callback: () => void) => {
   return () => {
     listeners.delete(callback);
   };
+};
+
+// Queue listeners: a mutation can end up queued while the device still reports
+// "connected" (e.g. after the client-side network timeout race). NetInfo will
+// not fire for those, so the sync manager needs an in-process signal too.
+const queueListeners = new Set<() => void>();
+
+export const subscribeToQueue = (callback: () => void) => {
+  queueListeners.add(callback);
+  return () => {
+    queueListeners.delete(callback);
+  };
+};
+
+export const notifyQueueChanged = () => {
+  queueListeners.forEach((cb) => {
+    try {
+      cb();
+    } catch (e) {
+      console.warn('Error in queue subscriber:', e);
+    }
+  });
 };
 
 export const notifyCacheChanged = () => {
@@ -425,6 +460,7 @@ export const pushMutationToQueue = (
         requiresIds: requires.size > 0 ? Array.from(requires) : undefined,
       });
       await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(nextQueue));
+      notifyQueueChanged();
       return itemId;
     } catch (err) {
       console.warn('Failed to push to mutation queue', err);

@@ -689,7 +689,7 @@ const CategoryDetailView = ({
   const linkedGoal = useOfflineQuery<any>('yearlyGoals.getGoal', api.yearlyGoals.getGoal, category?.goalId ? { id: category.goalId } : 'skip');
   const directProjects = useOfflineQuery<any[]>('projects.getProjectsByCategory', api.projects.getProjectsByCategory, { categoryId });
   const allTodos = useOfflineQuery<any[]>('todos', api.todos.get, userId ? { userId } : 'skip');
-  const categoryTasks = useOfflineQuery<any[]>('todos.getTasksByCategory', api.todos.getTasksByCategory, userId ? { userId, categoryId } : 'skip') || [];
+  const categoryTasks = useOfflineQuery<any[]>('todos.getTasksByCategory', api.todos.getTasksByCategory, userId ? { categoryId } : 'skip') || [];
   
   // Real-time reactive items for this category from Convex
   const toggleItems = useOfflineQuery<any[]>('categoryItems_toggle', api.projects.getCategoryItems, { categoryId, listType: 'toggle' }) || [];
